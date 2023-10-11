@@ -113,7 +113,7 @@ impl Image {
 
 #[cfg(test)]
 mod tests {
-    use super::{convert_rgb_values_to_ycbcr, Image};
+    use super::{convert_rgb_values_to_ycbcr, Image, read_ppm_from_file};
 
     fn test_convert_rgb_values_to_rcbcr_internal(start: (u16, u16, u16), target: (u16, u16, u16)) {
         let result = convert_rgb_values_to_ycbcr(start.0, start.1, start.2);
