@@ -13,7 +13,9 @@ Bilder werden in einem struct abgebildet, das ein dreidimensionales Feld enthäl
 
 Außerdem enthält dieses struct den Farbraum, der als Enum definiert sein müsste.
 
-Begründung: Das ermöglicht einfach-ishe Manipulation eines Farbkanals und guten Zugriff auf "Schrittweiten"
+Begründung: Das ermöglicht einfach-ishe Manipulation eines Farbkanals und guten Zugriff auf "Schrittweiten".
+
+Einzelne R/G/B-Werte werden als vorzeichenlose 16-Bit-Integer (u16) gespeichert, mit einer Werterange von 0 bis 65536.
 
 ## Bibliotheken
 
