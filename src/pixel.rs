@@ -1,7 +1,8 @@
+#[derive(Debug, PartialEq)]
 pub(crate) struct Pixel{
-    one: u16,
-    two: u16,
-    three: u16
+    pub(crate) one: u16,
+    pub(crate) two: u16,
+    pub(crate) three: u16
 }
 
 impl Pixel {
