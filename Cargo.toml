@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 nalgebra = "0.32.3"
+regex = "1.10.0"
+regex-split = "0.1.0"
