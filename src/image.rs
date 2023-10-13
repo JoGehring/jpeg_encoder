@@ -1,8 +1,10 @@
+extern crate nalgebra as na;
+
+use std::fs::read_to_string;
+
 use na::{Matrix3, Vector3};
-use std::fs::{read, read_to_string};
 use regex::Regex;
 
-extern crate nalgebra as na;
 
 #[derive(Debug, PartialEq)]
 pub struct Image {
@@ -30,6 +32,23 @@ fn convert_rgb_values_to_ycbcr(r: u16, g: u16, b: u16) -> (u16, u16, u16) {
     };
 }
 
+
+/// Reads an P3 PPM image file to image data structure
+///
+/// # Arguments
+///
+/// * `filename`: Path to the image file
+///
+/// # Examples
+///
+/// ```
+/// let image = read_ppm_from_file("../path/to/image.ppm");
+/// ```
+///
+/// # Panics
+///
+/// * PPM image file is not P3 format
+/// * Any row or column of R/G/B values doesn't match the stated width and height
 pub fn read_ppm_from_file(filename: &str) -> Image {
     let mut result: Vec<String> = vec![];
     for raw_line in read_to_string(filename).unwrap().lines() {
@@ -40,12 +59,12 @@ pub fn read_ppm_from_file(filename: &str) -> Image {
         result.push(line);
     }
     if result[0] != String::from("P3") {
-        panic!("ALARM!");
+        panic!("Unsupported PPM format");
     }
     let dimensions: Vec<_> = result[1].split(" ").collect();
-    let maxValue = result[2].clone();
+    // let maxValue = result[2].clone();
     let height: u16 = dimensions[0].parse().unwrap();
-    let width: u16 =  dimensions[1].parse().unwrap();
+    let width: u16 = dimensions[1].parse().unwrap();
     let re = Regex::new(r"\s+").unwrap();
 
     let mut image_values1: Vec<Vec<u16>> = vec![];
@@ -53,36 +72,35 @@ pub fn read_ppm_from_file(filename: &str) -> Image {
     let mut image_values3: Vec<Vec<u16>> = vec![];
 
     for i in 3..result.len() {
-        let mut row1: Vec<u16> = vec![];
-        let mut row2: Vec<u16> = vec![];
-        let mut row3: Vec<u16> = vec![];
+        let mut r_values: Vec<u16> = vec![];
+        let mut g_values: Vec<u16> = vec![];
+        let mut b_values: Vec<u16> = vec![];
         let values: Vec<String> = re.split(result[i].as_str()).map(|x| x.to_string()).collect();
-        if values.len()/3 != width as usize {
+        if values.len() / 3 != width as usize {
             panic!("Line length to expected width mismatch");
         }
 
         for j in (0..values.len()).step_by(3) {
-            row1.push(values[j].parse().unwrap());
-            row2.push(values[j+1].parse().unwrap());
-            row3.push(values[j+2].parse().unwrap());
+            r_values.push(values[j].parse().unwrap());
+            g_values.push(values[j + 1].parse().unwrap());
+            b_values.push(values[j + 2].parse().unwrap());
         }
-        image_values1.push(row1);
-        image_values2.push(row2);
-        image_values3.push(row3);
-
+        image_values1.push(r_values);
+        image_values2.push(g_values);
+        image_values3.push(b_values);
     }
 
     if image_values1.len() != height as usize {
-        panic!("row length to expected height mismatch");
+        panic!("R values row length to expected height mismatch");
     }
     if image_values2.len() != height as usize {
-        panic!("row length to expected height mismatch");
+        panic!("G values row length to expected height mismatch");
     }
     if image_values3.len() != height as usize {
-        panic!("row length to expected height mismatch");
+        panic!("B values row length to expected height mismatch");
     }
 
-    Image{height, width, data1: image_values1, data2: image_values2, data3: image_values3}
+    Image { height, width, data1: image_values1, data2: image_values2, data3: image_values3 }
 }
 
 
@@ -107,6 +125,13 @@ impl Image {
                 self.data2[row][col] = cr;
                 self.data3[row][col] = cb;
             }
+        }
+    }
+
+    pub fn downsample(&self, a: usize, b: usize, c: usize) {
+        let product = a * b * c;
+        if (product & product - 1) != 0 {
+            panic!("One of the values is not in power of two");
         }
     }
 }
@@ -188,5 +213,32 @@ mod tests {
     #[should_panic]
     fn test_ppm_from_file_width_not_as_expected() {
         let read_image = read_ppm_from_file("test/invalid_test_width_not_equal_to_expected.ppm");
+    }
+
+    #[test]
+    fn test_downsampling_parameters_are_power_of_two() {
+        let image = read_ppm_from_file("test/valid_test.ppm");
+        image.downsample(4, 2, 2);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_downsampling_a_value_not_power_of_two() {
+        let image = read_ppm_from_file("test/valid_test.ppm");
+        image.downsample(5, 2, 2);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_downsampling_b_value_not_power_of_two() {
+        let image = read_ppm_from_file("test/valid_test.ppm");
+        image.downsample(4, 3, 2);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_downsampling_c_value_not_power_of_two() {
+        let image = read_ppm_from_file("test/valid_test.ppm");
+        image.downsample(4, 2, 3);
     }
 }
