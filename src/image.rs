@@ -224,6 +224,9 @@ impl Image {
     /// 
     /// * When a, b or c is not a power of two.
     pub fn downsample(&mut self, a: usize, b: usize, c: usize) {
+        if a == b && a == c && b == c {
+            return;
+        }
         let product = a * b * c;
         if (product & product - 1) != 0 {
             panic!("One of the values is not in power of two");
@@ -258,7 +261,7 @@ impl Default for Image {
 #[cfg(test)]
 mod tests {
     use super::{convert_rgb_values_to_ycbcr, read_ppm_from_file, Image};
-    // TODO tests for pixel_at, downsample
+    // TODO tests for pixel_at, downsample of whole image
 
     fn test_convert_rgb_values_to_rcbcr_internal(start: (u16, u16, u16), target: (u16, u16, u16)) {
         let result = convert_rgb_values_to_ycbcr(start.0, start.1, start.2);

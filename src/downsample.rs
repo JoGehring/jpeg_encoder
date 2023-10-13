@@ -1,7 +1,7 @@
 /// Down-sample a color channel of an image.
 /// `a` and `b` are expected to fit the first two parts of standard subsampling notation: https://en.wikipedia.org/wiki/Chroma_subsampling
 /// TODO: replace the above link with the proper RFC/place where the notation was defined
-/// 
+///
 /// # Arguments
 ///
 /// * `channel`: The color channel to downsample.
@@ -40,7 +40,7 @@ pub fn downsample_channel(
 /// Down-sample the row and potentially the row below it, based on the factors `a` and `b`.
 /// `a` and `b` are expected to fit the first two parts of standard subsampling notation: https://en.wikipedia.org/wiki/Chroma_subsampling
 /// TODO: replace the above link with the proper RFC/place where the notation was defined
-/// 
+///
 /// If downsample_vertical is set, the two rows are combined into the first returned row, the second one is just the downsampled `row2`.
 ///
 /// # Arguments
@@ -71,15 +71,16 @@ fn downsample_rows(
         let mut upper_subresult = downsample_segment_of_row(&upper_row_vec, a, b);
         let mut lower_subresult = downsample_segment_of_row(&lower_row_vec, a, b);
 
-        if downsample_vertical {
-            for i in 0..(upper_subresult.len() - 1) {
-                upper_subresult[i] = (upper_subresult[i] + lower_subresult[i]) / 2;
+        if downsample_vertical && a != b{
+
+            for i in 0..upper_subresult.len() {
+                let vertical_avg = (upper_subresult[i] + lower_subresult[i]) / 2;
+                upper_subresult[i] = vertical_avg;
+                lower_subresult[i] = vertical_avg;
             }
-            final_row.append(&mut upper_subresult);
-        } else {
-            final_row.append(&mut upper_subresult);
-            final_lower_row.append(&mut lower_subresult);
         }
+        final_row.append(&mut upper_subresult);
+        final_lower_row.append(&mut lower_subresult);
     }
 
     return (final_row, final_lower_row);
@@ -174,9 +175,57 @@ fn downsample_vec_by_two(original_vec: Vec<u16>) -> Vec<u16> {
 
 #[cfg(test)]
 mod tests {
-    use super::{copy_and_pad, downsample_segment_of_row, downsample_vec_by_two};
+    use super::{copy_and_pad, downsample_rows, downsample_segment_of_row, downsample_vec_by_two};
 
-    // TODO: test downsample_rows, downsample_channel
+// TODO: test downsample_channel
+
+    #[test]
+    fn test_downsample_row_without_vertical_single() {
+        let (upper_row, lower_row) = downsample_rows(&vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
+                                                     &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], 4, 1, false);
+        assert_eq!(vec![8, 48, 29], upper_row);
+        assert_eq!(vec![42, 37, 41], lower_row);
+    }
+
+    #[test]
+    fn test_downsample_row_with_vertical_single() {
+        let (upper_row, lower_row) = downsample_rows(&vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
+                                                     &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], 4, 1, true);
+        assert_eq!(vec![25, 42, 35], upper_row);
+        assert_eq!(vec![25, 42, 35], lower_row);
+    }
+
+    #[test]
+    fn test_downsample_row_without_vertical_double() {
+        let (upper_row, lower_row) = downsample_rows(&vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
+                                                     &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], 4, 2, false);
+        assert_eq!(vec![13, 4, 40, 56, 30, 29], upper_row);
+        assert_eq!(vec![35, 50, 55, 20, 58, 25], lower_row);
+    }
+
+    #[test]
+    fn test_downsample_row_with_vertical_double() {
+        let (upper_row, lower_row) = downsample_rows(&vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
+                                                     &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], 4, 2, true);
+        assert_eq!(vec![24, 27, 47, 38, 44, 27], upper_row);
+        assert_eq!(vec![24, 27, 47, 38, 44, 27], lower_row);
+    }
+
+        #[test]
+    fn test_downsample_row_without_vertical_none() {
+        let (upper_row, lower_row) = downsample_rows(&vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
+                                                     &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], 4, 4, false);
+        assert_eq!(vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13], upper_row);
+        assert_eq!(vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], lower_row);
+    }
+
+    #[test]
+    fn test_downsample_row_with_vertical_none() {
+        let (upper_row, lower_row) = downsample_rows(&vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
+                                                     &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], 4, 4, true);
+        assert_eq!(vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13], upper_row);
+        assert_eq!(vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], lower_row);
+    }
 
     #[test]
     fn test_copy_and_pad_in_bounds() {
@@ -227,6 +276,7 @@ mod tests {
         let value = downsample_segment_of_row(&[44, 36, 29, 31, 10], 4, 1);
         assert_eq!(vec![35, 10], value);
     }
+
     #[test]
     fn test_downsample_even_vec_by_two() {
         let value = downsample_vec_by_two(vec![60, 40, 30, 20]);
