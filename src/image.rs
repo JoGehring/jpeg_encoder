@@ -5,6 +5,8 @@ use std::fs::read_to_string;
 use na::{Matrix3, Vector3};
 use regex::Regex;
 
+use crate::downsample::downsample_channel;
+
 #[derive(Debug, PartialEq)]
 pub struct Image {
     height: u16,
@@ -12,6 +14,9 @@ pub struct Image {
     data1: Vec<Vec<u16>>,
     data2: Vec<Vec<u16>>,
     data3: Vec<Vec<u16>>,
+    downsample1: usize,
+    downsample2: usize,
+    downsample3: usize,
 }
 
 const TRANSFORM_RGB_YCBCR_MATRIX: Matrix3<f32> = Matrix3::new(
@@ -125,10 +130,41 @@ pub fn read_ppm_from_file(filename: &str) -> Image {
         data1: image_values1,
         data2: image_values2,
         data3: image_values3,
+        ..Default::default()
     }
 }
 
 impl Image {
+    /// Get the pixel at the x/y coordinates, with a bounds check.
+    /// If it is outside the bounds, return the border pixel instead.
+    ///
+    /// # Arguments
+    ///
+    /// * `self`: This image
+    /// * `x`: The x coordinate of the pixel.
+    /// * `y`: The y coordinate of the pixel.
+    ///
+    /// # Examples
+    /// ```
+    /// let image = read_ppm_from_file("../path/to/image.ppm");
+    /// println!('{}', image.pixel_at(4, 19));
+    /// ```
+    pub fn pixel_at(&mut self, x: i16, y: i16) -> (u16, u16, u16) {
+        let mut actual_y = (std::cmp::max(y, 0)) as usize;
+        // TODO this needs to be changed/y needs to be calculated individually per channel as downsampling is implemented
+        actual_y = std::cmp::min(actual_y, self.data1.len() - 1);
+
+        let mut actual_x = (std::cmp::max(x, 0)) as usize;
+        // TODO this needs to be changed/x needs to be calculated individually per channel as downsampling is implemented
+        actual_x = std::cmp::min(actual_x, self.data1[actual_y].len() - 1);
+
+        return (
+            self.data1[actual_y][actual_x],
+            self.data2[actual_y][actual_x],
+            self.data3[actual_y][actual_x],
+        );
+    }
+
     /// Convert this image from RGB to YCbCr color space.
     ///
     /// # Arguments
@@ -169,10 +205,52 @@ impl Image {
         }
     }
 
-    pub fn downsample(&self, a: usize, b: usize, c: usize) {
+    /// Down-sample this image.
+    /// `a`, `b` and `c` are expected to fit the segments of standard subsampling notation: https://en.wikipedia.org/wiki/Chroma_subsampling
+    /// TODO: replace the above link with the proper RFC/place where the notation was defined
+    ///
+    /// # Arguments
+    ///
+    /// * `self`: This image
+    /// * `a`: `a` as per the standard subsampling notation.
+    /// * `b`: `b` as per the standard subsampling notation.
+    /// * `c`: `c` as per the standard subsampling notation.
+    /// 
+    /// # Examples
+    /// 
+    /// TODO
+    /// 
+    /// # Panics
+    /// 
+    /// * When a, b or c is not a power of two.
+    pub fn downsample(&mut self, a: usize, b: usize, c: usize) {
         let product = a * b * c;
         if (product & product - 1) != 0 {
             panic!("One of the values is not in power of two");
+        }
+        let result_cb = downsample_channel(&self.data2, a, b, c != 0);
+        let cr_b = if c == 0 { b } else { c };
+        let result_cr = downsample_channel(&self.data3, a, cr_b, c != 0);
+
+        self.data2 = result_cb;
+        self.data3 = result_cr;
+
+        self.downsample2 = a / b;
+        self.downsample3 = a / cr_b;
+    }
+}
+
+impl Default for Image {
+    fn default() -> Image {
+        Image {
+            height: 0,
+            width: 0,
+            data1: vec![],
+            data2: vec![],
+            data3: vec![],
+            downsample1: 1,
+            downsample2: 1,
+            downsample3: 1,
         }
     }
 }
@@ -180,6 +258,7 @@ impl Image {
 #[cfg(test)]
 mod tests {
     use super::{convert_rgb_values_to_ycbcr, read_ppm_from_file, Image};
+    // TODO tests for pixel_at, downsample
 
     fn test_convert_rgb_values_to_rcbcr_internal(start: (u16, u16, u16), target: (u16, u16, u16)) {
         let result = convert_rgb_values_to_ycbcr(start.0, start.1, start.2);
@@ -219,6 +298,7 @@ mod tests {
             data1: Vec::from([Vec::from([0, 65535, 0, 0, 65535])]),
             data2: Vec::from([Vec::from([0, 0, 65535, 0, 65535])]),
             data3: Vec::from([Vec::from([0, 0, 0, 65535, 65535])]),
+            ..Default::default()
         };
         image.rgb_to_ycbcr();
         assert_eq!(
@@ -229,6 +309,7 @@ mod tests {
                 data1: Vec::from([Vec::from([0, 19595, 38469, 7471, 65535])]),
                 data2: Vec::from([Vec::from([32767, 21711, 11062, 65535, 32774])]),
                 data3: Vec::from([Vec::from([32767, 65535, 5334, 27439, 32774])]),
+                ..Default::default()
             }
         )
     }
@@ -257,6 +338,7 @@ mod tests {
                 vec![0, 0, 7, 0],
                 vec![15, 0, 0, 0],
             ],
+            ..Default::default()
         };
 
         assert_eq!(expected_image, read_image);
@@ -282,28 +364,28 @@ mod tests {
 
     #[test]
     fn test_downsampling_parameters_are_power_of_two() {
-        let image = read_ppm_from_file("test/valid_test.ppm");
+        let mut image = read_ppm_from_file("test/valid_test.ppm");
         image.downsample(4, 2, 2);
     }
 
     #[test]
     #[should_panic]
     fn test_downsampling_a_value_not_power_of_two() {
-        let image = read_ppm_from_file("test/valid_test.ppm");
+        let mut image = read_ppm_from_file("test/valid_test.ppm");
         image.downsample(5, 2, 2);
     }
 
     #[test]
     #[should_panic]
     fn test_downsampling_b_value_not_power_of_two() {
-        let image = read_ppm_from_file("test/valid_test.ppm");
+        let mut image = read_ppm_from_file("test/valid_test.ppm");
         image.downsample(4, 3, 2);
     }
 
     #[test]
     #[should_panic]
     fn test_downsampling_c_value_not_power_of_two() {
-        let image = read_ppm_from_file("test/valid_test.ppm");
+        let mut image = read_ppm_from_file("test/valid_test.ppm");
         image.downsample(4, 2, 3);
     }
 }
