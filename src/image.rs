@@ -5,7 +5,6 @@ use std::fs::read_to_string;
 use na::{Matrix3, Vector3};
 use regex::Regex;
 
-
 #[derive(Debug, PartialEq)]
 pub struct Image {
     height: u16,
@@ -19,6 +18,24 @@ const TRANSFORM_RGB_YCBCR_MATRIX: Matrix3<f32> = Matrix3::new(
     0.299, 0.587, 0.114, -0.1687, -0.3312, 0.5, 0.5, -0.4186, -0.0813,
 );
 
+/// Convert an RGB value to a YCbCr value.
+///
+/// # Arguments
+///
+/// * `r`: The input's "Red" channel
+/// * `g`: The input's "Green" channel
+/// * `b`: The input's "Blue" channel
+///
+/// # Examples
+///
+/// ```
+/// let color = convert_rgb_values_to_ycbcr(0, 0, 0);
+/// assert_eq!(color, (0, 32767, 32767))
+/// ```
+///
+/// # Panics
+///
+/// * Error casting back from floating point to integer numbers.
 fn convert_rgb_values_to_ycbcr(r: u16, g: u16, b: u16) -> (u16, u16, u16) {
     let mut result = TRANSFORM_RGB_YCBCR_MATRIX * Vector3::new(r as f32, g as f32, b as f32);
 
@@ -31,7 +48,6 @@ fn convert_rgb_values_to_ycbcr(r: u16, g: u16, b: u16) -> (u16, u16, u16) {
         None => panic!("Error while trying to convert to YCbCr!"),
     };
 }
-
 
 /// Reads an P3 PPM image file to image data structure
 ///
@@ -75,7 +91,10 @@ pub fn read_ppm_from_file(filename: &str) -> Image {
         let mut r_values: Vec<u16> = vec![];
         let mut g_values: Vec<u16> = vec![];
         let mut b_values: Vec<u16> = vec![];
-        let values: Vec<String> = re.split(result[i].as_str()).map(|x| x.to_string()).collect();
+        let values: Vec<String> = re
+            .split(result[i].as_str())
+            .map(|x| x.to_string())
+            .collect();
         if values.len() / 3 != width as usize {
             panic!("Line length to expected width mismatch");
         }
@@ -100,11 +119,33 @@ pub fn read_ppm_from_file(filename: &str) -> Image {
         panic!("B values row length to expected height mismatch");
     }
 
-    Image { height, width, data1: image_values1, data2: image_values2, data3: image_values3 }
+    Image {
+        height,
+        width,
+        data1: image_values1,
+        data2: image_values2,
+        data3: image_values3,
+    }
 }
 
-
 impl Image {
+    /// Convert this image from RGB to YCbCr color space.
+    ///
+    /// # Arguments
+    ///
+    /// * `self`: This image
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let image = read_ppm_from_file("../path/to/image.ppm");
+    /// image.rgb_to_ycbcr()
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// * Method is called after the image was downsampled (the different channels aren't the same size)
+    /// * Internal error when calling convert_rgb_values_to_ycbcr
     pub fn rgb_to_ycbcr(&mut self) {
         if self.data1.len() != self.data2.len() || self.data2.len() != self.data3.len() {
             panic!("rgb_to_ycbcr called after downsampling!")
@@ -138,7 +179,7 @@ impl Image {
 
 #[cfg(test)]
 mod tests {
-    use super::{convert_rgb_values_to_ycbcr, Image, read_ppm_from_file};
+    use super::{convert_rgb_values_to_ycbcr, read_ppm_from_file, Image};
 
     fn test_convert_rgb_values_to_rcbcr_internal(start: (u16, u16, u16), target: (u16, u16, u16)) {
         let result = convert_rgb_values_to_ycbcr(start.0, start.1, start.2);
@@ -180,19 +221,43 @@ mod tests {
             data3: Vec::from([Vec::from([0, 0, 0, 65535, 65535])]),
         };
         image.rgb_to_ycbcr();
-        assert_eq!(image, Image {
-            height: 1,
-            width: 5,
-            data1: Vec::from([Vec::from([0, 19595, 38469, 7471, 65535])]),
-            data2: Vec::from([Vec::from([32767, 21711, 11062, 65535, 32774])]),
-            data3: Vec::from([Vec::from([32767, 65535, 5334, 27439, 32774])]),
-        })
+        assert_eq!(
+            image,
+            Image {
+                height: 1,
+                width: 5,
+                data1: Vec::from([Vec::from([0, 19595, 38469, 7471, 65535])]),
+                data2: Vec::from([Vec::from([32767, 21711, 11062, 65535, 32774])]),
+                data3: Vec::from([Vec::from([32767, 65535, 5334, 27439, 32774])]),
+            }
+        )
     }
 
     #[test]
     fn test_ppm_from_file_successful() {
         let read_image = read_ppm_from_file("test/valid_test.ppm");
-        let expected_image = Image { height: 4, width: 4, data1: vec![vec![0, 0, 0, 15], vec![0, 0, 0, 0], vec![0, 0, 0, 0], vec![15, 0, 0, 0]], data2: vec![vec![0, 0, 0, 0], vec![0, 15, 0, 0], vec![0, 0, 15, 0], vec![0, 0, 0, 0]], data3: vec![vec![0, 0, 0, 15], vec![0, 7, 0, 0], vec![0, 0, 7, 0], vec![15, 0, 0, 0]] };
+        let expected_image = Image {
+            height: 4,
+            width: 4,
+            data1: vec![
+                vec![0, 0, 0, 15],
+                vec![0, 0, 0, 0],
+                vec![0, 0, 0, 0],
+                vec![15, 0, 0, 0],
+            ],
+            data2: vec![
+                vec![0, 0, 0, 0],
+                vec![0, 15, 0, 0],
+                vec![0, 0, 15, 0],
+                vec![0, 0, 0, 0],
+            ],
+            data3: vec![
+                vec![0, 0, 0, 15],
+                vec![0, 7, 0, 0],
+                vec![0, 0, 7, 0],
+                vec![15, 0, 0, 0],
+            ],
+        };
 
         assert_eq!(expected_image, read_image);
     }
