@@ -265,19 +265,19 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_ppm_from_file_p3_not_present() {
-        let read_image = read_ppm_from_file("test/invalid_test_p3_not_present.ppm");
+        let _read_image = read_ppm_from_file("test/invalid_test_p3_not_present.ppm");
     }
 
     #[test]
     #[should_panic]
     fn test_ppm_from_file_height_not_as_expected() {
-        let read_image = read_ppm_from_file("test/invalid_test_height_not_equal_to_expected.ppm");
+        let _read_image = read_ppm_from_file("test/invalid_test_height_not_equal_to_expected.ppm");
     }
 
     #[test]
     #[should_panic]
     fn test_ppm_from_file_width_not_as_expected() {
-        let read_image = read_ppm_from_file("test/invalid_test_width_not_equal_to_expected.ppm");
+        let _read_image = read_ppm_from_file("test/invalid_test_width_not_equal_to_expected.ppm");
     }
 
     #[test]
