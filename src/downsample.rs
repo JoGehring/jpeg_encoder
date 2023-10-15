@@ -10,8 +10,9 @@
 /// * `downsample_vertical`: Whether every set of two rows should also be combined into one (vertical downsampling).
 ///
 /// # Examples
-///
+///```
 /// let result_cb = downsample_channel(&self.data2, a, b, c != 0);
+/// ```
 pub fn downsample_channel(
     channel: &Vec<Vec<u16>>,
     a: usize,
@@ -20,11 +21,7 @@ pub fn downsample_channel(
 ) -> Vec<Vec<u16>> {
     let mut final_channel: Vec<Vec<u16>> = vec![];
     for y in (0..channel.len() - 1).step_by(2) {
-        let lower_row = if y + 1 < channel.len() {
-            &channel[y + 1]
-        } else {
-            &channel[y]
-        };
+        let lower_row = if y + 1 < channel.len() { &channel[y + 1] } else { &channel[y] };
 
         let (final_row, final_lower_row) =
             downsample_rows(&channel[y], &lower_row, a, b, downsample_vertical);
@@ -52,10 +49,11 @@ pub fn downsample_channel(
 /// * `downsample_vertical`: Whether the two rows should also be combined into one.
 ///
 /// # Examples
-///
-/// let (upper_row, lower_row) = downsample_rows(&vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
-//                                                      &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], 4, 1, false);
-///
+///```
+/// let row1 = &vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13];
+/// let row2 = &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45];
+/// let (upper_row, lower_row) = downsample_rows(row1, row2, 4, 1, false);
+///```
 fn downsample_rows(
     row: &Vec<u16>,
     row2: &Vec<u16>,
@@ -73,8 +71,7 @@ fn downsample_rows(
         let mut upper_subresult = downsample_segment_of_row(&upper_row_vec, a, b);
         let mut lower_subresult = downsample_segment_of_row(&lower_row_vec, a, b);
 
-        if downsample_vertical && a != b{
-
+        if downsample_vertical && a != b {
             for i in 0..upper_subresult.len() {
                 let vertical_avg = (upper_subresult[i] + lower_subresult[i]) / 2;
                 upper_subresult[i] = vertical_avg;
@@ -177,9 +174,55 @@ fn downsample_vec_by_two(original_vec: Vec<u16>) -> Vec<u16> {
 
 #[cfg(test)]
 mod tests {
-    use super::{copy_and_pad, downsample_rows, downsample_segment_of_row, downsample_vec_by_two};
+    use super::{copy_and_pad, downsample_channel, downsample_rows, downsample_segment_of_row, downsample_vec_by_two};
 
-// TODO: test downsample_channel
+    #[test]
+    fn test_downsample_channel_vertical() {
+        let input_channel = vec![
+            vec![1, 2, 3, 4],
+            vec![5, 6, 7, 8],
+            vec![9, 10, 11, 12],
+            vec![13, 14, 15, 16]];
+
+        let expected_output: Vec<Vec<u16>> = vec![vec![3, 5], vec![11, 13]];
+
+        let result = downsample_channel(&input_channel, 4, 2, true);
+
+        assert_eq!(result, expected_output);
+    }
+
+    #[test]
+    fn test_downsample_channel_horizontal() {
+        let input_channel = vec![
+            vec![1, 2, 3, 4],
+            vec![5, 6, 7, 8],
+            vec![9, 10, 11, 12],
+            vec![13, 14, 15, 16]];
+
+        let expected_output: Vec<Vec<u16>> = vec![
+            vec![1, 3],
+            vec![5, 7],
+            vec![9, 11],
+            vec![13, 15]];
+
+        let result = downsample_channel(&input_channel, 4, 2, false);
+
+        assert_eq!(result, expected_output);
+    }
+
+    #[test]
+    fn test_downsample_channel_no_change() {
+        let input_channel = vec![
+            vec![1, 2, 3, 4],
+            vec![5, 6, 7, 8],
+            vec![9, 10, 11, 12],
+            vec![13, 14, 15, 16]];
+
+        let result = downsample_channel(&input_channel, 4, 4, false);
+
+        assert_eq!(result, input_channel);
+    }
+
 
     #[test]
     fn test_downsample_row_without_vertical_single() {
@@ -213,7 +256,7 @@ mod tests {
         assert_eq!(vec![24, 27, 47, 38, 44, 27], lower_row);
     }
 
-        #[test]
+    #[test]
     fn test_downsample_row_without_vertical_none() {
         let (upper_row, lower_row) = downsample_rows(&vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
                                                      &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], 4, 4, false);

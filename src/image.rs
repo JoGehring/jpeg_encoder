@@ -7,7 +7,7 @@ use regex::Regex;
 
 use crate::downsample::downsample_channel;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Image {
     height: u16,
     width: u16,
@@ -215,14 +215,14 @@ impl Image {
     /// * `a`: `a` as per the standard subsampling notation.
     /// * `b`: `b` as per the standard subsampling notation.
     /// * `c`: `c` as per the standard subsampling notation.
-    /// 
+    ///
     /// # Examples
-    /// 
-    ///   let mut image = read_ppm_from_file("../path/to/image.ppm");
-    ///   image.downsample(4, 2, 2);
-    /// 
+    /// ```
+    /// let mut image = read_ppm_from_file("../path/to/image.ppm");
+    /// image.downsample(4, 2, 2);
+    /// ```
     /// # Panics
-    /// 
+    ///
     /// * When a, b or c is not a power of two.
     pub fn downsample(&mut self, a: usize, b: usize, c: usize) {
         if a == b && a == c && b == c {
@@ -261,8 +261,9 @@ impl Default for Image {
 
 #[cfg(test)]
 mod tests {
-    use super::{convert_rgb_values_to_ycbcr, read_ppm_from_file, Image};
-    // TODO tests for pixel_at, downsample of whole image
+    use super::{convert_rgb_values_to_ycbcr, Image, read_ppm_from_file};
+
+// TODO tests for pixel_at, downsample of whole image
 
     fn test_convert_rgb_values_to_rcbcr_internal(start: (u16, u16, u16), target: (u16, u16, u16)) {
         let result = convert_rgb_values_to_ycbcr(start.0, start.1, start.2);
