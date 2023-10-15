@@ -11,7 +11,7 @@
 ///
 /// # Examples
 ///
-/// TODO
+/// let result_cb = downsample_channel(&self.data2, a, b, c != 0);
 pub fn downsample_channel(
     channel: &Vec<Vec<u16>>,
     a: usize,
@@ -53,7 +53,9 @@ pub fn downsample_channel(
 ///
 /// # Examples
 ///
-/// TODO
+/// let (upper_row, lower_row) = downsample_rows(&vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
+//                                                      &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], 4, 1, false);
+///
 fn downsample_rows(
     row: &Vec<u16>,
     row2: &Vec<u16>,

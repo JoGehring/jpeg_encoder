@@ -149,7 +149,7 @@ impl Image {
     /// let image = read_ppm_from_file("../path/to/image.ppm");
     /// println!('{}', image.pixel_at(4, 19));
     /// ```
-    pub fn pixel_at(&mut self, x: i16, y: i16) -> (u16, u16, u16) {
+    pub fn pixel_at(&self, x: u16, y: u16) -> (u16, u16, u16) {
         let mut actual_y = (std::cmp::max(y, 0)) as usize;
         // TODO this needs to be changed/y needs to be calculated individually per channel as downsampling is implemented
         actual_y = std::cmp::min(actual_y, self.data1.len() - 1);
@@ -218,7 +218,8 @@ impl Image {
     /// 
     /// # Examples
     /// 
-    /// TODO
+    ///   let mut image = read_ppm_from_file("../path/to/image.ppm");
+    ///   image.downsample(4, 2, 2);
     /// 
     /// # Panics
     /// 
