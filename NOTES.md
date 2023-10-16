@@ -2,18 +2,13 @@
 
 ## Datenstrukturen
 
-Bilder werden in einem struct abgebildet, das ein dreidimensionales Feld enthält:
+Bilder werden in einem struct abgebildet, das drei Felder enthält. Jedes davon ist ein zweidimensionales Array, das die Bilddaten für jeweils einen Kanal beinhaltet.
 
-```pseudocode
-[
-    [[R1, G1, B1], [R2, G2, B2], ...], // Reihe 1
-    [[R1, G1, B1], [R2, G2, B2], ...], // Reihe 2
-]
-```
+Für jeden Kanal wird außerdem gespeichert, in welchem Ausmaß er heruntergerechnet wurde.
 
-Außerdem enthält dieses struct den Farbraum, der als Enum definiert sein müsste.
+Außerdem enthält dieses struct den Farbraum, der als Enum definiert sein müsste (TODO).
 
-Begründung: Das ermöglicht einfach-ishe Manipulation eines Farbkanals und guten Zugriff auf "Schrittweiten".
+Begründung: Das ermöglicht einfach-ishe Manipulation eines Farbkanals und guten Zugriff auf "Schrittweiten". Außerdem ist es möglich, einzelne Kanäle unabhängig voneinander herunterzurechnen.
 
 Einzelne R/G/B-Werte werden als vorzeichenlose 16-Bit-Integer (u16) gespeichert, mit einer Werterange von 0 bis 65536.
 
