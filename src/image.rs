@@ -17,6 +17,7 @@ pub struct Image {
     downsample1: usize,
     downsample2: usize,
     downsample3: usize,
+    downsampled_vertically: bool,
 }
 
 const TRANSFORM_RGB_YCBCR_MATRIX: Matrix3<f32> = Matrix3::new(
@@ -151,17 +152,23 @@ impl Image {
     /// ```
     pub fn pixel_at(&self, x: u16, y: u16) -> (u16, u16, u16) {
         let mut actual_y = (std::cmp::max(y, 0)) as usize;
-        // TODO this needs to be changed/y needs to be calculated individually per channel as downsampling is implemented
         actual_y = std::cmp::min(actual_y, self.data1.len() - 1);
+        let actual_y_downsampled = if self.downsampled_vertically {
+            actual_y / 2
+        } else {
+            actual_y
+        };
 
         let mut actual_x = (std::cmp::max(x, 0)) as usize;
-        // TODO this needs to be changed/x needs to be calculated individually per channel as downsampling is implemented
         actual_x = std::cmp::min(actual_x, self.data1[actual_y].len() - 1);
+        let actual_x_1 = actual_x / self.downsample1;
+        let actual_x_2 = actual_x / self.downsample2;
+        let actual_x_3 = actual_x / self.downsample3;
 
         return (
-            self.data1[actual_y][actual_x],
-            self.data2[actual_y][actual_x],
-            self.data3[actual_y][actual_x],
+            self.data1[actual_y][actual_x_1],
+            self.data2[actual_y_downsampled][actual_x_2],
+            self.data3[actual_y_downsampled][actual_x_3],
         );
     }
 
@@ -183,15 +190,14 @@ impl Image {
     /// * Method is called after the image was downsampled (the different channels aren't the same size)
     /// * Internal error when calling convert_rgb_values_to_ycbcr
     pub fn rgb_to_ycbcr(&mut self) {
-        if self.data1.len() != self.data2.len() || self.data2.len() != self.data3.len() {
+        if self.downsample1 != 1
+            || self.downsample2 != 1
+            || self.downsample3 != 1
+            || self.downsampled_vertically
+        {
             panic!("rgb_to_ycbcr called after downsampling!")
         }
         for row in 0..self.data1.len() {
-            if self.data1[row].len() != self.data2[row].len()
-                || self.data2[row].len() != self.data3[row].len()
-            {
-                panic!("rgb_to_ycbcr called after downsampling!")
-            }
             for col in 0..self.data1[row].len() {
                 let (y, cr, cb) = convert_rgb_values_to_ycbcr(
                     self.data1[row][col],
@@ -232,15 +238,16 @@ impl Image {
         if (product & product - 1) != 0 {
             panic!("One of the values is not in power of two");
         }
-        let result_cb = downsample_channel(&self.data2, a, b, c != 0);
+        let result_cb = downsample_channel(&self.data2, a, b, c == 0);
         let cr_b = if c == 0 { b } else { c };
-        let result_cr = downsample_channel(&self.data3, a, cr_b, c != 0);
+        let result_cr = downsample_channel(&self.data3, a, cr_b, c == 0);
 
         self.data2 = result_cb;
         self.data3 = result_cr;
 
         self.downsample2 = a / b;
         self.downsample3 = a / cr_b;
+        self.downsampled_vertically = c == 0;
     }
 }
 
@@ -255,13 +262,14 @@ impl Default for Image {
             downsample1: 1,
             downsample2: 1,
             downsample3: 1,
+            downsampled_vertically: false,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{convert_rgb_values_to_ycbcr, Image, read_ppm_from_file};
+    use super::{convert_rgb_values_to_ycbcr, read_ppm_from_file, Image};
 
     // TODO tests for downsample of whole image
     #[test]
@@ -290,6 +298,46 @@ mod tests {
         let read_image = read_ppm_from_file("test/valid_test.ppm");
         let pixel = read_image.pixel_at(4, 4);
         assert_eq!((0, 0, 0), pixel);
+    }
+
+    #[test]
+    fn test_pixel_at_in_bounds_after_downsample() {
+        let mut read_image = read_ppm_from_file("test/valid_test.ppm");
+        read_image.downsample(4, 2, 2);
+        let pixel = read_image.pixel_at(3, 0);
+        assert_eq!((15, 0, 7), pixel);
+    }
+
+    #[test]
+    fn test_pixel_at_x_out_of_bounds_after_downsample() {
+        let mut read_image = read_ppm_from_file("test/valid_test.ppm");
+        read_image.downsample(4, 2, 2);
+        let pixel = read_image.pixel_at(4, 0);
+        assert_eq!((15, 0, 7), pixel);
+    }
+
+    #[test]
+    fn test_pixel_at_y_out_of_bounds_after_vertical_downsample() {
+        let mut read_image = read_ppm_from_file("test/valid_test.ppm");
+        read_image.downsample(4, 2, 0);
+        let pixel = read_image.pixel_at(0, 4);
+        assert_eq!((15, 0, 3), pixel);
+    }
+
+    #[test]
+    fn test_pixel_at_y_and_x_out_of_bounds_after_downsample() {
+        let mut read_image = read_ppm_from_file("test/valid_test.ppm");
+        read_image.downsample(4, 2, 2);
+        let pixel = read_image.pixel_at(4, 4);
+        assert_eq!((0, 0, 0), pixel);
+    }
+
+    #[test]
+    fn test_pixel_at_y_and_x_out_of_bounds_after_vertical_downsample() {
+        let mut read_image = read_ppm_from_file("test/valid_test.ppm");
+        read_image.downsample(4, 2, 0);
+        let pixel = read_image.pixel_at(4, 4);
+        assert_eq!((0, 3, 1), pixel);
     }
 
     fn test_convert_rgb_values_to_rcbcr_internal(start: (u16, u16, u16), target: (u16, u16, u16)) {
