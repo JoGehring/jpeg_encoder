@@ -204,7 +204,7 @@ fn overflow_safe_avg(value1: u16, value2: u16) -> u16 {
 mod tests {
     use super::{
         copy_and_pad, downsample_channel, downsample_rows, downsample_segment_of_row,
-        downsample_vec_by_two,
+        downsample_vec_by_two, overflow_safe_avg
     };
 
     #[test]
@@ -411,5 +411,12 @@ mod tests {
         let value = downsample_vec_by_two(vec![]);
         let to_compare: Vec<u16> = vec![];
         assert_eq!(to_compare, value);
+    }
+
+    #[test]
+    fn test_overflow_safe_avg() {
+        assert_eq!(65534, overflow_safe_avg(65535, 65533));
+        assert_eq!(50000, overflow_safe_avg(49998, 50002));
+        assert_eq!(3, overflow_safe_avg(1, 5));
     }
 }
