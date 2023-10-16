@@ -271,7 +271,97 @@ impl Default for Image {
 mod tests {
     use super::{convert_rgb_values_to_ycbcr, read_ppm_from_file, Image};
 
-    // TODO tests for downsample of whole image
+    #[test]
+    fn test_downsample_image_factor_two() {
+        let mut read_image = read_ppm_from_file("test/valid_test.ppm");
+        read_image.downsample(4, 2, 2);
+        assert_eq!(
+            Image {
+                width: 4,
+                height: 4,
+                data1: vec![
+                    vec![0, 0, 0, 15],
+                    vec![0, 0, 0, 0],
+                    vec![0, 0, 0, 0],
+                    vec![15, 0, 0, 0]
+                ],
+                data2: vec![vec![0, 0], vec![7, 0], vec![0, 7], vec![0, 0]],
+                data3: vec![vec![0, 7], vec![3, 0], vec![0, 3], vec![7, 0]],
+                downsample1: 1,
+                downsample2: 2,
+                downsample3: 2,
+                downsampled_vertically: false,
+            },
+            read_image
+        );
+    }
+
+    #[test]
+    fn test_downsample_image_no_downsample() {
+        let mut read_image = read_ppm_from_file("test/valid_test.ppm");
+        read_image.downsample(4, 4, 4);
+        assert_eq!(
+            Image {
+                width: 4,
+                height: 4,
+                data1: vec![
+                    vec![0, 0, 0, 15],
+                    vec![0, 0, 0, 0],
+                    vec![0, 0, 0, 0],
+                    vec![15, 0, 0, 0]
+                ],
+                data2: vec![
+                    vec![0, 0, 0, 0],
+                    vec![0, 15, 0, 0],
+                    vec![0, 0, 15, 0],
+                    vec![0, 0, 0, 0]
+                ],
+                data3: vec![
+                    vec![0, 0, 0, 15],
+                    vec![0, 7, 0, 0],
+                    vec![0, 0, 7, 0],
+                    vec![15, 0, 0, 0]
+                ],
+                downsample1: 1,
+                downsample2: 1,
+                downsample3: 1,
+                downsampled_vertically: false,
+            },
+            read_image
+        );
+    }
+
+    #[test]
+    fn test_downsample_image_factor_four_and_vertical() {
+        let mut read_image = read_ppm_from_file("test/valid_test.ppm");
+        read_image.downsample(4, 1, 0);
+        assert_eq!(
+            Image {
+                width: 4,
+                height: 4,
+                data1: vec![
+                    vec![0, 0, 0, 15],
+                    vec![0, 0, 0, 0],
+                    vec![0, 0, 0, 0],
+                    vec![15, 0, 0, 0]
+                ],
+                data2: vec![
+                    vec![1],
+                    vec![1],
+                ],
+                data3: vec![
+                    vec![2],
+                    vec![2],
+                ],
+                downsample1: 1,
+                downsample2: 4,
+                downsample3: 4,
+                downsampled_vertically: true,
+            },
+            read_image
+        );
+    }
+
     #[test]
     fn test_pixel_at_in_bounds() {
         let read_image = read_ppm_from_file("test/valid_test.ppm");
