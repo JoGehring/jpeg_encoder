@@ -21,7 +21,11 @@ pub fn downsample_channel(
 ) -> Vec<Vec<u16>> {
     let mut final_channel: Vec<Vec<u16>> = vec![];
     for y in (0..channel.len() - 1).step_by(2) {
-        let lower_row = if y + 1 < channel.len() { &channel[y + 1] } else { &channel[y] };
+        let lower_row = if y + 1 < channel.len() {
+            &channel[y + 1]
+        } else {
+            &channel[y]
+        };
 
         let (final_row, final_lower_row) =
             downsample_rows(&channel[y], &lower_row, a, b, downsample_vertical);
@@ -73,7 +77,7 @@ fn downsample_rows(
 
         if downsample_vertical && a != b {
             for i in 0..upper_subresult.len() {
-                let vertical_avg = (upper_subresult[i] + lower_subresult[i]) / 2;
+                let vertical_avg = overflow_safe_avg(upper_subresult[i], lower_subresult[i]);
                 upper_subresult[i] = vertical_avg;
                 lower_subresult[i] = vertical_avg;
             }
@@ -167,14 +171,41 @@ fn downsample_vec_by_two(original_vec: Vec<u16>) -> Vec<u16> {
         } else {
             2 * i
         };
-        new_vec.push((original_vec[2 * i] + original_vec[key]) / 2);
+        new_vec.push(overflow_safe_avg(
+            original_vec[2 * i],
+            original_vec[key],
+        ));
     }
     return new_vec;
 }
 
+/// Calculate an average between two values, while accounting for overflows.
+/// This works by halving the values before adding them (avoiding overflows)
+/// but also checking for whether that would lose a carry due to rounding error.
+/// 
+/// # Arguments
+/// 
+/// * `value1` First value to add up.
+/// * `value2` Second value to add up.
+/// 
+/// # Examples
+/// 
+/// ```
+/// let result = overflow_safe_avg(65535, 65533);
+/// assert_eq!(65534, result);
+/// ```
+fn overflow_safe_avg(value1: u16, value2: u16) -> u16 {
+    let carry = u16::from(value1 % 2 == 1 && (value2 % 2 == 1));
+    let value = value1 / 2 + value2 / 2;
+    carry + value
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{copy_and_pad, downsample_channel, downsample_rows, downsample_segment_of_row, downsample_vec_by_two};
+    use super::{
+        copy_and_pad, downsample_channel, downsample_rows, downsample_segment_of_row,
+        downsample_vec_by_two,
+    };
 
     #[test]
     fn test_downsample_channel_vertical() {
@@ -182,7 +213,8 @@ mod tests {
             vec![1, 2, 3, 4],
             vec![5, 6, 7, 8],
             vec![9, 10, 11, 12],
-            vec![13, 14, 15, 16]];
+            vec![13, 14, 15, 16],
+        ];
 
         let expected_output: Vec<Vec<u16>> = vec![vec![3, 5], vec![11, 13]];
 
@@ -197,13 +229,11 @@ mod tests {
             vec![1, 2, 3, 4],
             vec![5, 6, 7, 8],
             vec![9, 10, 11, 12],
-            vec![13, 14, 15, 16]];
+            vec![13, 14, 15, 16],
+        ];
 
-        let expected_output: Vec<Vec<u16>> = vec![
-            vec![1, 3],
-            vec![5, 7],
-            vec![9, 11],
-            vec![13, 15]];
+        let expected_output: Vec<Vec<u16>> =
+            vec![vec![1, 3], vec![5, 7], vec![9, 11], vec![13, 15]];
 
         let result = downsample_channel(&input_channel, 4, 2, false);
 
@@ -216,60 +246,102 @@ mod tests {
             vec![1, 2, 3, 4],
             vec![5, 6, 7, 8],
             vec![9, 10, 11, 12],
-            vec![13, 14, 15, 16]];
+            vec![13, 14, 15, 16],
+        ];
 
         let result = downsample_channel(&input_channel, 4, 4, false);
 
         assert_eq!(result, input_channel);
     }
 
-
     #[test]
     fn test_downsample_row_without_vertical_single() {
-        let (upper_row, lower_row) = downsample_rows(&vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
-                                                     &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], 4, 1, false);
+        let (upper_row, lower_row) = downsample_rows(
+            &vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
+            &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45],
+            4,
+            1,
+            false,
+        );
         assert_eq!(vec![8, 48, 29], upper_row);
         assert_eq!(vec![42, 37, 41], lower_row);
     }
 
     #[test]
     fn test_downsample_row_with_vertical_single() {
-        let (upper_row, lower_row) = downsample_rows(&vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
-                                                     &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], 4, 1, true);
+        let (upper_row, lower_row) = downsample_rows(
+            &vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
+            &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45],
+            4,
+            1,
+            true,
+        );
         assert_eq!(vec![25, 42, 35], upper_row);
         assert_eq!(vec![25, 42, 35], lower_row);
     }
 
     #[test]
     fn test_downsample_row_without_vertical_double() {
-        let (upper_row, lower_row) = downsample_rows(&vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
-                                                     &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], 4, 2, false);
+        let (upper_row, lower_row) = downsample_rows(
+            &vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
+            &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45],
+            4,
+            2,
+            false,
+        );
         assert_eq!(vec![13, 4, 40, 56, 30, 29], upper_row);
         assert_eq!(vec![35, 50, 55, 20, 58, 25], lower_row);
     }
 
     #[test]
     fn test_downsample_row_with_vertical_double() {
-        let (upper_row, lower_row) = downsample_rows(&vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
-                                                     &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], 4, 2, true);
+        let (upper_row, lower_row) = downsample_rows(
+            &vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
+            &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45],
+            4,
+            2,
+            true,
+        );
         assert_eq!(vec![24, 27, 47, 38, 44, 27], upper_row);
         assert_eq!(vec![24, 27, 47, 38, 44, 27], lower_row);
     }
 
     #[test]
     fn test_downsample_row_without_vertical_none() {
-        let (upper_row, lower_row) = downsample_rows(&vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
-                                                     &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], 4, 4, false);
-        assert_eq!(vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13], upper_row);
-        assert_eq!(vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], lower_row);
+        let (upper_row, lower_row) = downsample_rows(
+            &vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
+            &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45],
+            4,
+            4,
+            false,
+        );
+        assert_eq!(
+            vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
+            upper_row
+        );
+        assert_eq!(
+            vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45],
+            lower_row
+        );
     }
 
     #[test]
     fn test_downsample_row_with_vertical_none() {
-        let (upper_row, lower_row) = downsample_rows(&vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
-                                                     &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], 4, 4, true);
-        assert_eq!(vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13], upper_row);
-        assert_eq!(vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45], lower_row);
+        let (upper_row, lower_row) = downsample_rows(
+            &vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
+            &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45],
+            4,
+            4,
+            true,
+        );
+        assert_eq!(
+            vec![16, 10, 4, 4, 13, 68, 39, 74, 38, 23, 45, 13],
+            upper_row
+        );
+        assert_eq!(
+            vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45],
+            lower_row
+        );
     }
 
     #[test]
