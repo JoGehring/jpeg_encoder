@@ -263,7 +263,34 @@ impl Default for Image {
 mod tests {
     use super::{convert_rgb_values_to_ycbcr, Image, read_ppm_from_file};
 
-// TODO tests for pixel_at, downsample of whole image
+    // TODO tests for downsample of whole image
+    #[test]
+    fn test_pixel_at_in_bounds() {
+        let read_image = read_ppm_from_file("test/valid_test.ppm");
+        let pixel = read_image.pixel_at(3, 0);
+        assert_eq!((15, 0, 15), pixel);
+    }
+
+    #[test]
+    fn test_pixel_at_x_out_of_bounds() {
+        let read_image = read_ppm_from_file("test/valid_test.ppm");
+        let pixel = read_image.pixel_at(4, 0);
+        assert_eq!((15, 0, 15), pixel);
+    }
+
+    #[test]
+    fn test_pixel_at_y_out_of_bounds() {
+        let read_image = read_ppm_from_file("test/valid_test.ppm");
+        let pixel = read_image.pixel_at(0, 4);
+        assert_eq!((15, 0, 15), pixel);
+    }
+
+    #[test]
+    fn test_pixel_at_y_and_x_out_of_bounds() {
+        let read_image = read_ppm_from_file("test/valid_test.ppm");
+        let pixel = read_image.pixel_at(4, 4);
+        assert_eq!((0, 0, 0), pixel);
+    }
 
     fn test_convert_rgb_values_to_rcbcr_internal(start: (u16, u16, u16), target: (u16, u16, u16)) {
         let result = convert_rgb_values_to_ycbcr(start.0, start.1, start.2);
