@@ -228,7 +228,7 @@ impl Image {
         if a == b && a == c && b == c {
             return;
         }
-        let product = a * b * c;
+        let product = (a * b * c) as isize;
         if (product & product - 1) != 0 {
             panic!("One of the values is not in power of two");
         }
