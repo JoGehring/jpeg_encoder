@@ -20,7 +20,7 @@ pub fn downsample_channel(
     downsample_vertical: bool,
 ) -> Vec<Vec<u16>> {
     let mut final_channel: Vec<Vec<u16>> = vec![];
-    for y in (0..channel.len() - 1).step_by(2) {
+    for y in (0..channel.len()).step_by(2) {
         let lower_row = if y + 1 < channel.len() {
             &channel[y + 1]
         } else {

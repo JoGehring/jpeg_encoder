@@ -8,9 +8,9 @@ use crate::downsample::downsample_channel;
 pub struct Image {
     height: u16,
     width: u16,
-    data1: Vec<Vec<u16>>,
-    data2: Vec<Vec<u16>>,
-    data3: Vec<Vec<u16>>,
+    channel1: Vec<Vec<u16>>,
+    channel2: Vec<Vec<u16>>,
+    channel3: Vec<Vec<u16>>,
     downsample1: usize,
     downsample2: usize,
     downsample3: usize,
@@ -46,10 +46,10 @@ fn convert_rgb_values_to_ycbcr(r: u16, g: u16, b: u16) -> (u16, u16, u16) {
 
     let result_as_int = result.map(|value| value.round()).try_cast::<u16>();
 
-    return match result_as_int {
+    match result_as_int {
         Some(value) => (value[0], value[1], value[2]),
         None => panic!("Error while trying to convert to YCbCr!"),
-    };
+    }
 }
 
 /// Create an image.
@@ -58,22 +58,22 @@ fn convert_rgb_values_to_ycbcr(r: u16, g: u16, b: u16) -> (u16, u16, u16) {
 ///
 /// * height: The image height.
 /// * width: The image width.
-/// * data1: The first channel of data.
-/// * data2: The second channel of data.
-/// * data3: The third channel of data.
+/// * channel1: The first channel of data.
+/// * channel2: The second channel of data.
+/// * channel3: The third channel of data.
 pub fn create_image(
     height: u16,
     width: u16,
-    data1: Vec<Vec<u16>>,
-    data2: Vec<Vec<u16>>,
-    data3: Vec<Vec<u16>>,
+    channel1: Vec<Vec<u16>>,
+    channel2: Vec<Vec<u16>>,
+    channel3: Vec<Vec<u16>>,
 ) -> Image {
     Image {
         height: height,
         width: width,
-        data1: data1,
-        data2: data2,
-        data3: data3,
+        channel1: channel1,
+        channel2: channel2,
+        channel3: channel3,
         ..Default::default()
     }
 }
@@ -95,7 +95,7 @@ impl Image {
     /// ```
     pub fn pixel_at(&self, x: u16, y: u16) -> (u16, u16, u16) {
         let mut actual_y = (std::cmp::max(y, 0)) as usize;
-        actual_y = std::cmp::min(actual_y, self.data1.len() - 1);
+        actual_y = std::cmp::min(actual_y, self.channel1.len() - 1);
         let actual_y_downsampled = if self.downsampled_vertically {
             actual_y / 2
         } else {
@@ -103,16 +103,16 @@ impl Image {
         };
 
         let mut actual_x = (std::cmp::max(x, 0)) as usize;
-        actual_x = std::cmp::min(actual_x, self.data1[actual_y].len() - 1);
+        actual_x = std::cmp::min(actual_x, self.channel1[actual_y].len() - 1);
         let actual_x_1 = actual_x / self.downsample1;
         let actual_x_2 = actual_x / self.downsample2;
         let actual_x_3 = actual_x / self.downsample3;
 
-        return (
-            self.data1[actual_y][actual_x_1],
-            self.data2[actual_y_downsampled][actual_x_2],
-            self.data3[actual_y_downsampled][actual_x_3],
-        );
+        (
+            self.channel1[actual_y][actual_x_1],
+            self.channel2[actual_y_downsampled][actual_x_2],
+            self.channel3[actual_y_downsampled][actual_x_3],
+        )
     }
 
     /// Convert this image from RGB to YCbCr color space.
@@ -140,16 +140,16 @@ impl Image {
         {
             panic!("rgb_to_ycbcr called after downsampling!")
         }
-        for row in 0..self.data1.len() {
-            for col in 0..self.data1[row].len() {
+        for row in 0..self.channel1.len() {
+            for col in 0..self.channel1[row].len() {
                 let (y, cr, cb) = convert_rgb_values_to_ycbcr(
-                    self.data1[row][col],
-                    self.data2[row][col],
-                    self.data3[row][col],
+                    self.channel1[row][col],
+                    self.channel2[row][col],
+                    self.channel3[row][col],
                 );
-                self.data1[row][col] = y;
-                self.data2[row][col] = cr;
-                self.data3[row][col] = cb;
+                self.channel1[row][col] = y;
+                self.channel2[row][col] = cr;
+                self.channel3[row][col] = cb;
             }
         }
     }
@@ -181,16 +181,16 @@ impl Image {
         if (product & product - 1) != 0 {
             panic!("One of the values is not in power of two");
         }
-        let result_cb = downsample_channel(&self.data2, a, b, c == 0);
+        let result_cb = downsample_channel(&self.channel2, a, b, c == 0);
         let cr_b = if c == 0 { b } else { c };
-        let result_cr = downsample_channel(&self.data3, a, cr_b, c == 0);
+        let result_cr = downsample_channel(&self.channel3, a, cr_b, c == 0);
 
-        self.data2 = result_cb;
-        self.data3 = result_cr;
+        self.channel2 = result_cb;
+        self.channel3 = result_cr;
 
-        self.downsample2 = a / b;
-        self.downsample3 = a / cr_b;
-        self.downsampled_vertically = c == 0;
+        self.downsample2 *= a / b;
+        self.downsample3 *= a / cr_b;
+        self.downsampled_vertically |= c == 0;
     }
 }
 
@@ -199,9 +199,9 @@ impl Default for Image {
         Image {
             height: 0,
             width: 0,
-            data1: vec![],
-            data2: vec![],
-            data3: vec![],
+            channel1: vec![],
+            channel2: vec![],
+            channel3: vec![],
             downsample1: 1,
             downsample2: 1,
             downsample3: 1,
@@ -223,14 +223,14 @@ mod tests {
             Image {
                 width: 4,
                 height: 4,
-                data1: vec![
+                channel1: vec![
                     vec![0, 0, 0, 15],
                     vec![0, 0, 0, 0],
                     vec![0, 0, 0, 0],
                     vec![15, 0, 0, 0]
                 ],
-                data2: vec![vec![0, 0], vec![7, 0], vec![0, 7], vec![0, 0]],
-                data3: vec![vec![0, 7], vec![3, 0], vec![0, 3], vec![7, 0]],
+                channel2: vec![vec![0, 0], vec![7, 0], vec![0, 7], vec![0, 0]],
+                channel3: vec![vec![0, 7], vec![3, 0], vec![0, 3], vec![7, 0]],
                 downsample1: 1,
                 downsample2: 2,
                 downsample3: 2,
@@ -248,19 +248,19 @@ mod tests {
             Image {
                 width: 4,
                 height: 4,
-                data1: vec![
+                channel1: vec![
                     vec![0, 0, 0, 15],
                     vec![0, 0, 0, 0],
                     vec![0, 0, 0, 0],
                     vec![15, 0, 0, 0]
                 ],
-                data2: vec![
+                channel2: vec![
                     vec![0, 0, 0, 0],
                     vec![0, 15, 0, 0],
                     vec![0, 0, 15, 0],
                     vec![0, 0, 0, 0]
                 ],
-                data3: vec![
+                channel3: vec![
                     vec![0, 0, 0, 15],
                     vec![0, 7, 0, 0],
                     vec![0, 0, 7, 0],
@@ -283,14 +283,14 @@ mod tests {
             Image {
                 width: 4,
                 height: 4,
-                data1: vec![
+                channel1: vec![
                     vec![0, 0, 0, 15],
                     vec![0, 0, 0, 0],
                     vec![0, 0, 0, 0],
                     vec![15, 0, 0, 0]
                 ],
-                data2: vec![vec![1], vec![1],],
-                data3: vec![vec![2], vec![2],],
+                channel2: vec![vec![1], vec![1],],
+                channel3: vec![vec![2], vec![2],],
                 downsample1: 1,
                 downsample2: 4,
                 downsample3: 4,
@@ -403,9 +403,9 @@ mod tests {
         let mut image = Image {
             height: 1,
             width: 5,
-            data1: Vec::from([Vec::from([0, 65535, 0, 0, 65535])]),
-            data2: Vec::from([Vec::from([0, 0, 65535, 0, 65535])]),
-            data3: Vec::from([Vec::from([0, 0, 0, 65535, 65535])]),
+            channel1: Vec::from([Vec::from([0, 65535, 0, 0, 65535])]),
+            channel2: Vec::from([Vec::from([0, 0, 65535, 0, 65535])]),
+            channel3: Vec::from([Vec::from([0, 0, 0, 65535, 65535])]),
             ..Default::default()
         };
         image.rgb_to_ycbcr();
@@ -414,9 +414,9 @@ mod tests {
             Image {
                 height: 1,
                 width: 5,
-                data1: Vec::from([Vec::from([0, 19595, 38469, 7471, 65535])]),
-                data2: Vec::from([Vec::from([32767, 21711, 11062, 65535, 32774])]),
-                data3: Vec::from([Vec::from([32767, 65535, 5334, 27439, 32774])]),
+                channel1: Vec::from([Vec::from([0, 19595, 38469, 7471, 65535])]),
+                channel2: Vec::from([Vec::from([32767, 21711, 11062, 65535, 32774])]),
+                channel3: Vec::from([Vec::from([32767, 65535, 5334, 27439, 32774])]),
                 ..Default::default()
             }
         )
