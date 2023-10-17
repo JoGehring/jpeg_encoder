@@ -1,3 +1,5 @@
+use std::fs;
+
 #[derive(Clone, Debug, PartialEq)]
 struct BitStream {
     data: Vec<u8>,
@@ -81,9 +83,22 @@ impl BitStream {
         self.bits_in_last_byte += shift;
     }
 
-    pub fn flush_to_file(&self, fname: &str) {
-        panic!("Not implemented yet!");
-        // TODO
+    /// Flush the bit stream to a file.
+    ///
+    /// # Arguments
+    ///
+    /// * filename: The name of the file to write to.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let stream = BitStream.open();
+    /// stream.append_bit(true);
+    /// stream.append_bit(false);
+    /// stream.flush_to_file("test.bin");
+    /// ```
+    pub fn flush_to_file(&self, filename: &str) -> std::io::Result<()> {
+         fs::write(filename, &self.data)
     }
 }
 
