@@ -43,13 +43,13 @@ impl BitStream {
     /// Append a byte of data to this bit stream.
     /// TODO: Perhaps also add a generic function to append
     /// integers of any size?
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * value: The data to append.
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// let stream = BitStream.open();
     /// stream.append_byte(244);
@@ -114,25 +114,26 @@ impl Default for BitStream {
 #[cfg(test)]
 mod tests {
     use std::fs;
+
     use super::BitStream;
 
     #[test]
-        fn test_flush_to_file() -> std::io::Result<()> {
-            let stream = BitStream {
-                data: vec![0b10101010, 0b01010101],
-                bits_in_last_byte: 0,
-            };
-            let filename = "test.bin";
-            stream.flush_to_file(filename)?;
+    fn test_flush_to_file() -> std::io::Result<()> {
+        let stream = BitStream {
+            data: vec![0b10101010, 0b01010101],
+            bits_in_last_byte: 0,
+        };
+        let filename = "test.bin";
+        stream.flush_to_file(filename)?;
 
-            let contents = fs::read(filename)?;
-            assert_eq!(vec![0b10101010, 0b01010101], contents);
+        let contents = fs::read(filename)?;
+        assert_eq!(vec![0b10101010, 0b01010101], contents);
 
-            // Clean up the file
-            fs::remove_file(filename)?;
+        // Clean up the file
+        fs::remove_file(filename)?;
 
-            Ok(())
-        }
+        Ok(())
+    }
 
     #[test]
     fn test_append_bits() {
