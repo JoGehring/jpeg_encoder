@@ -98,7 +98,7 @@ impl BitStream {
     /// stream.flush_to_file("test.bin");
     /// ```
     pub fn flush_to_file(&self, filename: &str) -> std::io::Result<()> {
-         fs::write(filename, &self.data)
+        fs::write(filename, &self.data)
     }
 }
 
@@ -113,7 +113,26 @@ impl Default for BitStream {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use super::BitStream;
+
+    #[test]
+        fn test_flush_to_file() -> std::io::Result<()> {
+            let stream = BitStream {
+                data: vec![0b10101010, 0b01010101],
+                bits_in_last_byte: 0,
+            };
+            let filename = "test.bin";
+            stream.flush_to_file(filename)?;
+
+            let contents = fs::read(filename)?;
+            assert_eq!(vec![0b10101010, 0b01010101], contents);
+
+            // Clean up the file
+            fs::remove_file(filename)?;
+
+            Ok(())
+        }
 
     #[test]
     fn test_append_bits() {
