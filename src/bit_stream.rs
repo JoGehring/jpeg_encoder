@@ -1,3 +1,5 @@
+use std::fs;
+
 /// Clear the last n bytes of the value.
 /// TODO: find a better/not ugly way to do this.
 /// 
@@ -56,7 +58,6 @@ fn clear_first_n_bytes(value: u8, n: u8) -> u8 {
     value & to_and
 }
 
-
 #[derive(Clone, Debug, PartialEq)]
 struct BitStream {
     data: Vec<u8>,
@@ -100,13 +101,13 @@ impl BitStream {
     /// Append a byte of data to this bit stream.
     /// TODO: Perhaps also add a generic function to append
     /// integers of any size?
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * value: The data to append.
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// let stream = BitStream.open();
     /// stream.append_byte(244);
@@ -138,9 +139,22 @@ impl BitStream {
         self.bits_in_last_byte += shift;
     }
 
-    pub fn flush_to_file(&self, fname: &str) {
-        panic!("Not implemented yet!");
-        // TODO
+    /// Flush the bit stream to a file.
+    ///
+    /// # Arguments
+    ///
+    /// * filename: The name of the file to write to.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let stream = BitStream.open();
+    /// stream.append_bit(true);
+    /// stream.append_bit(false);
+    /// stream.flush_to_file("test.bin");
+    /// ```
+    pub fn flush_to_file(&self, filename: &str) -> std::io::Result<()> {
+        fs::write(filename, &self.data)
     }
 }
 
@@ -155,7 +169,27 @@ impl Default for BitStream {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::BitStream;
+
+    #[test]
+    fn test_flush_to_file() -> std::io::Result<()> {
+        let stream = BitStream {
+            data: vec![0b10101010, 0b01010101],
+            bits_in_last_byte: 0,
+        };
+        let filename = "test.bin";
+        stream.flush_to_file(filename)?;
+
+        let contents = fs::read(filename)?;
+        assert_eq!(vec![0b10101010, 0b01010101], contents);
+
+        // Clean up the file
+        fs::remove_file(filename)?;
+
+        Ok(())
+    }
 
     #[test]
     fn test_append_bits() {
