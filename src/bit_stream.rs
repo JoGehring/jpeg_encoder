@@ -121,9 +121,9 @@ impl BitStream {
         let upper_value =
             clear_last_n_bytes(value, self.bits_in_last_byte) >> self.bits_in_last_byte;
         let previous_bits_in_last_byte = self.bits_in_last_byte;
-        self.shift_and_add_to_last_byte(upper_value, 8 - self.bits_in_last_byte);
+        self.shift_and_add_to_last_byte(upper_value, 8 - previous_bits_in_last_byte);
 
-        let lower_value = clear_first_n_bytes(value, 8 - previous_bits_in_last_byte);
+        let lower_value = clear_first_n_bytes(value, 8 - previous_bits_in_last_byte) << (8 - previous_bits_in_last_byte);
         self.data.push(lower_value);
         self.bits_in_last_byte = previous_bits_in_last_byte;
     }
@@ -134,7 +134,7 @@ impl BitStream {
     /// # Arguments
     ///
     /// * `value`: The data to append. Only the first `shift` bits of this should be set.
-    /// * `shift`: The amount of bits to add to the last byte.
+    /// * `size`: The amount of bits to add to the last byte.
     ///
     /// # Example
     ///
@@ -144,13 +144,13 @@ impl BitStream {
     /// stream.shift_and_add_to_last_byte(3, 2);
     /// assert_eq!(vec![3], stream.data);
     /// ```
-    fn shift_and_add_to_last_byte(&mut self, value: u8, shift: u8) {
+    fn shift_and_add_to_last_byte(&mut self, mut value: u8, size: u8) {
         let mut last_byte = self.data[self.data.len() - 1];
-        last_byte = last_byte << shift;
+        value = clear_first_n_bytes(value, 8 - size) << (8 - size - self.bits_in_last_byte);
         last_byte += value;
         let index = self.data.len() - 1;
         self.data[index] = last_byte;
-        self.bits_in_last_byte += shift;
+        self.bits_in_last_byte += size;
     }
 
     /// Flush the bit stream to a file.
@@ -212,7 +212,7 @@ mod tests {
         stream.append_bit(false);
         stream.append_bit(true);
         stream.append_bit(true);
-        assert_eq!(11, stream.data[0]);
+        assert_eq!(176, stream.data[0]);
     }
 
     #[test]
@@ -230,6 +230,6 @@ mod tests {
         stream.append_bit(false);
         stream.append_bit(true);
         stream.append_byte(255);
-        assert_eq!(vec![44, 127, 3], stream.data)
+        assert_eq!(vec![44, 127, 192], stream.data)
     }
 }
