@@ -174,7 +174,7 @@ mod tests {
     use super::BitStream;
 
     #[test]
-    fn test_flush_to_file() -> std::io::Result<()> {
+    fn test_flush_to_file() {
         let stream = BitStream {
             data: vec![0b10101010, 0b01010101],
             bits_in_last_byte: 0,
@@ -187,8 +187,6 @@ mod tests {
 
         // Clean up the file
         fs::remove_file(filename)?;
-
-        Ok(())
     }
 
     #[test]
