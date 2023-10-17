@@ -1,3 +1,4 @@
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::fs;
 
 /// Clear the last n bytes of the value.
@@ -76,23 +77,6 @@ impl BitStream {
         BitStream {
             ..Default::default()
         }
-    }
-
-    /// Create a BitStream object from a file.
-    ///
-    /// # Arguments
-    ///
-    /// * filename: The name of the file to write to.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let stream = BitStream::read_bit_stream_from_file(filename);
-    /// stream.append_bit(true);
-    /// ```
-    pub fn read_bit_stream_from_file(filename: &str) -> BitStream {
-        let data = fs::read(filename).expect("failed to read file");
-        BitStream{data, bits_in_last_byte: 0}
     }
 
     /// Append a bit of data to this bit stream.
@@ -187,7 +171,6 @@ impl BitStream {
     pub fn flush_to_file(&self, filename: &str) -> std::io::Result<()> {
         fs::write(filename, &self.data)
     }
-
 }
 
 impl Default for BitStream {
@@ -199,67 +182,16 @@ impl Default for BitStream {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::fs;
-
-    use super::BitStream;
-
-    #[test]
-    fn test_flush_to_file() -> std::io::Result<()> {
-        let stream = BitStream {
-            data: vec![0b10101010, 0b01010101],
-            bits_in_last_byte: 0,
-        };
-        let filename = "test.bin";
-        stream.flush_to_file(filename)?;
-
-        let contents = fs::read(filename)?;
-        assert_eq!(vec![0b10101010, 0b01010101], contents);
-
-        // Clean up the file
-        fs::remove_file(filename)?;
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_append_bits() {
-        let mut stream = BitStream::open();
-        stream.append_bit(true);
-        stream.append_bit(false);
-        stream.append_bit(true);
-        stream.append_bit(true);
-        assert_eq!(11, stream.data[0]);
-    }
-
-    #[test]
-    fn test_append_bytes() {
-        let mut stream = BitStream::open();
-        stream.append_byte(44);
-        stream.append_byte(231);
-        assert_eq!(vec![44, 231], stream.data);
-    }
-
-    #[test]
-    fn test_append_bits_and_bytes() {
-        let mut stream = BitStream::open();
-        stream.append_byte(44);
-        stream.append_bit(false);
-        stream.append_bit(true);
-        stream.append_byte(255);
-        assert_eq!(vec![44, 127, 3], stream.data)
-    }
-
-    #[test]
-    fn test_read_bit_stream_from_file() {
-        let stream = BitStream {
-            data: vec![1,2,3,4,5,6,7,8],
-            bits_in_last_byte: 0,
-        };
-        let filename = "test/binary_stream_test_file.bin";
-
-        let bit_stream = BitStream::read_bit_stream_from_file(filename);
-        assert_eq!(stream, bit_stream);
-    }
+pub fn criterion_benchmark(c: &mut Criterion) {
+    c.bench_function("Test", |b| {
+        b.iter(|| {
+            let mut stream = BitStream::open();
+            for i in 0..10000000 {
+                stream.append_bit(i % 2 == 1);
+            }
+        })
+    });
 }
+
+criterion_group!(benches, criterion_benchmark);
+criterion_main!(benches);
