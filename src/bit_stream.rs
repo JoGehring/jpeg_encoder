@@ -203,7 +203,51 @@ impl Default for BitStream {
 mod tests {
     use std::fs;
 
-    use super::BitStream;
+    use super::{BitStream, clear_first_n_bytes, clear_last_n_bytes};
+
+    #[test]
+    fn test_append_bit() {
+        let mut stream = BitStream::open();
+        stream.append_bit(true);
+        stream.append_bit(false);
+        stream.append_bit(true);
+        assert_eq!(vec![0b00000101], stream.data);
+    }
+
+    #[test]
+    fn test_append_byte() {
+        let mut stream = BitStream::open();
+        stream.append_byte(0b10101010);
+        stream.append_byte(0b11110000);
+        assert_eq!(vec![0b10101010, 0b11110000], stream.data);
+    }
+
+    #[test]
+    fn test_clear_first_n_bytes() {
+        assert_eq!(0b11111111, clear_first_n_bytes(0b11111111, 0));
+        assert_eq!(0b01111111, clear_first_n_bytes(0b11111111, 1));
+        assert_eq!(0b00111111, clear_first_n_bytes(0b11111111, 2));
+        assert_eq!(0b00011111, clear_first_n_bytes(0b11111111, 3));
+        assert_eq!(0b00001111, clear_first_n_bytes(0b11111111, 4));
+        assert_eq!(0b00000111, clear_first_n_bytes(0b11111111, 5));
+        assert_eq!(0b00000011, clear_first_n_bytes(0b11111111, 6));
+        assert_eq!(0b00000001, clear_first_n_bytes(0b11111111, 7));
+        assert_eq!(0b00000000, clear_first_n_bytes(0b11111111, 8));
+    }
+
+    #[test]
+    fn test_clear_last_n_bytes() {
+        assert_eq!(0b11111111, clear_last_n_bytes(0b11111111, 0));
+        assert_eq!(0b11111110, clear_last_n_bytes(0b11111111, 1));
+        assert_eq!(0b11111100, clear_last_n_bytes(0b11111111, 2));
+        assert_eq!(0b11111000, clear_last_n_bytes(0b11111111, 3));
+        assert_eq!(0b11110000, clear_last_n_bytes(0b11111111, 4));
+        assert_eq!(0b11100000, clear_last_n_bytes(0b11111111, 5));
+        assert_eq!(0b11000000, clear_last_n_bytes(0b11111111, 6));
+        assert_eq!(0b10000000, clear_last_n_bytes(0b11111111, 7));
+        assert_eq!(0b00000000, clear_last_n_bytes(0b11111111, 8));
+    }
+
 
     #[test]
     fn test_flush_to_file() -> std::io::Result<()> {
