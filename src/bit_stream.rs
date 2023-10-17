@@ -206,23 +206,6 @@ mod tests {
     use super::{BitStream, clear_first_n_bytes, clear_last_n_bytes};
 
     #[test]
-    fn test_append_bit() {
-        let mut stream = BitStream::open();
-        stream.append_bit(true);
-        stream.append_bit(false);
-        stream.append_bit(true);
-        assert_eq!(vec![0b00000101], stream.data);
-    }
-
-    #[test]
-    fn test_append_byte() {
-        let mut stream = BitStream::open();
-        stream.append_byte(0b10101010);
-        stream.append_byte(0b11110000);
-        assert_eq!(vec![0b10101010, 0b11110000], stream.data);
-    }
-
-    #[test]
     fn test_clear_first_n_bytes() {
         assert_eq!(0b11111111, clear_first_n_bytes(0b11111111, 0));
         assert_eq!(0b01111111, clear_first_n_bytes(0b11111111, 1));
@@ -274,7 +257,7 @@ mod tests {
         stream.append_bit(false);
         stream.append_bit(true);
         stream.append_bit(true);
-        assert_eq!(176, stream.data[0]);
+        assert_eq!(vec![0b10110000], stream.data);
     }
 
     #[test]
@@ -292,7 +275,7 @@ mod tests {
         stream.append_bit(false);
         stream.append_bit(true);
         stream.append_byte(255);
-        assert_eq!(vec![44, 127, 192], stream.data)
+        assert_eq!(vec![44, 0b01111111, 0b11000000], stream.data)
     }
 
     #[test]
