@@ -92,7 +92,10 @@ impl BitStream {
     /// ```
     pub fn read_bit_stream_from_file(filename: &str) -> BitStream {
         let data = fs::read(filename).expect("failed to read file");
-        BitStream { data, bits_in_last_byte: 0 }
+        BitStream {
+            data,
+            bits_in_last_byte: 0,
+        }
     }
 
     /// Append a bit of data to this bit stream.
@@ -130,7 +133,7 @@ impl BitStream {
     /// stream.append_byte(244);
     /// ```
     ///
-    /// # Explaination
+    /// # Explanation
     ///
     /// ## upper_value
     ///
@@ -140,12 +143,13 @@ impl BitStream {
     /// ## lower_value
     ///
     /// The value we have to append as a new byte. Cut off the bits we already appended to the last byte
-    /// and move the remaining towards the MSB
+    /// and move the remaining towards the MSB, then append as a new byte.
     ///
     /// ## General
     ///
     /// * If we have a fully filled byte at the end, we can just push the next to data
-    /// * bits_in_last_byte doesn't change as we add a whole byte to the stream
+    /// * bits_in_last_byte doesn't change as we add a whole byte to the stream. We do need to store and re-set it though,
+    ///     as shift_and_add_to_last_byte changes the value of bits_in_last_byte.
     pub fn append_byte(&mut self, value: u8) {
         // if the last byte in the stream is full, we can just append this one
         if self.bits_in_last_byte == 8 {
@@ -153,15 +157,20 @@ impl BitStream {
             return;
         }
 
+        let previous_bits_in_last_byte = self.bits_in_last_byte;
+
         let upper_value =
             clear_last_n_bytes(value, self.bits_in_last_byte) >> self.bits_in_last_byte;
         let bits_still_available_in_last_byte = 8 - self.bits_in_last_byte;
         self.shift_and_add_to_last_byte(upper_value, bits_still_available_in_last_byte);
-        let lower_value = clear_first_n_bytes(value, bits_still_available_in_last_byte) << bits_still_available_in_last_byte;
+        let lower_value = clear_first_n_bytes(value, bits_still_available_in_last_byte)
+            << bits_still_available_in_last_byte;
         self.data.push(lower_value);
+
+        self.bits_in_last_byte = previous_bits_in_last_byte;
     }
 
-    /// Shift the last byte and then add the provided value to it.
+    /// Shift the provided value to the correct position, then store it in the last byte.
     /// This should be used to write data to the stream.
     ///
     /// # Arguments
@@ -178,13 +187,13 @@ impl BitStream {
     /// assert_eq!(vec![3], stream.data);
     /// ```
     ///
-    /// # Explaination
-    /// We shift it to the correct position given by the available space in the last byte, then add the
+    /// # Explanation
+    /// We shift the value to the correct position given by the available space in the last byte, then add the
     /// resulting byte to the last one and replace it within the vector
     fn shift_and_add_to_last_byte(&mut self, mut value: u8, bits_to_occupy: u8) {
         let index = self.data.len() - 1;
         let mut last_byte = self.data[index];
-        let bits_available =  8 - bits_to_occupy - self.bits_in_last_byte;
+        let bits_available = 8 - bits_to_occupy - self.bits_in_last_byte;
         value = value << bits_available;
         last_byte += value;
         self.data[index] = last_byte;
@@ -223,7 +232,7 @@ impl Default for BitStream {
 mod tests {
     use std::fs;
 
-    use super::{BitStream, clear_first_n_bytes, clear_last_n_bytes};
+    use super::{clear_first_n_bytes, clear_last_n_bytes, BitStream};
 
     #[test]
     fn test_clear_first_n_bytes() {
@@ -251,7 +260,6 @@ mod tests {
         assert_eq!(0b00000000, clear_last_n_bytes(0b11111111, 8));
     }
 
-
     #[test]
     fn test_flush_to_file() -> std::io::Result<()> {
         let stream = BitStream {
@@ -278,6 +286,7 @@ mod tests {
         stream.append_bit(true);
         stream.append_bit(true);
         assert_eq!(vec![0b10110000], stream.data);
+        assert_eq!(4, stream.bits_in_last_byte);
     }
 
     #[test]
@@ -286,6 +295,7 @@ mod tests {
         stream.append_byte(44);
         stream.append_byte(231);
         assert_eq!(vec![44, 231], stream.data);
+        assert_eq!(8, stream.bits_in_last_byte);
     }
 
     #[test]
@@ -295,7 +305,8 @@ mod tests {
         stream.append_bit(false);
         stream.append_bit(true);
         stream.append_byte(255);
-        assert_eq!(vec![44, 0b01111111, 0b11000000], stream.data)
+        assert_eq!(vec![44, 0b01111111, 0b11000000], stream.data);
+        assert_eq!(2, stream.bits_in_last_byte);
     }
 
     #[test]
