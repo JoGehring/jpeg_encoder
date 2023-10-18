@@ -31,7 +31,7 @@ pub fn read_ppm_from_file(filename: &str) -> Image {
     let width: u16 = dimensions[1].parse().unwrap();
 
     let (image_values1, image_values2, image_values3) =
-        parse_image_values_from_string_array(result, width as usize);
+        parse_image_values_from_string_array(result, width as usize, height as usize);
 
     if image_values1.len() != height as usize {
         panic!("R values row length to expected height mismatch");
@@ -90,10 +90,11 @@ fn parse_file_to_string_vec(filename: &str) -> Vec<String> {
 fn parse_image_values_from_string_array(
     data: Vec<String>,
     width: usize,
+    height: usize
 ) -> (Vec<Vec<u16>>, Vec<Vec<u16>>, Vec<Vec<u16>>) {
-    let mut image_values1: Vec<Vec<u16>> = vec![];
-    let mut image_values2: Vec<Vec<u16>> = vec![];
-    let mut image_values3: Vec<Vec<u16>> = vec![];
+    let mut image_values1: Vec<Vec<u16>> = Vec::with_capacity(height);
+    let mut image_values2: Vec<Vec<u16>> = Vec::with_capacity(height);
+    let mut image_values3: Vec<Vec<u16>> = Vec::with_capacity(height);
 
     for i in 3..data.len() {
         let (r_values, g_values, b_values) = parse_image_values_from_line(&data[i], width);
@@ -118,16 +119,15 @@ fn parse_image_values_from_string_array(
 fn parse_image_values_from_line(data: &String, width: usize) -> (Vec<u16>, Vec<u16>, Vec<u16>) {
     // regex to split by whitespace
     let re = Regex::new(r"\s+").unwrap();
-
-    let mut r_values: Vec<u16> = vec![];
-    let mut g_values: Vec<u16> = vec![];
-    let mut b_values: Vec<u16> = vec![];
-
     let values: Vec<String> = re.split(data.as_str()).map(|x| x.to_string()).collect();
 
     if values.len() / 3 != width {
         panic!("Line length to expected width mismatch");
     }
+
+    let mut r_values: Vec<u16> = Vec::with_capacity(width);
+    let mut g_values: Vec<u16> = Vec::with_capacity(width);
+    let mut b_values: Vec<u16> = Vec::with_capacity(width);
 
     for j in (0..values.len()).step_by(3) {
         r_values.push(values[j].parse().unwrap());

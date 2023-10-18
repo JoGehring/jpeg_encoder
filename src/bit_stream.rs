@@ -92,7 +92,7 @@ impl BitStream {
     /// ```
     pub fn read_bit_stream_from_file(filename: &str) -> BitStream {
         let data = fs::read(filename).expect("failed to read file");
-        BitStream{data, bits_in_last_byte: 0}
+        BitStream { data, bits_in_last_byte: 0 }
     }
 
     /// Append a bit of data to this bit stream.
@@ -129,20 +129,36 @@ impl BitStream {
     /// let mut stream = BitStream.open();
     /// stream.append_byte(244);
     /// ```
+    ///
+    /// # Explaination
+    ///
+    /// ## upper_value
+    ///
+    /// The bits we can append to the last byte in the stream. Cut off the amount of bits already
+    ///  occupied in the last byte and move the remaining towards the LSB, then add them to the last byte
+    ///
+    /// ## lower_value
+    ///
+    /// The value we have to append as a new byte. Cut off the bits we already appended to the last byte
+    /// and move the remaining towards the MSB
+    ///
+    /// ## General
+    ///
+    /// * If we have a fully filled byte at the end, we can just push the next to data
+    /// * bits_in_last_byte doesn't change as we add a whole byte to the stream
     pub fn append_byte(&mut self, value: u8) {
         // if the last byte in the stream is full, we can just append this one
         if self.bits_in_last_byte == 8 {
             self.data.push(value);
             return;
         }
+
         let upper_value =
             clear_last_n_bytes(value, self.bits_in_last_byte) >> self.bits_in_last_byte;
-        let previous_bits_in_last_byte = self.bits_in_last_byte;
-        self.shift_and_add_to_last_byte(upper_value, 8 - previous_bits_in_last_byte);
-
-        let lower_value = clear_first_n_bytes(value, 8 - previous_bits_in_last_byte) << (8 - previous_bits_in_last_byte);
+        let bits_still_available_in_last_byte = 8 - self.bits_in_last_byte;
+        self.shift_and_add_to_last_byte(upper_value, bits_still_available_in_last_byte);
+        let lower_value = clear_first_n_bytes(value, bits_still_available_in_last_byte) << bits_still_available_in_last_byte;
         self.data.push(lower_value);
-        self.bits_in_last_byte = previous_bits_in_last_byte;
     }
 
     /// Shift the last byte and then add the provided value to it.
@@ -151,7 +167,7 @@ impl BitStream {
     /// # Arguments
     ///
     /// * `value`: The data to append. Only the first `shift` bits of this should be set.
-    /// * `size`: The amount of bits to add to the last byte.
+    /// * `bits_to_occupy`: The amount of bits to add to the last byte.
     ///
     /// # Example
     ///
@@ -161,13 +177,18 @@ impl BitStream {
     /// stream.shift_and_add_to_last_byte(3, 2);
     /// assert_eq!(vec![3], stream.data);
     /// ```
-    fn shift_and_add_to_last_byte(&mut self, mut value: u8, size: u8) {
-        let mut last_byte = self.data[self.data.len() - 1];
-        value = clear_first_n_bytes(value, 8 - size) << (8 - size - self.bits_in_last_byte);
-        last_byte += value;
+    ///
+    /// # Explaination
+    /// We shift it to the correct position given by the available space in the last byte, then add the
+    /// resulting byte to the last one and replace it within the vector
+    fn shift_and_add_to_last_byte(&mut self, mut value: u8, bits_to_occupy: u8) {
         let index = self.data.len() - 1;
+        let mut last_byte = self.data[index];
+        let bits_available =  8 - bits_to_occupy - self.bits_in_last_byte;
+        value = value << bits_available;
+        last_byte += value;
         self.data[index] = last_byte;
-        self.bits_in_last_byte += size;
+        self.bits_in_last_byte += bits_to_occupy;
     }
 
     /// Flush the bit stream to a file.
@@ -187,7 +208,6 @@ impl BitStream {
     pub fn flush_to_file(&self, filename: &str) -> std::io::Result<()> {
         fs::write(filename, &self.data)
     }
-
 }
 
 impl Default for BitStream {
@@ -281,7 +301,7 @@ mod tests {
     #[test]
     fn test_read_bit_stream_from_file() {
         let stream = BitStream {
-            data: vec![1,2,3,4,5,6,7,8],
+            data: vec![1, 2, 3, 4, 5, 6, 7, 8],
             bits_in_last_byte: 0,
         };
         let filename = "test/binary_stream_test_file.bin";
