@@ -1,6 +1,9 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::fs;
 
+// Due to limitations with Criterion, we need to copy/paste bit_stream.rs here.
+// We can only use code from src/ if we are creating a library :/
+
 /// Clear the last n bytes of the value.
 /// TODO: find a better/not ugly way to do this.
 ///
@@ -79,6 +82,26 @@ impl BitStream {
         }
     }
 
+    /// Create a BitStream object from a file.
+    ///
+    /// # Arguments
+    ///
+    /// * filename: The name of the file to write to.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let stream = BitStream::read_bit_stream_from_file(filename);
+    /// stream.append_bit(true);
+    /// ```
+    pub fn read_bit_stream_from_file(filename: &str) -> BitStream {
+        let data = fs::read(filename).expect("failed to read file");
+        BitStream {
+            data,
+            bits_in_last_byte: 0,
+        }
+    }
+
     /// Append a bit of data to this bit stream.
     ///
     /// # Arguments
@@ -113,29 +136,51 @@ impl BitStream {
     /// let mut stream = BitStream.open();
     /// stream.append_byte(244);
     /// ```
+    ///
+    /// # Explanation
+    ///
+    /// ## upper_value
+    ///
+    /// The bits we can append to the last byte in the stream. Cut off the amount of bits already
+    ///  occupied in the last byte and move the remaining towards the LSB, then add them to the last byte
+    ///
+    /// ## lower_value
+    ///
+    /// The value we have to append as a new byte. Cut off the bits we already appended to the last byte
+    /// and move the remaining towards the MSB, then append as a new byte.
+    ///
+    /// ## General
+    ///
+    /// * If we have a fully filled byte at the end, we can just push the next to data
+    /// * bits_in_last_byte doesn't change as we add a whole byte to the stream. We do need to store and re-set it though,
+    ///     as shift_and_add_to_last_byte changes the value of bits_in_last_byte.
     pub fn append_byte(&mut self, value: u8) {
         // if the last byte in the stream is full, we can just append this one
         if self.bits_in_last_byte == 8 {
             self.data.push(value);
             return;
         }
+
+        let previous_bits_in_last_byte = self.bits_in_last_byte;
+
         let upper_value =
             clear_last_n_bytes(value, self.bits_in_last_byte) >> self.bits_in_last_byte;
-        let previous_bits_in_last_byte = self.bits_in_last_byte;
-        self.shift_and_add_to_last_byte(upper_value, 8 - self.bits_in_last_byte);
-
-        let lower_value = clear_first_n_bytes(value, 8 - previous_bits_in_last_byte);
+        let bits_still_available_in_last_byte = 8 - self.bits_in_last_byte;
+        self.shift_and_add_to_last_byte(upper_value, bits_still_available_in_last_byte);
+        let lower_value = clear_first_n_bytes(value, bits_still_available_in_last_byte)
+            << bits_still_available_in_last_byte;
         self.data.push(lower_value);
+
         self.bits_in_last_byte = previous_bits_in_last_byte;
     }
 
-    /// Shift the last byte and then add the provided value to it.
+    /// Shift the provided value to the correct position, then store it in the last byte.
     /// This should be used to write data to the stream.
     ///
     /// # Arguments
     ///
     /// * `value`: The data to append. Only the first `shift` bits of this should be set.
-    /// * `shift`: The amount of bits to add to the last byte.
+    /// * `bits_to_occupy`: The amount of bits to add to the last byte.
     ///
     /// # Example
     ///
@@ -145,13 +190,22 @@ impl BitStream {
     /// stream.shift_and_add_to_last_byte(3, 2);
     /// assert_eq!(vec![3], stream.data);
     /// ```
-    fn shift_and_add_to_last_byte(&mut self, value: u8, shift: u8) {
-        let mut last_byte = self.data[self.data.len() - 1];
-        last_byte = last_byte << shift;
-        last_byte += value;
+    ///
+    /// # Explanation
+    /// We shift the value to the correct position given by the available space in the last byte, then add the
+    /// resulting byte to the last one and replace it within the vector
+    /// 
+    /// # Panics
+    /// 
+    /// * If more than the last `bits_to_occupy` bits of `value` are set
+    fn shift_and_add_to_last_byte(&mut self, mut value: u8, bits_to_occupy: u8) {
         let index = self.data.len() - 1;
+        let mut last_byte = self.data[index];
+        let bits_available = 8 - bits_to_occupy - self.bits_in_last_byte;
+        value = value << bits_available;
+        last_byte += value;
         self.data[index] = last_byte;
-        self.bits_in_last_byte += shift;
+        self.bits_in_last_byte += bits_to_occupy;
     }
 
     /// Flush the bit stream to a file.
