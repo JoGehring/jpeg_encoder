@@ -190,6 +190,10 @@ impl BitStream {
     /// # Explanation
     /// We shift the value to the correct position given by the available space in the last byte, then add the
     /// resulting byte to the last one and replace it within the vector
+    /// 
+    /// # Panics
+    /// 
+    /// * If more than the last `bits_to_occupy` bits of `value` are set
     fn shift_and_add_to_last_byte(&mut self, mut value: u8, bits_to_occupy: u8) {
         let index = self.data.len() - 1;
         let mut last_byte = self.data[index];
