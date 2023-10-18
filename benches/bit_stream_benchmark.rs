@@ -186,8 +186,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("Test", |b| {
         b.iter(|| {
             let mut stream = BitStream::open();
-            for i in 0..10000000 {
-                stream.append_bit(i % 2 == 1);
+            for _ in 0..10000000 {
+                stream.append_bit(black_box(true));
             }
         })
     });
