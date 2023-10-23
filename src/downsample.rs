@@ -182,14 +182,14 @@ fn downsample_vec_by_two(original_vec: Vec<u16>) -> Vec<u16> {
 /// Calculate an average between two values, while accounting for overflows.
 /// This works by halving the values before adding them (avoiding overflows)
 /// but also checking for whether that would lose a carry due to rounding error.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `value1` First value to add up.
 /// * `value2` Second value to add up.
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```
 /// let result = overflow_safe_avg(65535, 65533);
 /// assert_eq!(65534, result);
@@ -204,7 +204,7 @@ fn overflow_safe_avg(value1: u16, value2: u16) -> u16 {
 mod tests {
     use super::{
         copy_and_pad, downsample_channel, downsample_rows, downsample_segment_of_row,
-        downsample_vec_by_two, overflow_safe_avg
+        downsample_vec_by_two, overflow_safe_avg,
     };
 
     #[test]

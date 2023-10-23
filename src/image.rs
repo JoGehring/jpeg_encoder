@@ -212,8 +212,9 @@ impl Default for Image {
 
 #[cfg(test)]
 mod tests {
-    use super::{convert_rgb_values_to_ycbcr, Image};
     use crate::ppm_parser::read_ppm_from_file;
+
+    use super::{convert_rgb_values_to_ycbcr, Image};
 
     #[test]
     fn test_downsample_image_factor_two() {
@@ -227,7 +228,7 @@ mod tests {
                     vec![0, 0, 0, 15],
                     vec![0, 0, 0, 0],
                     vec![0, 0, 0, 0],
-                    vec![15, 0, 0, 0]
+                    vec![15, 0, 0, 0],
                 ],
                 channel2: vec![vec![0, 0], vec![7, 0], vec![0, 7], vec![0, 0]],
                 channel3: vec![vec![0, 7], vec![3, 0], vec![0, 3], vec![7, 0]],
@@ -252,19 +253,19 @@ mod tests {
                     vec![0, 0, 0, 15],
                     vec![0, 0, 0, 0],
                     vec![0, 0, 0, 0],
-                    vec![15, 0, 0, 0]
+                    vec![15, 0, 0, 0],
                 ],
                 channel2: vec![
                     vec![0, 0, 0, 0],
                     vec![0, 15, 0, 0],
                     vec![0, 0, 15, 0],
-                    vec![0, 0, 0, 0]
+                    vec![0, 0, 0, 0],
                 ],
                 channel3: vec![
                     vec![0, 0, 0, 15],
                     vec![0, 7, 0, 0],
                     vec![0, 0, 7, 0],
-                    vec![15, 0, 0, 0]
+                    vec![15, 0, 0, 0],
                 ],
                 downsample1: 1,
                 downsample2: 1,
@@ -287,10 +288,10 @@ mod tests {
                     vec![0, 0, 0, 15],
                     vec![0, 0, 0, 0],
                     vec![0, 0, 0, 0],
-                    vec![15, 0, 0, 0]
+                    vec![15, 0, 0, 0],
                 ],
-                channel2: vec![vec![1], vec![1],],
-                channel3: vec![vec![2], vec![2],],
+                channel2: vec![vec![1], vec![1]],
+                channel3: vec![vec![2], vec![2]],
                 downsample1: 1,
                 downsample2: 4,
                 downsample3: 4,

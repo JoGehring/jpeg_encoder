@@ -1,6 +1,8 @@
-use crate::image::{create_image, Image};
-use regex::Regex;
 use std::fs::read_to_string;
+
+use regex::Regex;
+
+use crate::image::{create_image, Image};
 
 /// Reads an P3 PPM image file to image data structure
 ///
@@ -18,10 +20,12 @@ use std::fs::read_to_string;
 ///
 /// * PPM image file is not P3 format
 /// * Any row or column of R/G/B values doesn't match the stated width and height
+const SUPPORTED_FORMAT: &str = "P3";
+
 pub fn read_ppm_from_file(filename: &str) -> Image {
     let result = parse_file_to_string_vec(filename);
 
-    if result[0] != String::from("P3") {
+    if result[0] != SUPPORTED_FORMAT {
         panic!("Unsupported PPM format");
     }
 
@@ -47,50 +51,49 @@ pub fn read_ppm_from_file(filename: &str) -> Image {
 }
 
 /// Parse a file as a string vec.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `filename`: The file name.
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// let vector = parse_file_to_string_vec("/path/to/file");
 /// ```
 fn parse_file_to_string_vec(filename: &str) -> Vec<String> {
     let mut result: Vec<String> = vec![];
-    for raw_line in read_to_string(filename).unwrap().lines() {
-        let line = raw_line.to_string();
+    for line in read_to_string(filename).unwrap().lines() {
         if line.starts_with("#") {
             continue;
         }
-        result.push(line);
+        result.push(line.to_owned());
     }
     result
 }
 
 /// Parse the image values from a string representation of a PPM file.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `data`: The file to parse.
 /// * `width`: The expected image width.
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// let vector = parse_file_to_string_vec("/path/to/file");
 /// // in a real world example, you should get the width from the file!
 /// let (r, g, b) = parse_image_values_from_string_array(vector, 4);
 /// ```
-/// 
+///
 /// # Panics
-/// 
+///
 /// * If the amount of values in any line doesn't match the expected width.
 fn parse_image_values_from_string_array(
     data: Vec<String>,
     width: usize,
-    height: usize
+    height: usize,
 ) -> (Vec<Vec<u16>>, Vec<Vec<u16>>, Vec<Vec<u16>>) {
     let mut image_values1: Vec<Vec<u16>> = Vec::with_capacity(height);
     let mut image_values2: Vec<Vec<u16>> = Vec::with_capacity(height);
@@ -107,19 +110,19 @@ fn parse_image_values_from_string_array(
 }
 
 /// Parse a line from a PPM file.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `data`: The line to parse.
 /// * `width`: The expected image width.
-/// 
+///
 /// # Panics
-/// 
+///
 /// * If the amount of values in the line doesn't match the expected width.
-fn parse_image_values_from_line(data: &String, width: usize) -> (Vec<u16>, Vec<u16>, Vec<u16>) {
+fn parse_image_values_from_line(data: &str, width: usize) -> (Vec<u16>, Vec<u16>, Vec<u16>) {
     // regex to split by whitespace
     let re = Regex::new(r"\s+").unwrap();
-    let values: Vec<String> = re.split(data.as_str()).map(|x| x.to_string()).collect();
+    let values: Vec<&str> = re.split(data).collect();
 
     if values.len() / 3 != width {
         panic!("Line length to expected width mismatch");
@@ -140,10 +143,11 @@ fn parse_image_values_from_line(data: &String, width: usize) -> (Vec<u16>, Vec<u
 
 #[cfg(test)]
 mod tests {
-    use super::read_ppm_from_file;
     use crate::image::create_image;
 
-    // TODO: tests for utility functions
+    use super::read_ppm_from_file;
+
+// TODO: tests for utility functions
 
     #[test]
     fn test_ppm_from_file_successful() {
@@ -191,6 +195,4 @@ mod tests {
     fn test_ppm_from_file_width_not_as_expected() {
         let _read_image = read_ppm_from_file("test/invalid_test_width_not_equal_to_expected.ppm");
     }
-
-
 }
