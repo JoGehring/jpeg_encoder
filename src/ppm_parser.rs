@@ -30,7 +30,6 @@ pub fn read_ppm_from_file(filename: &str) -> Image {
     }
 
     let dimensions: Vec<_> = result[1].split(" ").collect();
-    // let maxValue = result[2].clone();
     let height: u16 = dimensions[0].parse().unwrap();
     let width: u16 = dimensions[1].parse().unwrap();
 
@@ -95,12 +94,16 @@ fn parse_image_values_from_string_array(
     width: usize,
     height: usize,
 ) -> (Vec<Vec<u16>>, Vec<Vec<u16>>, Vec<Vec<u16>>) {
+    let max_value_in_ppm: u16 = data[2].parse().unwrap();
+    let scaling_factor = u16::MAX as f32 / max_value_in_ppm as f32;
+
     let mut image_values1: Vec<Vec<u16>> = Vec::with_capacity(height);
     let mut image_values2: Vec<Vec<u16>> = Vec::with_capacity(height);
     let mut image_values3: Vec<Vec<u16>> = Vec::with_capacity(height);
 
     for i in 3..data.len() {
-        let (r_values, g_values, b_values) = parse_image_values_from_line(&data[i], width);
+        let (r_values, g_values, b_values) =
+            parse_image_values_from_line(&data[i], width, scaling_factor);
         image_values1.push(r_values);
         image_values2.push(g_values);
         image_values3.push(b_values);
@@ -115,11 +118,16 @@ fn parse_image_values_from_string_array(
 ///
 /// * `data`: The line to parse.
 /// * `width`: The expected image width.
+/// * `scaling_factor`: The factor to scale values with, if the PPM file uses a different value range than our image struct.
 ///
 /// # Panics
 ///
 /// * If the amount of values in the line doesn't match the expected width.
-fn parse_image_values_from_line(data: &str, width: usize) -> (Vec<u16>, Vec<u16>, Vec<u16>) {
+fn parse_image_values_from_line(
+    data: &str,
+    width: usize,
+    scaling_factor: f32,
+) -> (Vec<u16>, Vec<u16>, Vec<u16>) {
     // regex to split by whitespace
     let re = Regex::new(r"\s+").unwrap();
     let values: Vec<&str> = re.split(data).collect();
@@ -133,12 +141,31 @@ fn parse_image_values_from_line(data: &str, width: usize) -> (Vec<u16>, Vec<u16>
     let mut b_values: Vec<u16> = Vec::with_capacity(width);
 
     for j in (0..values.len()).step_by(3) {
-        r_values.push(values[j].parse().unwrap());
-        g_values.push(values[j + 1].parse().unwrap());
-        b_values.push(values[j + 2].parse().unwrap());
+        r_values.push(apply_scaling_factor(
+            values[j].parse().unwrap(),
+            scaling_factor,
+        ));
+        g_values.push(apply_scaling_factor(
+            values[j + 1].parse().unwrap(),
+            scaling_factor,
+        ));
+        b_values.push(apply_scaling_factor(
+            values[j + 2].parse().unwrap(),
+            scaling_factor,
+        ));
     }
 
     (r_values, g_values, b_values)
+}
+
+/// Apply the scaling factor. This is only extracted for readability purposes.
+///
+/// # Arguments
+///
+/// * `value`: The value to multiply with.
+/// * `scaling_factor`: The factor to scale it by.
+fn apply_scaling_factor(value: u16, scaling_factor: f32) -> u16 {
+    (value as f32 * scaling_factor) as u16
 }
 
 #[cfg(test)]
@@ -147,7 +174,7 @@ mod tests {
 
     use super::read_ppm_from_file;
 
-// TODO: tests for utility functions
+    // TODO: tests for utility functions
 
     #[test]
     fn test_ppm_from_file_successful() {
@@ -156,22 +183,22 @@ mod tests {
             4,
             4,
             vec![
-                vec![0, 0, 0, 15],
+                vec![0, 0, 0, 65535],
                 vec![0, 0, 0, 0],
                 vec![0, 0, 0, 0],
-                vec![15, 0, 0, 0],
+                vec![65535, 0, 0, 0],
             ],
             vec![
                 vec![0, 0, 0, 0],
-                vec![0, 15, 0, 0],
-                vec![0, 0, 15, 0],
+                vec![0, 65535, 0, 0],
+                vec![0, 0, 65535, 0],
                 vec![0, 0, 0, 0],
             ],
             vec![
-                vec![0, 0, 0, 15],
-                vec![0, 7, 0, 0],
-                vec![0, 0, 7, 0],
-                vec![15, 0, 0, 0],
+                vec![0, 0, 0, 65535],
+                vec![0, 30583, 0, 0],
+                vec![0, 0, 30583, 0],
+                vec![65535, 0, 0, 0],
             ],
         );
 

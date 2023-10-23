@@ -227,13 +227,13 @@ mod tests {
                 width: 4,
                 height: 4,
                 channel1: vec![
-                    vec![0, 0, 0, 15],
+                    vec![0, 0, 0, 65535],
                     vec![0, 0, 0, 0],
                     vec![0, 0, 0, 0],
-                    vec![15, 0, 0, 0],
+                    vec![65535, 0, 0, 0],
                 ],
-                channel2: vec![vec![0, 0], vec![7, 0], vec![0, 7], vec![0, 0]],
-                channel3: vec![vec![0, 7], vec![3, 0], vec![0, 3], vec![7, 0]],
+                channel2: vec![vec![0, 0], vec![32767, 0], vec![0, 32767], vec![0, 0]],
+                channel3: vec![vec![0, 32767], vec![15291, 0], vec![0, 15291], vec![32767, 0]],
                 downsample1: 1,
                 downsample2: 2,
                 downsample3: 2,
@@ -252,22 +252,22 @@ mod tests {
                 width: 4,
                 height: 4,
                 channel1: vec![
-                    vec![0, 0, 0, 15],
+                    vec![0, 0, 0, 65535],
                     vec![0, 0, 0, 0],
                     vec![0, 0, 0, 0],
-                    vec![15, 0, 0, 0],
+                    vec![65535, 0, 0, 0],
                 ],
                 channel2: vec![
                     vec![0, 0, 0, 0],
-                    vec![0, 15, 0, 0],
-                    vec![0, 0, 15, 0],
+                    vec![0, 65535, 0, 0],
+                    vec![0, 0, 65535, 0],
                     vec![0, 0, 0, 0],
                 ],
                 channel3: vec![
-                    vec![0, 0, 0, 15],
-                    vec![0, 7, 0, 0],
-                    vec![0, 0, 7, 0],
-                    vec![15, 0, 0, 0],
+                    vec![0, 0, 0, 65535],
+                    vec![0, 30583, 0, 0],
+                    vec![0, 0, 30583, 0],
+                    vec![65535, 0, 0, 0],
                 ],
                 downsample1: 1,
                 downsample2: 1,
@@ -287,13 +287,13 @@ mod tests {
                 width: 4,
                 height: 4,
                 channel1: vec![
-                    vec![0, 0, 0, 15],
+                    vec![0, 0, 0, 65535],
                     vec![0, 0, 0, 0],
                     vec![0, 0, 0, 0],
-                    vec![15, 0, 0, 0],
+                    vec![65535, 0, 0, 0],
                 ],
-                channel2: vec![vec![1], vec![1]],
-                channel3: vec![vec![2], vec![2]],
+                channel2: vec![vec![8191], vec![8191]],
+                channel3: vec![vec![12014], vec![12014]],
                 downsample1: 1,
                 downsample2: 4,
                 downsample3: 4,
@@ -307,21 +307,21 @@ mod tests {
     fn test_pixel_at_in_bounds() {
         let read_image = read_ppm_from_file("test/valid_test.ppm");
         let pixel = read_image.pixel_at(3, 0);
-        assert_eq!((15, 0, 15), pixel);
+        assert_eq!((65535, 0, 65535), pixel);
     }
 
     #[test]
     fn test_pixel_at_x_out_of_bounds() {
         let read_image = read_ppm_from_file("test/valid_test.ppm");
         let pixel = read_image.pixel_at(4, 0);
-        assert_eq!((15, 0, 15), pixel);
+        assert_eq!((65535, 0, 65535), pixel);
     }
 
     #[test]
     fn test_pixel_at_y_out_of_bounds() {
         let read_image = read_ppm_from_file("test/valid_test.ppm");
         let pixel = read_image.pixel_at(0, 4);
-        assert_eq!((15, 0, 15), pixel);
+        assert_eq!((65535, 0, 65535), pixel);
     }
 
     #[test]
@@ -336,7 +336,7 @@ mod tests {
         let mut read_image = read_ppm_from_file("test/valid_test.ppm");
         read_image.downsample(4, 2, 2);
         let pixel = read_image.pixel_at(3, 0);
-        assert_eq!((15, 0, 7), pixel);
+        assert_eq!((65535, 0, 32767), pixel);
     }
 
     #[test]
@@ -344,7 +344,7 @@ mod tests {
         let mut read_image = read_ppm_from_file("test/valid_test.ppm");
         read_image.downsample(4, 2, 2);
         let pixel = read_image.pixel_at(4, 0);
-        assert_eq!((15, 0, 7), pixel);
+        assert_eq!((65535, 0, 32767), pixel);
     }
 
     #[test]
@@ -352,7 +352,7 @@ mod tests {
         let mut read_image = read_ppm_from_file("test/valid_test.ppm");
         read_image.downsample(4, 2, 0);
         let pixel = read_image.pixel_at(0, 4);
-        assert_eq!((15, 0, 3), pixel);
+        assert_eq!((65535, 0, 16383), pixel);
     }
 
     #[test]
@@ -368,7 +368,7 @@ mod tests {
         let mut read_image = read_ppm_from_file("test/valid_test.ppm");
         read_image.downsample(4, 2, 0);
         let pixel = read_image.pixel_at(4, 4);
-        assert_eq!((0, 3, 1), pixel);
+        assert_eq!((0, 16383, 7645), pixel);
     }
 
     fn test_convert_rgb_values_to_rcbcr_internal(start: (u16, u16, u16), target: (u16, u16, u16)) {
