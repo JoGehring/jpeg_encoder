@@ -69,11 +69,11 @@ pub fn create_image(
     channel3: Vec<Vec<u16>>,
 ) -> Image {
     Image {
-        height: height,
-        width: width,
-        channel1: channel1,
-        channel2: channel2,
-        channel3: channel3,
+        height,
+        width,
+        channel1,
+        channel2,
+        channel3,
         ..Default::default()
     }
 }
