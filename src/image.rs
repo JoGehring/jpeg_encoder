@@ -21,6 +21,8 @@ const TRANSFORM_RGB_YCBCR_MATRIX: Matrix3<f32> = Matrix3::new(
     0.299, 0.587, 0.114, -0.1687, -0.3312, 0.5, 0.5, -0.4186, -0.0813,
 );
 
+const RGB_TO_YCBCR_OFFSET: Vector3<f32> = Vector3::new(0.0, 32767.0, 32767.0);
+
 /// Convert an RGB value to a YCbCr value.
 ///
 /// # Arguments
@@ -42,7 +44,7 @@ const TRANSFORM_RGB_YCBCR_MATRIX: Matrix3<f32> = Matrix3::new(
 fn convert_rgb_values_to_ycbcr(r: u16, g: u16, b: u16) -> (u16, u16, u16) {
     let mut result = TRANSFORM_RGB_YCBCR_MATRIX * Vector3::new(r as f32, g as f32, b as f32);
 
-    result = Vector3::new(0.0, 32767.0, 32767.0) + result;
+    result += RGB_TO_YCBCR_OFFSET;
 
     let result_as_int = result.map(|value| value.round()).try_cast::<u16>();
 
@@ -94,7 +96,7 @@ impl Image {
     /// println!('{}', image.pixel_at(4, 19));
     /// ```
     pub fn pixel_at(&self, x: u16, y: u16) -> (u16, u16, u16) {
-        let mut actual_y = (std::cmp::max(y, 0)) as usize;
+        let mut actual_y = std::cmp::max(y, 0) as usize;
         actual_y = std::cmp::min(actual_y, self.channel1.len() - 1);
         let actual_y_downsampled = if self.downsampled_vertically {
             actual_y / 2
@@ -102,7 +104,7 @@ impl Image {
             actual_y
         };
 
-        let mut actual_x = (std::cmp::max(x, 0)) as usize;
+        let mut actual_x = std::cmp::max(x, 0) as usize;
         actual_x = std::cmp::min(actual_x, self.channel1[actual_y].len() - 1);
         let actual_x_1 = actual_x / self.downsample1;
         let actual_x_2 = actual_x / self.downsample2;
