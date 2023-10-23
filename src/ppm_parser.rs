@@ -4,6 +4,8 @@ use regex::Regex;
 
 use crate::image::{create_image, Image};
 
+const SUPPORTED_FORMAT: &str = "P3";
+
 /// Reads an P3 PPM image file to image data structure
 ///
 /// # Arguments
@@ -20,8 +22,6 @@ use crate::image::{create_image, Image};
 ///
 /// * PPM image file is not P3 format
 /// * Any row or column of R/G/B values doesn't match the stated width and height
-const SUPPORTED_FORMAT: &str = "P3";
-
 pub fn read_ppm_from_file(filename: &str) -> Image {
     let result = parse_file_to_string_vec(filename);
 
