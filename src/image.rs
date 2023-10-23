@@ -220,7 +220,7 @@ mod tests {
 
     #[test]
     fn test_downsample_image_factor_two() {
-        let mut read_image = read_ppm_from_file("test/valid_test.ppm");
+        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         read_image.downsample(4, 2, 2);
         assert_eq!(
             Image {
@@ -245,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_downsample_image_no_downsample() {
-        let mut read_image = read_ppm_from_file("test/valid_test.ppm");
+        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         read_image.downsample(4, 4, 4);
         assert_eq!(
             Image {
@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn test_downsample_image_factor_four_and_vertical() {
-        let mut read_image = read_ppm_from_file("test/valid_test.ppm");
+        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         read_image.downsample(4, 1, 0);
         assert_eq!(
             Image {
@@ -305,35 +305,35 @@ mod tests {
 
     #[test]
     fn test_pixel_at_in_bounds() {
-        let read_image = read_ppm_from_file("test/valid_test.ppm");
+        let read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         let pixel = read_image.pixel_at(3, 0);
         assert_eq!((65535, 0, 65535), pixel);
     }
 
     #[test]
     fn test_pixel_at_x_out_of_bounds() {
-        let read_image = read_ppm_from_file("test/valid_test.ppm");
+        let read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         let pixel = read_image.pixel_at(4, 0);
         assert_eq!((65535, 0, 65535), pixel);
     }
 
     #[test]
     fn test_pixel_at_y_out_of_bounds() {
-        let read_image = read_ppm_from_file("test/valid_test.ppm");
+        let read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         let pixel = read_image.pixel_at(0, 4);
         assert_eq!((65535, 0, 65535), pixel);
     }
 
     #[test]
     fn test_pixel_at_y_and_x_out_of_bounds() {
-        let read_image = read_ppm_from_file("test/valid_test.ppm");
+        let read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         let pixel = read_image.pixel_at(4, 4);
         assert_eq!((0, 0, 0), pixel);
     }
 
     #[test]
     fn test_pixel_at_in_bounds_after_downsample() {
-        let mut read_image = read_ppm_from_file("test/valid_test.ppm");
+        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         read_image.downsample(4, 2, 2);
         let pixel = read_image.pixel_at(3, 0);
         assert_eq!((65535, 0, 32767), pixel);
@@ -341,7 +341,7 @@ mod tests {
 
     #[test]
     fn test_pixel_at_x_out_of_bounds_after_downsample() {
-        let mut read_image = read_ppm_from_file("test/valid_test.ppm");
+        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         read_image.downsample(4, 2, 2);
         let pixel = read_image.pixel_at(4, 0);
         assert_eq!((65535, 0, 32767), pixel);
@@ -349,7 +349,7 @@ mod tests {
 
     #[test]
     fn test_pixel_at_y_out_of_bounds_after_vertical_downsample() {
-        let mut read_image = read_ppm_from_file("test/valid_test.ppm");
+        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         read_image.downsample(4, 2, 0);
         let pixel = read_image.pixel_at(0, 4);
         assert_eq!((65535, 0, 16383), pixel);
@@ -357,7 +357,7 @@ mod tests {
 
     #[test]
     fn test_pixel_at_y_and_x_out_of_bounds_after_downsample() {
-        let mut read_image = read_ppm_from_file("test/valid_test.ppm");
+        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         read_image.downsample(4, 2, 2);
         let pixel = read_image.pixel_at(4, 4);
         assert_eq!((0, 0, 0), pixel);
@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn test_pixel_at_y_and_x_out_of_bounds_after_vertical_downsample() {
-        let mut read_image = read_ppm_from_file("test/valid_test.ppm");
+        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         read_image.downsample(4, 2, 0);
         let pixel = read_image.pixel_at(4, 4);
         assert_eq!((0, 16383, 7645), pixel);
@@ -427,28 +427,92 @@ mod tests {
 
     #[test]
     fn test_downsampling_parameters_are_power_of_two() {
-        let mut image = read_ppm_from_file("test/valid_test.ppm");
+        let mut image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         image.downsample(4, 2, 2);
+    }
+
+    #[test]
+    fn test_correct_scaling_not_maximal_value() {
+        let mut image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
+        let expected_image =             Image {
+                width: 4,
+                height: 4,
+                channel1: vec![
+                    vec![0, 0, 0, 65535],
+                    vec![0, 0, 0, 0],
+                    vec![0, 0, 0, 0],
+                    vec![65535, 0, 0, 0]
+                ],
+                channel2: vec![
+                    vec![0, 0, 0, 0],
+                    vec![0, 65535, 0, 0],
+                    vec![0, 0, 65535, 0],
+                    vec![0, 0, 0, 0]
+                ],
+                channel3: vec![
+                    vec![0, 0, 0, 65535],
+                    vec![0, 30583, 0, 0],
+                    vec![0, 0, 30583, 0],
+                    vec![65535, 0, 0, 0]
+                ],
+                downsample1: 1,
+                downsample2: 1,
+                downsample3: 1,
+                downsampled_vertically: false,
+            };
+        assert_eq!(expected_image, image);
+    }
+
+        #[test]
+    fn test_correct_scaling_maximal_value() {
+        let mut image = read_ppm_from_file("test/valid_test_maxVal_65535.ppm");
+        let expected_image =             Image {
+                width: 4,
+                height: 4,
+                channel1: vec![
+                    vec![0, 0, 0, 65535],
+                    vec![0, 0, 0, 0],
+                    vec![0, 0, 0, 0],
+                    vec![65535, 0, 0, 0]
+                ],
+                channel2: vec![
+                    vec![0, 0, 0, 0],
+                    vec![0, 65535, 0, 0],
+                    vec![0, 0, 65535, 0],
+                    vec![0, 0, 0, 0]
+                ],
+                channel3: vec![
+                    vec![0, 0, 0, 65535],
+                    vec![0, 7, 0, 0],
+                    vec![0, 0, 7, 0],
+                    vec![65535, 0, 0, 0]
+                ],
+                downsample1: 1,
+                downsample2: 1,
+                downsample3: 1,
+                downsampled_vertically: false,
+            };
+            assert_eq!(expected_image, image);
     }
 
     #[test]
     #[should_panic]
     fn test_downsampling_a_value_not_power_of_two() {
-        let mut image = read_ppm_from_file("test/valid_test.ppm");
+        let mut image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         image.downsample(5, 2, 2);
     }
 
     #[test]
     #[should_panic]
     fn test_downsampling_b_value_not_power_of_two() {
-        let mut image = read_ppm_from_file("test/valid_test.ppm");
+        let mut image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         image.downsample(4, 3, 2);
     }
 
     #[test]
     #[should_panic]
     fn test_downsampling_c_value_not_power_of_two() {
-        let mut image = read_ppm_from_file("test/valid_test.ppm");
+        let mut image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         image.downsample(4, 2, 3);
     }
 }

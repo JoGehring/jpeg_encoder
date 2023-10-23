@@ -178,7 +178,7 @@ mod tests {
 
     #[test]
     fn test_ppm_from_file_successful() {
-        let read_image = read_ppm_from_file("test/valid_test.ppm");
+        let read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         let expected_image = create_image(
             4,
             4,
