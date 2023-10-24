@@ -1,4 +1,5 @@
 use crate::bit_stream::BitStream;
+use crate::ppm_parser::read_ppm_from_file;
 
 mod image;
 mod downsample;
@@ -6,6 +7,14 @@ mod ppm_parser;
 mod bit_stream;
 
 fn main() {
+    // keep this in to avoid loads of "unused" warnings
+    let mut image = read_ppm_from_file("test/valid_test.ppm");
+    println!("{:?}", image);
+    image.rgb_to_ycbcr();
+    println!("{:?}", image);
+    image.downsample(4, 2, 0);
+    println!("{:?}", image);
+
     let mut stream = BitStream::open();
     stream.append_bit(true);
     stream.append_bit(true);

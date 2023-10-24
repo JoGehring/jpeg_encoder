@@ -1,12 +1,19 @@
 use std::fs::read_to_string;
 
+use lazy_static::lazy_static;
 use regex::Regex;
 
 use crate::image::{create_image, Image};
 
+lazy_static! {
+    static ref WHITESPACE_REGEX: Regex = Regex::new(r"\s+").unwrap();
+}
+
 const SUPPORTED_FORMAT: &str = "P3";
-// TODO CR: Restructure ppm parser to match standard with whitespace separation blablabla
-/// Reads an P3 PPM image file to image data structure
+
+/// Reads an P3 PPM image file to image data structure.
+/// If the width or height specified by the file is smaller than the actual width/height,
+/// part of the data will be discarded.
 ///
 /// # Arguments
 ///
@@ -21,35 +28,42 @@ const SUPPORTED_FORMAT: &str = "P3";
 /// # Panics
 ///
 /// * PPM image file is not P3 format
-/// * Any row or column of R/G/B values doesn't match the stated width and height
+/// * The PPM file is malformed so that image values contain non-numeric values.
+/// * The width or height specified in the file is greater than the data's width/height.
 pub fn read_ppm_from_file(filename: &str) -> Image {
-    let result = parse_file_to_string_vec(filename);
+    let result = parse_file_to_split_vec(filename);
 
     if result[0] != SUPPORTED_FORMAT {
         panic!("Unsupported PPM format");
     }
 
-    let dimensions: Vec<_> = result[1].split(" ").collect();
-    let height: u16 = dimensions[0].parse().unwrap();
-    let width: u16 = dimensions[1].parse().unwrap();
+    let height: usize = result[1].parse().unwrap();
+    let width: usize = result[2].parse().unwrap();
 
-    let (image_values1, image_values2, image_values3) =
-        parse_image_values_from_string_array(&result, width as usize, height as usize);
+    let max_value_in_ppm: u16 = result[3].parse().unwrap();
+    let scaling_factor = u16::MAX as f32 / max_value_in_ppm as f32;
 
-    if image_values1.len() != height as usize {
-        panic!("R values row length to expected height mismatch");
-    }
-    if image_values2.len() != height as usize {
-        panic!("G values row length to expected height mismatch");
-    }
-    if image_values3.len() != height as usize {
-        panic!("B values row length to expected height mismatch");
+    let mut image_values1: Vec<Vec<u16>> = vec![vec![0; width]; height];
+    let mut image_values2: Vec<Vec<u16>> = vec![vec![0; width]; height];
+    let mut image_values3: Vec<Vec<u16>> = vec![vec![0; width]; height];
+
+    for i in 0..height {
+        for j in 0..width {
+            // index is 4 (because data starts at index 4)
+            // plus width * 3 * i (to get to the row we're currently reading)
+            // plus 3 * j (for the value in the row)
+            let index = 4 + width * 3 * i + 3 * j;
+            image_values1[i][j] = unwrap_and_scale(&result[index], scaling_factor);
+            image_values2[i][j] = unwrap_and_scale(&result[index + 1], scaling_factor);
+            image_values3[i][j] = unwrap_and_scale(&result[index + 2], scaling_factor);
+        }
     }
 
-    create_image(height, width, image_values1, image_values2, image_values3)
+    create_image(height as u16, width as u16, image_values1, image_values2, image_values3)
 }
 
-/// Parse a file as a string vec.
+/// Parse the file and split it by white spaces/newlines.
+/// Lines starting with '#' (comments) are discarded.
 ///
 /// # Arguments
 ///
@@ -58,104 +72,34 @@ pub fn read_ppm_from_file(filename: &str) -> Image {
 /// # Example
 ///
 /// ```
-/// let vector = parse_file_to_string_vec("/path/to/file");
+/// let my_vec = parse_file_to_split_vec("/path/to/file");
 /// ```
-fn parse_file_to_string_vec(filename: &str) -> Vec<String> {
-    let mut result: Vec<String> = vec![];
-    for line in read_to_string(filename).unwrap().lines() {
-        if line.starts_with("#") {
-            continue;
-        }
-        result.push(line.to_owned());
-    }
-    result
+fn parse_file_to_split_vec(filename: &str) -> Vec<String> {
+    let string = parse_file_to_string(filename);
+    WHITESPACE_REGEX.split(&string).map(|str_value| str_value.to_string()).collect()
 }
-//TODO JG/CR: könnten dann überall statt vec.push() eigentlich vec[i]=value verwenden, geht flotter
-/// Parse the image values from a string representation of a PPM file.
+
+/// Parse a file as a string.
+/// Lines are connected with a blank space.
+/// Lines starting with '#' (comments) are discarded.
 ///
 /// # Arguments
 ///
-/// * `data`: The file to parse.
-/// * `width`: The expected image width.
+/// * `filename`: The file name.
 ///
 /// # Example
 ///
 /// ```
-/// let vector = parse_file_to_string_vec("/path/to/file");
-/// // in a real world example, you should get the width from the file!
-/// let (r, g, b) = parse_image_values_from_string_array(vector, 4);
+/// let my_string = parse_file_to_string("/path/to/file");
 /// ```
-///
-/// # Panics
-///
-/// * If the amount of values in any line doesn't match the expected width.
-fn parse_image_values_from_string_array(
-    data: &Vec<String>,
-    width: usize,
-    height: usize,
-) -> (Vec<Vec<u16>>, Vec<Vec<u16>>, Vec<Vec<u16>>) {
-    let max_value_in_ppm: u16 = data[2].parse().unwrap();
-    let scaling_factor = u16::MAX as f32 / max_value_in_ppm as f32;
-
-    let mut image_values1: Vec<Vec<u16>> = Vec::with_capacity(height);
-    let mut image_values2: Vec<Vec<u16>> = Vec::with_capacity(height);
-    let mut image_values3: Vec<Vec<u16>> = Vec::with_capacity(height);
-
-    for i in 3..data.len() {
-        let (r_values, g_values, b_values) =
-            parse_image_values_from_line(&data[i], width, scaling_factor);
-        image_values1.push(r_values);
-        image_values2.push(g_values);
-        image_values3.push(b_values);
-    }
-
-    (image_values1, image_values2, image_values3)
-}
-
-/// Parse a line from a PPM file.
-///
-/// # Arguments
-///
-/// * `data`: The line to parse.
-/// * `width`: The expected image width.
-/// * `scaling_factor`: The factor to scale values with, if the PPM file uses a different value range than our image struct.
-///
-/// # Panics
-///
-/// * If the amount of values in the line doesn't match the expected width.
-fn parse_image_values_from_line(
-    data: &str,
-    width: usize,
-    scaling_factor: f32,
-) -> (Vec<u16>, Vec<u16>, Vec<u16>) {
-    // regex to split by whitespace
-    let re = Regex::new(r"\s+").unwrap();
-    let values: Vec<&str> = re.split(data).collect();
-
-    if values.len() / 3 != width {
-        panic!("Line length to expected width mismatch");
-    }
-
-    let mut r_values: Vec<u16> = Vec::with_capacity(width);
-    let mut g_values: Vec<u16> = Vec::with_capacity(width);
-    let mut b_values: Vec<u16> = Vec::with_capacity(width);
-
-    for j in (0..values.len()).step_by(3) {
-        r_values.push(apply_scaling_factor(
-            values[j].parse().unwrap(),
-            scaling_factor,
-        ));
-        g_values.push(apply_scaling_factor(
-            values[j + 1].parse().unwrap(),
-            scaling_factor,
-        ));
-        b_values.push(apply_scaling_factor(
-            values[j + 2].parse().unwrap(),
-            scaling_factor,
-        ));
-    }
-
-    (r_values, g_values, b_values)
+fn parse_file_to_string(filename: &str) -> String {
+    let string = read_to_string(filename)
+        .unwrap();
+    let vec: Vec<_> = string
+        .lines()
+        .filter(|line| !line.starts_with("#"))
+        .collect();
+    vec.join(" ")
 }
 
 /// Apply the scaling factor. This is only extracted for readability purposes.
@@ -164,8 +108,12 @@ fn parse_image_values_from_line(
 ///
 /// * `value`: The value to multiply with.
 /// * `scaling_factor`: The factor to scale it by.
-fn apply_scaling_factor(value: u16, scaling_factor: f32) -> u16 {
-    (value as f32 * scaling_factor) as u16
+/// 
+/// # Panics
+/// 
+/// * If the value cannot be parsed into a float.
+fn unwrap_and_scale(value: &String, scaling_factor: f32) -> u16 {
+    (value.parse::<f32>().unwrap() as f32 * scaling_factor) as u16
 }
 
 #[cfg(test)]
@@ -213,13 +161,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_ppm_from_file_height_not_as_expected() {
-        let _read_image = read_ppm_from_file("test/invalid_test_height_not_equal_to_expected.ppm");
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_ppm_from_file_width_not_as_expected() {
-        let _read_image = read_ppm_from_file("test/invalid_test_width_not_equal_to_expected.ppm");
+    fn test_ppm_from_file_malformed() {
+        let _read_image = read_ppm_from_file("test/invalid_test_malformed_value.ppm");
     }
 }

@@ -433,7 +433,7 @@ mod tests {
 
     #[test]
     fn test_correct_scaling_not_maximal_value() {
-        let mut image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
+        let image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         let expected_image =             Image {
                 width: 4,
                 height: 4,
@@ -465,7 +465,7 @@ mod tests {
 
         #[test]
     fn test_correct_scaling_maximal_value() {
-        let mut image = read_ppm_from_file("test/valid_test_maxVal_65535.ppm");
+        let image = read_ppm_from_file("test/valid_test_maxVal_65535.ppm");
         let expected_image =             Image {
                 width: 4,
                 height: 4,

@@ -1,0 +1,6 @@
+# this is the same image as valid_test_maxVal_15.ppm
+P3 4        4
+15
+0  0     0 0  0  0    0  0  0   15  0 15
+0  0  0  0 15  7    0  0  0    0  0  0  0  0  0  0  0  0    0 15  7    0  0  0 15  0 15  0
+0  0    0  0  0    0  0  0
