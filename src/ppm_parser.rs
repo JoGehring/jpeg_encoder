@@ -164,4 +164,16 @@ mod tests {
     fn test_ppm_from_file_malformed() {
         let _read_image = read_ppm_from_file("test/invalid_test_malformed_value.ppm");
     }
+
+    #[test]
+    #[should_panic]
+    fn test_ppm_from_file_too_large_height() {
+        let _read_image = read_ppm_from_file("test/invalid_test_too_large_height.ppm");
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_ppm_from_file_too_large_width() {
+        let _read_image = read_ppm_from_file("test/invalid_test_too_large_width.ppm");
+    }
 }
