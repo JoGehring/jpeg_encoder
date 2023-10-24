@@ -34,7 +34,7 @@ pub fn read_ppm_from_file(filename: &str) -> Image {
     let width: u16 = dimensions[1].parse().unwrap();
 
     let (image_values1, image_values2, image_values3) =
-        parse_image_values_from_string_array(result, width as usize, height as usize);
+        parse_image_values_from_string_array(&result, width as usize, height as usize);
 
     if image_values1.len() != height as usize {
         panic!("R values row length to expected height mismatch");
@@ -90,7 +90,7 @@ fn parse_file_to_string_vec(filename: &str) -> Vec<String> {
 ///
 /// * If the amount of values in any line doesn't match the expected width.
 fn parse_image_values_from_string_array(
-    data: Vec<String>,
+    data: &Vec<String>,
     width: usize,
     height: usize,
 ) -> (Vec<Vec<u16>>, Vec<Vec<u16>>, Vec<Vec<u16>>) {

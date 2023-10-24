@@ -145,7 +145,7 @@ fn downsample_segment_of_row(row_segment: &[u16], a: usize, b: usize) -> Vec<u16
     subresult.copy_from_slice(&row_segment);
     let mut factor = b;
     while factor != a {
-        subresult = downsample_vec_by_two(subresult);
+        subresult = downsample_vec_by_two(&subresult);
         factor *= 2;
     }
     return subresult;
@@ -163,7 +163,7 @@ fn downsample_segment_of_row(row_segment: &[u16], a: usize, b: usize) -> Vec<u16
 /// let value = downsample_vec_by_two(vec![60, 40, 30, 20]);
 /// assert_eq!(vec![50, 25], value);
 /// ```
-fn downsample_vec_by_two(original_vec: Vec<u16>) -> Vec<u16> {
+fn downsample_vec_by_two(original_vec: &Vec<u16>) -> Vec<u16> {
     let mut new_vec: Vec<u16> = vec![];
     for i in 0..(original_vec.len() / 2 + original_vec.len() % 2) {
         let key = if 2 * i + 1 < original_vec.len() {
@@ -396,19 +396,19 @@ mod tests {
 
     #[test]
     fn test_downsample_even_vec_by_two() {
-        let value = downsample_vec_by_two(vec![60, 40, 30, 20]);
+        let value = downsample_vec_by_two(&vec![60, 40, 30, 20]);
         assert_eq!(vec![50, 25], value);
     }
 
     #[test]
     fn test_downsample_odd_vec_by_two() {
-        let value = downsample_vec_by_two(vec![33, 31, 20, 40, 50]);
+        let value = downsample_vec_by_two(&vec![33, 31, 20, 40, 50]);
         assert_eq!(vec![32, 30, 50], value);
     }
 
     #[test]
     fn test_downsample_empty_vec_by_two() {
-        let value = downsample_vec_by_two(vec![]);
+        let value = downsample_vec_by_two(&vec![]);
         let to_compare: Vec<u16> = vec![];
         assert_eq!(to_compare, value);
     }
