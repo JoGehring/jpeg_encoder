@@ -3,7 +3,7 @@ extern crate nalgebra as na;
 use na::{Matrix3, Vector3};
 
 use crate::downsample::downsample_channel;
-
+// TODO JG: doc kommentar für downsample attribute von image
 #[derive(Clone, Debug, PartialEq)]
 pub struct Image {
     height: u16,
@@ -302,7 +302,7 @@ mod tests {
             read_image
         );
     }
-
+// TODO MS: GROßES BILD TESTEN
     #[test]
     fn test_pixel_at_in_bounds() {
         let read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");

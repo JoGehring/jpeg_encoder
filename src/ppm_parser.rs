@@ -5,7 +5,7 @@ use regex::Regex;
 use crate::image::{create_image, Image};
 
 const SUPPORTED_FORMAT: &str = "P3";
-
+// TODO CR: Restructure ppm parser to match standard with whitespace separation blablabla
 /// Reads an P3 PPM image file to image data structure
 ///
 /// # Arguments
@@ -70,7 +70,7 @@ fn parse_file_to_string_vec(filename: &str) -> Vec<String> {
     }
     result
 }
-
+//TODO JG/CR: könnten dann überall statt vec.push() eigentlich vec[i]=value verwenden, geht flotter
 /// Parse the image values from a string representation of a PPM file.
 ///
 /// # Arguments
@@ -174,8 +174,8 @@ mod tests {
 
     use super::read_ppm_from_file;
 
-    // TODO: tests for utility functions
-
+    // TODO JG: tests for utility functions
+    // TODO MS: GROßES BILD TESTEN
     #[test]
     fn test_ppm_from_file_successful() {
         let read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
