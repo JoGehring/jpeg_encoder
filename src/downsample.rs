@@ -1,6 +1,5 @@
 /// Down-sample a color channel of an image.
 /// `a` and `b` are expected to fit the first two parts of standard subsampling notation: https://en.wikipedia.org/wiki/Chroma_subsampling
-/// TODO: replace the above link with the proper RFC/place where the notation was defined
 ///
 /// # Arguments
 ///
@@ -19,7 +18,7 @@ pub fn downsample_channel(
     b: usize,
     downsample_vertical: bool,
 ) -> Vec<Vec<u16>> {
-    let mut final_channel: Vec<Vec<u16>> = vec![];
+    let mut final_channel: Vec<Vec<u16>> = Vec::with_capacity(channel.len());
     for y in (0..channel.len()).step_by(2) {
         let lower_row = if y + 1 < channel.len() {
             &channel[y + 1]
@@ -41,7 +40,6 @@ pub fn downsample_channel(
 
 /// Down-sample the row and potentially the row below it, based on the factors `a` and `b`.
 /// `a` and `b` are expected to fit the first two parts of standard subsampling notation: https://en.wikipedia.org/wiki/Chroma_subsampling
-/// TODO: replace the above link with the proper RFC/place where the notation was defined
 ///
 /// If downsample_vertical is set, the two rows are combined into the first returned row, the second one is just the downsampled `row2`.
 ///
@@ -125,7 +123,6 @@ fn copy_and_pad(row: &Vec<u16>, offset: usize, length: usize) -> Vec<u16> {
 
 /// Down-sample the vector, based on the factors `a` and `b`.
 /// `a` and `b` are expected to fit the first two parts of standard subsampling notation: https://en.wikipedia.org/wiki/Chroma_subsampling
-/// TODO: replace the above link with the proper RFC/place where the notation was defined
 ///
 /// # Arguments
 ///
@@ -165,7 +162,7 @@ fn downsample_segment_of_row(row_segment: &[u16], a: usize, b: usize) -> Vec<u16
 /// assert_eq!(vec![50, 25], value);
 /// ```
 fn downsample_vec_by_two(original_vec: &Vec<u16>) -> Vec<u16> {
-    let mut new_vec: Vec<u16> = vec![];
+    let mut new_vec: Vec<u16> = Vec::with_capacity(original_vec.len()/2);
     for i in 0..(original_vec.len() / 2 + original_vec.len() % 2) {
         let key = if 2 * i + 1 < original_vec.len() {
             2 * i + 1

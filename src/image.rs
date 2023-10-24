@@ -3,7 +3,16 @@ extern crate nalgebra as na;
 use na::{Matrix3, Vector3};
 
 use crate::downsample::downsample_channel;
-// TODO JG: doc kommentar für downsample attribute von image
+/// Image data structure for parsed image files
+///
+/// # Attributes
+///
+/// * `height`: Image height in pixels
+/// * `width`: Image width in pixels
+/// * `channel`: The three channels for pixel data, either RGB or YCbCr in this order 1-3
+/// * `downsample_factors`: The factor of downsampling for the corresponding channels, 1 by default.
+/// E.g. for 4:2:0 the downsampling factor for Cb and Cr is 2, because we only keep every second value
+/// * `downsampled_vertically`: True if two rows have been combined (e.g. for 4:2:0)
 #[derive(Clone, Debug, PartialEq)]
 pub struct Image {
     height: u16,
@@ -11,9 +20,9 @@ pub struct Image {
     channel1: Vec<Vec<u16>>,
     channel2: Vec<Vec<u16>>,
     channel3: Vec<Vec<u16>>,
-    downsample1: usize,
-    downsample2: usize,
-    downsample3: usize,
+    y_downsample_factor: usize,
+    cb_downsample_factor: usize,
+    cr_downsample_factor: usize,
     downsampled_vertically: bool,
 }
 
@@ -106,9 +115,9 @@ impl Image {
 
         let mut actual_x = std::cmp::max(x, 0) as usize;
         actual_x = std::cmp::min(actual_x, self.channel1[actual_y].len() - 1);
-        let actual_x_1 = actual_x / self.downsample1;
-        let actual_x_2 = actual_x / self.downsample2;
-        let actual_x_3 = actual_x / self.downsample3;
+        let actual_x_1 = actual_x / self.y_downsample_factor;
+        let actual_x_2 = actual_x / self.cb_downsample_factor;
+        let actual_x_3 = actual_x / self.cr_downsample_factor;
 
         (
             self.channel1[actual_y][actual_x_1],
@@ -135,9 +144,9 @@ impl Image {
     /// * Method is called after the image was downsampled (the different channels aren't the same size)
     /// * Internal error when calling convert_rgb_values_to_ycbcr
     pub fn rgb_to_ycbcr(&mut self) {
-        if self.downsample1 != 1
-            || self.downsample2 != 1
-            || self.downsample3 != 1
+        if self.y_downsample_factor != 1
+            || self.cb_downsample_factor != 1
+            || self.cr_downsample_factor != 1
             || self.downsampled_vertically
         {
             panic!("rgb_to_ycbcr called after downsampling!")
@@ -158,7 +167,6 @@ impl Image {
 
     /// Down-sample this image.
     /// `a`, `b` and `c` are expected to fit the segments of standard subsampling notation: https://en.wikipedia.org/wiki/Chroma_subsampling
-    /// TODO: replace the above link with the proper RFC/place where the notation was defined
     ///
     /// # Arguments
     ///
@@ -190,8 +198,8 @@ impl Image {
         self.channel2 = result_cb;
         self.channel3 = result_cr;
 
-        self.downsample2 *= a / b;
-        self.downsample3 *= a / cr_b;
+        self.cb_downsample_factor *= a / b;
+        self.cr_downsample_factor *= a / cr_b;
         self.downsampled_vertically |= c == 0;
     }
 }
@@ -204,9 +212,9 @@ impl Default for Image {
             channel1: vec![],
             channel2: vec![],
             channel3: vec![],
-            downsample1: 1,
-            downsample2: 1,
-            downsample3: 1,
+            y_downsample_factor: 1,
+            cb_downsample_factor: 1,
+            cr_downsample_factor: 1,
             downsampled_vertically: false,
         }
     }
@@ -234,9 +242,9 @@ mod tests {
                 ],
                 channel2: vec![vec![0, 0], vec![32767, 0], vec![0, 32767], vec![0, 0]],
                 channel3: vec![vec![0, 32767], vec![15291, 0], vec![0, 15291], vec![32767, 0]],
-                downsample1: 1,
-                downsample2: 2,
-                downsample3: 2,
+                y_downsample_factor: 1,
+                cb_downsample_factor: 2,
+                cr_downsample_factor: 2,
                 downsampled_vertically: false,
             },
             read_image
@@ -269,9 +277,9 @@ mod tests {
                     vec![0, 0, 30583, 0],
                     vec![65535, 0, 0, 0],
                 ],
-                downsample1: 1,
-                downsample2: 1,
-                downsample3: 1,
+                y_downsample_factor: 1,
+                cb_downsample_factor: 1,
+                cr_downsample_factor: 1,
                 downsampled_vertically: false,
             },
             read_image
@@ -294,9 +302,9 @@ mod tests {
                 ],
                 channel2: vec![vec![8191], vec![8191]],
                 channel3: vec![vec![12014], vec![12014]],
-                downsample1: 1,
-                downsample2: 4,
-                downsample3: 4,
+                y_downsample_factor: 1,
+                cb_downsample_factor: 4,
+                cr_downsample_factor: 4,
                 downsampled_vertically: true,
             },
             read_image
@@ -455,9 +463,9 @@ mod tests {
                     vec![0, 0, 30583, 0],
                     vec![65535, 0, 0, 0]
                 ],
-                downsample1: 1,
-                downsample2: 1,
-                downsample3: 1,
+                y_downsample_factor: 1,
+                cb_downsample_factor: 1,
+                cr_downsample_factor: 1,
                 downsampled_vertically: false,
             };
         assert_eq!(expected_image, image);
@@ -487,9 +495,9 @@ mod tests {
                     vec![0, 0, 7, 0],
                     vec![65535, 0, 0, 0]
                 ],
-                downsample1: 1,
-                downsample2: 1,
-                downsample3: 1,
+                y_downsample_factor: 1,
+                cb_downsample_factor: 1,
+                cr_downsample_factor: 1,
                 downsampled_vertically: false,
             };
             assert_eq!(expected_image, image);

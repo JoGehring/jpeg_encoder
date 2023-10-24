@@ -119,7 +119,7 @@ impl BitStream {
     }
 
     /// Append a byte of data to this bit stream.
-    /// TODO: Perhaps also add a generic function to append
+    /// TODO JG: Perhaps also add a generic function to append
     /// integers of any size?
     ///
     /// # Arguments
