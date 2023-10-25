@@ -65,10 +65,9 @@ fn downsample_rows(
     b: usize,
     downsample_vertical: bool,
 ) -> (Vec<u16>, Vec<u16>) {
-    // higher capacity than needed (final row len will be log_2(a/b))
-    // but it's cheaper to just allocate more ram than to calculate logarithm.
-    let mut final_row: Vec<u16> = Vec::with_capacity(row.len());
-    let mut final_lower_row: Vec<u16> = Vec::with_capacity(row.len());
+    let len = row.len() / (a / b);
+    let mut final_row: Vec<u16> = Vec::with_capacity(len);
+    let mut final_lower_row: Vec<u16> = Vec::with_capacity(len);
 
     for x in (0..(row.len())).step_by(a) {
         let upper_row_vec = copy_and_pad(row, x, a);
