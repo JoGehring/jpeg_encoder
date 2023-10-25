@@ -235,7 +235,7 @@ mod tests {
         for i in 1..13 {
             data.push(i.to_string());
         }
-        let (image_values1, image_values2, image_values3) = extract_pixel_values(&data, 3, 2, 3.14);
+        extract_pixel_values(&data, 3, 2, 3.14);
     }
 
     #[test]
@@ -261,6 +261,6 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_unwrap_and_scale_invalid_string() {
-        let calculated_value = unwrap_and_scale(&String::from("A"), 3.14);
+        _ = unwrap_and_scale(&String::from("A"), 3.14);
     }
 }

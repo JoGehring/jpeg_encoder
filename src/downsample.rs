@@ -18,7 +18,8 @@ pub fn downsample_channel(
     b: usize,
     downsample_vertical: bool,
 ) -> Vec<Vec<u16>> {
-    let mut final_channel: Vec<Vec<u16>> = Vec::with_capacity(channel.len());
+    let len = if downsample_vertical { channel.len() / 2 } else {channel.len()};
+    let mut final_channel: Vec<Vec<u16>> = Vec::with_capacity(len);
     for y in (0..channel.len()).step_by(2) {
         let lower_row = if y + 1 < channel.len() {
             &channel[y + 1]
@@ -64,8 +65,10 @@ fn downsample_rows(
     b: usize,
     downsample_vertical: bool,
 ) -> (Vec<u16>, Vec<u16>) {
-    let mut final_row: Vec<u16> = vec![];
-    let mut final_lower_row: Vec<u16> = vec![];
+    // higher capacity than needed (final row len will be log_2(a/b))
+    // but it's cheaper to just allocate more ram than to calculate logarithm.
+    let mut final_row: Vec<u16> = Vec::with_capacity(row.len());
+    let mut final_lower_row: Vec<u16> = Vec::with_capacity(row.len());
 
     for x in (0..(row.len())).step_by(a) {
         let upper_row_vec = copy_and_pad(row, x, a);
