@@ -1,5 +1,7 @@
 use std::fs;
 
+use crate::appendable_to_bit_stream::AppendableToBitStream;
+
 /// Clear the last n bytes of the value.
 /// TODO: find a better/not ugly way to do this.
 ///
@@ -58,7 +60,7 @@ fn clear_first_n_bytes(value: u8, n: u8) -> u8 {
     value & to_and
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct BitStream {
     data: Vec<u8>,
     bits_in_last_byte: u8,
@@ -119,7 +121,6 @@ impl BitStream {
     }
 
     /// Append a byte of data to this bit stream.
-    /// TODO JG: Perhaps also add a generic function to append
     /// integers of any size?
     ///
     /// # Arguments
@@ -152,8 +153,9 @@ impl BitStream {
     ///     as shift_and_add_to_last_byte changes the value of bits_in_last_byte.
     pub fn append_byte(&mut self, value: u8) {
         // if the last byte in the stream is full, we can just append this one
-        if self.bits_in_last_byte == 8 {
+        if self.bits_in_last_byte == 8 || self.bits_in_last_byte == 0 {
             self.data.push(value);
+            self.bits_in_last_byte = 8;
             return;
         }
 
@@ -166,7 +168,6 @@ impl BitStream {
         let lower_value = clear_first_n_bytes(value, bits_still_available_in_last_byte)
             << bits_still_available_in_last_byte;
         self.data.push(lower_value);
-
         self.bits_in_last_byte = previous_bits_in_last_byte;
     }
 
@@ -195,8 +196,14 @@ impl BitStream {
     ///
     /// * If more than the last `bits_to_occupy` bits of `value` are set
     fn shift_and_add_to_last_byte(&mut self, mut value: u8, bits_to_occupy: u8) {
-        let index = self.data.len() - 1;
-        let mut last_byte = self.data[index];
+        let mut index = 0;
+        let mut last_byte = 0;
+        if self.data.len() > 0 {
+            index = self.data.len() - 1;
+            last_byte = self.data[index];
+        } else {
+            self.data.push(last_byte);
+        }
         let bits_available = 8 - bits_to_occupy - self.bits_in_last_byte;
         value = value << bits_available;
         last_byte += value;
@@ -221,16 +228,12 @@ impl BitStream {
     pub fn flush_to_file(&self, filename: &str) -> std::io::Result<()> {
         fs::write(filename, &self.data)
     }
-}
 
-impl Default for BitStream {
-    fn default() -> BitStream {
-        BitStream {
-            data: vec![],
-            bits_in_last_byte: 8,
-        }
+    pub fn append<T: AppendableToBitStream>(&mut self, value: T) {
+        value.append(self);
     }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -309,6 +312,54 @@ mod tests {
         stream.append_bit(false);
         stream.append_bit(true);
         stream.append_byte(255);
+        assert_eq!(vec![44, 0b01111111, 0b11000000], stream.data);
+        assert_eq!(2, stream.bits_in_last_byte);
+    }
+
+    #[test]
+    fn test_generic_append_bits_only() {
+        let mut stream = BitStream::open();
+        stream.append(true);
+        stream.append(false);
+        stream.append(true);
+        assert_eq!(vec![0b10100000], stream.data);
+        assert_eq!(3, stream.bits_in_last_byte);
+    }
+
+    #[test]
+    fn test_generic_append_bit_vec() {
+        let mut stream = BitStream::open();
+        let bits = vec![true, false, true];
+        stream.append(bits);
+        assert_eq!(vec![0b10100000], stream.data);
+        assert_eq!(3, stream.bits_in_last_byte);
+    }
+
+    #[test]
+    fn test_generic_append_byte_vec() {
+        let mut stream = BitStream::open();
+        let bytes = vec![127, 4, 255];
+        stream.append(bytes);
+        assert_eq!(vec![127, 4, 255], stream.data);
+        assert_eq!(8, stream.bits_in_last_byte);
+    }
+
+    #[test]
+    fn test_generic_append_bytes_only() {
+        let mut stream = BitStream::open();
+        stream.append(44);
+        stream.append(231);
+        assert_eq!(vec![44, 231], stream.data);
+        assert_eq!(8, stream.bits_in_last_byte);
+    }
+
+    #[test]
+    fn test_generic_append_bits_and_bytes() {
+        let mut stream = BitStream::open();
+        stream.append(44);
+        stream.append(false);
+        stream.append(true);
+        stream.append(255);
         assert_eq!(vec![44, 0b01111111, 0b11000000], stream.data);
         assert_eq!(2, stream.bits_in_last_byte);
     }
