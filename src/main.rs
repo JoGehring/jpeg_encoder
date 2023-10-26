@@ -6,6 +6,7 @@ mod downsample;
 mod ppm_parser;
 mod bit_stream;
 mod jpg_writer;
+mod appendable_to_bit_stream;
 
 fn main() {
     // keep this in to avoid loads of "unused" warnings
