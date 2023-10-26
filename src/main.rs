@@ -8,7 +8,7 @@ mod bit_stream;
 
 fn main() {
     // keep this in to avoid loads of "unused" warnings
-    let mut image = read_ppm_from_file("test/valid_test.ppm");
+    let mut image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
     println!("{:?}", image);
     image.rgb_to_ycbcr();
     println!("{:?}", image);
