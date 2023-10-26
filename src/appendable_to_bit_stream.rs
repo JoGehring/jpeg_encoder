@@ -2,6 +2,7 @@ use crate::bit_stream::BitStream;
 
 pub trait AppendableToBitStream {
     fn append(&self, stream: &mut BitStream);
+
 }
 
 impl AppendableToBitStream for bool {
@@ -31,3 +32,4 @@ impl AppendableToBitStream for Vec<u8> {
         }
     }
 }
+
