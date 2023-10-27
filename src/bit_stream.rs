@@ -239,6 +239,8 @@ impl BitStream {
 mod tests {
     use std::fs;
 
+    //TODO: Tests for u16 generic append
+
     use super::{BitStream, clear_first_n_bytes, clear_last_n_bytes};
 
     #[test]
