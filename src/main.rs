@@ -36,4 +36,12 @@ fn main() {
     // stream.flush_to_file("test/binary_stream_test_file.bin").expect("TODO: panic message");
     // // let test = fs::read("binary_stream_test_file.bin").expect("TODO: panic message");
     println!("{:?}", stream);
+
+    let mut target_stream = BitStream::open();
+    jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOI);
+    jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::APP0);
+    jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOF0);
+    jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::EOI);
+    target_stream.flush_to_file("test/test.jpg").expect("TODO: Panic message");
+
 }

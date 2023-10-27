@@ -4,6 +4,7 @@ use na::{Matrix3, Vector3};
 
 use crate::downsample::downsample_channel;
 /// Image data structure for parsed image files
+/// TODO: do getters instead of pub members?
 ///
 /// # Attributes
 ///
@@ -15,15 +16,15 @@ use crate::downsample::downsample_channel;
 /// * `downsampled_vertically`: True if two rows have been combined (e.g. for 4:2:0)
 #[derive(Clone, Debug, PartialEq)]
 pub struct Image {
-    height: u16,
-    width: u16,
+    pub height: u16,
+    pub width: u16,
     channel1: Vec<Vec<u16>>,
     channel2: Vec<Vec<u16>>,
     channel3: Vec<Vec<u16>>,
-    y_downsample_factor: usize,
-    cb_downsample_factor: usize,
-    cr_downsample_factor: usize,
-    downsampled_vertically: bool,
+    pub y_downsample_factor: usize,
+    pub cb_downsample_factor: usize,
+    pub cr_downsample_factor: usize,
+    pub downsampled_vertically: bool,
 }
 
 const TRANSFORM_RGB_YCBCR_MATRIX: Matrix3<f32> = Matrix3::new(
