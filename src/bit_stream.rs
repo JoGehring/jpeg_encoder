@@ -340,7 +340,7 @@ mod tests {
     #[test]
     fn test_generic_append_byte_vec() {
         let mut stream = BitStream::open();
-        let bytes = vec![127, 4, 255];
+        let bytes:Vec<u8> = vec![127, 4, 255];
         stream.append(bytes);
         assert_eq!(vec![127, 4, 255], stream.data);
         assert_eq!(8, stream.bits_in_last_byte);
@@ -349,8 +349,8 @@ mod tests {
     #[test]
     fn test_generic_append_bytes_only() {
         let mut stream = BitStream::open();
-        stream.append(44);
-        stream.append(231);
+        stream.append::<u8>(44);
+        stream.append::<u8>(231);
         assert_eq!(vec![44, 231], stream.data);
         assert_eq!(8, stream.bits_in_last_byte);
     }
@@ -358,10 +358,10 @@ mod tests {
     #[test]
     fn test_generic_append_bits_and_bytes() {
         let mut stream = BitStream::open();
-        stream.append(44);
+        stream.append::<u8>(44);
         stream.append(false);
         stream.append(true);
-        stream.append(255);
+        stream.append::<u8>(255);
         assert_eq!(vec![44, 0b01111111, 0b11000000], stream.data);
         assert_eq!(2, stream.bits_in_last_byte);
     }
