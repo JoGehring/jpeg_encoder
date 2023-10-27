@@ -43,9 +43,7 @@ impl AppendableToBitStream for u16 {
 impl AppendableToBitStream for Vec<u16> {
     fn append(&self, stream: &mut BitStream) {
         for val in self {
-            let bytes = val.to_be_bytes();
-            stream.append_byte(bytes[0]);
-            stream.append_byte(bytes[1]);
+            stream.append(*val);
         }
     }
 }

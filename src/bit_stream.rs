@@ -234,14 +234,13 @@ impl BitStream {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::fs;
 
     //TODO: Tests for u16 generic append
 
-    use super::{BitStream, clear_first_n_bytes, clear_last_n_bytes};
+    use super::{clear_first_n_bytes, clear_last_n_bytes, BitStream};
 
     #[test]
     fn test_clear_first_n_bytes() {
@@ -340,7 +339,7 @@ mod tests {
     #[test]
     fn test_generic_append_byte_vec() {
         let mut stream = BitStream::open();
-        let bytes:Vec<u8> = vec![127, 4, 255];
+        let bytes: Vec<u8> = vec![127, 4, 255];
         stream.append(bytes);
         assert_eq!(vec![127, 4, 255], stream.data);
         assert_eq!(8, stream.bits_in_last_byte);
@@ -376,5 +375,23 @@ mod tests {
 
         let bit_stream = BitStream::read_bit_stream_from_file(filename);
         assert_eq!(stream, bit_stream);
+    }
+
+    #[test]
+    fn test_generic_append_u16_vec() {
+        let mut stream = BitStream::open();
+        let bytes: Vec<u16> = vec![0x1412, 0xffff, 0xfafe];
+        stream.append(bytes);
+        assert_eq!(vec![0x14, 0x12, 0xff, 0xff, 0xfa, 0xfe], stream.data);
+        assert_eq!(8, stream.bits_in_last_byte);
+    }
+
+    #[test]
+    fn test_generic_append_u16_only() {
+        let mut stream = BitStream::open();
+        stream.append::<u16>(0x1234);
+        stream.append::<u16>(0xfef0);
+        assert_eq!(vec![0x12, 0x34, 0xfe, 0xf0], stream.data);
+        assert_eq!(8, stream.bits_in_last_byte);
     }
 }
