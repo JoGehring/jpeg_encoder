@@ -231,8 +231,8 @@ impl BitStream {
     }
 }
 
-pub fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("Test", |b| {
+pub fn criterion_bit_benchmark(c: &mut Criterion) {
+    c.bench_function("Test append_bit", |b| {
         b.iter(|| {
             let mut stream = BitStream::open();
             for _ in 0..10000000 {
@@ -242,5 +242,18 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, criterion_benchmark);
+pub fn criterion_byte_benchmark(c: &mut Criterion) {
+    c.bench_function("Test append_byte", |b| {
+        b.iter(|| {
+            let mut stream = BitStream::open();
+            stream.append_bit(true);
+            stream.append_bit(true);
+            for _ in 0..10000000 {
+                stream.append_byte(black_box(170));
+            }
+        })
+    });
+}
+
+criterion_group!(benches, criterion_bit_benchmark, criterion_byte_benchmark);
 criterion_main!(benches);

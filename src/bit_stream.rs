@@ -2,7 +2,7 @@ use std::fs;
 
 use crate::appendable_to_bit_stream::AppendableToBitStream;
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct BitStream {
     data: Vec<u8>,
     bits_in_last_byte: u8,
@@ -139,7 +139,6 @@ impl BitStream {
         let mut index = 0;
         let mut last_byte = 0;
         if self.data.len() > 0 {
-            index = self.data.len() - 1;
             last_byte = self.data[index];
         } else {
             self.data.push(last_byte);
@@ -177,6 +176,15 @@ impl BitStream {
     }
     pub fn bits_in_last_byte(&self) -> u8 {
         self.bits_in_last_byte
+    }
+}
+
+impl Default for BitStream {
+    fn default() -> BitStream {
+        BitStream {
+            data: Vec::with_capacity(4048),
+            bits_in_last_byte: 0,
+        }
     }
 }
 
