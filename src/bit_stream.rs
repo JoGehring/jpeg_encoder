@@ -139,6 +139,7 @@ impl BitStream {
         let mut index = 0;
         let mut last_byte = 0;
         if self.data.len() > 0 {
+            index = self.data.len() - 1;
             last_byte = self.data[index];
         } else {
             self.data.push(last_byte);
@@ -249,7 +250,7 @@ mod tests {
         stream.append(true);
         stream.append(false);
         stream.append(true);
-        assert_eq!(vec![0b10100000], stream.data);
+        assert_eq!(vec![0b1010_0000], stream.data);
         assert_eq!(3, stream.bits_in_last_byte);
     }
 
@@ -258,7 +259,7 @@ mod tests {
         let mut stream = BitStream::open();
         let bits = vec![true, false, true];
         stream.append(bits);
-        assert_eq!(vec![0b10100000], stream.data);
+        assert_eq!(vec![0b1010_0000], stream.data);
         assert_eq!(3, stream.bits_in_last_byte);
     }
 
@@ -287,7 +288,7 @@ mod tests {
         stream.append(false);
         stream.append(true);
         stream.append::<u8>(255);
-        assert_eq!(vec![44, 0b01111111, 0b11000000], stream.data);
+        assert_eq!(vec![44, 0b0111_1111, 0b1100_0000], stream.data);
         assert_eq!(2, stream.bits_in_last_byte);
     }
 
