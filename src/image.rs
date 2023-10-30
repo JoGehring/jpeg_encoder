@@ -4,7 +4,6 @@ use na::{Matrix3, Vector3};
 
 use crate::downsample::downsample_channel;
 /// Image data structure for parsed image files
-/// TODO: do getters instead of pub members?
 ///
 /// # Attributes
 ///
@@ -16,15 +15,15 @@ use crate::downsample::downsample_channel;
 /// * `downsampled_vertically`: True if two rows have been combined (e.g. for 4:2:0)
 #[derive(Clone, Debug, PartialEq)]
 pub struct Image {
-    pub height: u16,
-    pub width: u16,
+    height: u16,
+    width: u16,
     channel1: Vec<Vec<u16>>,
     channel2: Vec<Vec<u16>>,
     channel3: Vec<Vec<u16>>,
-    pub y_downsample_factor: usize,
-    pub cb_downsample_factor: usize,
-    pub cr_downsample_factor: usize,
-    pub downsampled_vertically: bool,
+    y_downsample_factor: usize,
+    cb_downsample_factor: usize,
+    cr_downsample_factor: usize,
+    downsampled_vertically: bool,
 }
 
 const TRANSFORM_RGB_YCBCR_MATRIX: Matrix3<f32> = Matrix3::new(
@@ -202,6 +201,33 @@ impl Image {
         self.cb_downsample_factor *= a / b;
         self.cr_downsample_factor *= a / cr_b;
         self.downsampled_vertically |= c == 0;
+    }
+    pub fn channel1(&self) -> &Vec<Vec<u16>> {
+        &self.channel1
+    }
+    pub fn channel2(&self) -> &Vec<Vec<u16>> {
+        &self.channel2
+    }
+    pub fn channel3(&self) -> &Vec<Vec<u16>> {
+        &self.channel3
+    }
+    pub fn height(&self) -> u16 {
+        self.height
+    }
+    pub fn width(&self) -> u16 {
+        self.width
+    }
+    pub fn y_downsample_factor(&self) -> usize {
+        self.y_downsample_factor
+    }
+    pub fn cb_downsample_factor(&self) -> usize {
+        self.cb_downsample_factor
+    }
+    pub fn cr_downsample_factor(&self) -> usize {
+        self.cr_downsample_factor
+    }
+    pub fn downsampled_vertically(&self) -> bool {
+        self.downsampled_vertically
     }
 }
 

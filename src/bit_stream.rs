@@ -232,15 +232,19 @@ impl BitStream {
     pub fn append<T: AppendableToBitStream>(&mut self, value: T) {
         value.append(self);
     }
+    pub fn data(&self) -> &Vec<u8> {
+        &self.data
+    }
+    pub fn bits_in_last_byte(&self) -> u8 {
+        self.bits_in_last_byte
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::fs;
 
-    //TODO: Tests for u16 generic append
-
-    use super::{clear_first_n_bytes, clear_last_n_bytes, BitStream};
+    use super::{BitStream, clear_first_n_bytes, clear_last_n_bytes};
 
     #[test]
     fn test_clear_first_n_bytes() {

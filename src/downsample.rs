@@ -37,7 +37,6 @@ pub fn downsample_channel(
     }
     return final_channel;
 }
-//TODO JG: wir könnten die vektoren für die einzelnen channels mit ner entsprechenden kapazität initialisieren und dann auf die entsprechende position schreiben, könnten dann überall statt vec.push() eigentlich vec[i]=value verwenden, geht flotter
 
 /// Down-sample the row and potentially the row below it, based on the factors `a` and `b`.
 /// `a` and `b` are expected to fit the first two parts of standard subsampling notation: https://en.wikipedia.org/wiki/Chroma_subsampling
