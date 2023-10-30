@@ -178,7 +178,7 @@ impl BitStream {
 impl Default for BitStream {
     fn default() -> BitStream {
         BitStream {
-            data: Vec::with_capacity(4048),
+            data: Vec::with_capacity(4096),
             bits_in_last_byte: 0,
         }
     }
