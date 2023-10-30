@@ -54,7 +54,7 @@ impl AppendableToBitStream for Vec<u16> {
 }
 
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct BitStream {
     data: Vec<u8>,
     bits_in_last_byte: u8,
@@ -107,9 +107,10 @@ impl BitStream {
     /// stream.append_bit(true);
     /// ```
     pub fn append_bit(&mut self, value: bool) {
-        if self.bits_in_last_byte == 8 {
-            self.data.push(0);
-            self.bits_in_last_byte = 0;
+        if self.bits_in_last_byte == 8 || self.bits_in_last_byte == 0 {
+            self.data.push(if value { 0b1000_0000 } else { 0 });
+            self.bits_in_last_byte = 1;
+            return;
         }
         self.shift_and_add_to_last_byte(u8::from(value), 1);
     }
@@ -188,14 +189,8 @@ impl BitStream {
     ///
     /// * If more than the last `bits_to_occupy` bits of `value` are set
     fn shift_and_add_to_last_byte(&mut self, mut value: u8, bits_to_occupy: u8) {
-        let mut index = 0;
-        let mut last_byte = 0;
-        if self.data.len() > 0 {
-            index = self.data.len() - 1;
-            last_byte = self.data[index];
-        } else {
-            self.data.push(last_byte);
-        }
+        let index = self.data.len() - 1;
+        let mut last_byte = self.data[index];
         let bits_available = 8 - bits_to_occupy - self.bits_in_last_byte;
         value = value << bits_available;
         last_byte += value;
@@ -229,6 +224,15 @@ impl BitStream {
     }
     pub fn bits_in_last_byte(&self) -> u8 {
         self.bits_in_last_byte
+    }
+}
+
+impl Default for BitStream {
+    fn default() -> BitStream {
+        BitStream {
+            data: Vec::with_capacity(4096),
+            bits_in_last_byte: 0,
+        }
     }
 }
 
