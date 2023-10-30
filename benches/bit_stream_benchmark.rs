@@ -4,65 +4,56 @@ use std::fs;
 // Due to limitations with Criterion, we need to copy/paste bit_stream.rs here.
 // We can only use code from src/ if we are creating a library :/
 
-/// Clear the last n bytes of the value.
-/// TODO: find a better/not ugly way to do this.
-///
-/// # Arguments
-///
-/// * `value`: The value to work on.
-/// * `n`: The amount of bytes to clear.
-///
-/// # Example
-///
-/// ```
-/// let result = clear_last_n_bytes(7, 2);
-/// assert_eq!(4, result);
-/// ```
-fn clear_last_n_bytes(value: u8, n: u8) -> u8 {
-    let to_and = match n {
-        0 => 0b11111111,
-        1 => 0b11111110,
-        2 => 0b11111100,
-        3 => 0b11111000,
-        4 => 0b11110000,
-        5 => 0b11100000,
-        6 => 0b11000000,
-        7 => 0b10000000,
-        _ => 0,
-    };
-    value & to_and
+pub trait AppendableToBitStream {
+    fn append(&self, stream: &mut BitStream);
 }
 
-/// Clear the first n bytes of the value.
-/// TODO: find a better/not ugly way to do this.
-///
-/// # Arguments
-///
-/// * `value`: The value to work on.
-/// * `n`: The amount of bytes to clear.
-///
-/// # Example
-///
-/// ```
-/// let result = clear_first_n_bytes(255, 2);
-/// assert_eq!(63, result);
-/// ```
-fn clear_first_n_bytes(value: u8, n: u8) -> u8 {
-    let to_and = match n {
-        0 => 0b11111111,
-        1 => 0b01111111,
-        2 => 0b00111111,
-        3 => 0b00011111,
-        4 => 0b00001111,
-        5 => 0b00000111,
-        6 => 0b00000011,
-        7 => 0b00000001,
-        _ => 0,
-    };
-    value & to_and
+impl AppendableToBitStream for bool {
+    fn append(&self, stream: &mut BitStream) {
+        stream.append_bit(*self);
+    }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+impl AppendableToBitStream for Vec<bool> {
+    fn append(&self, stream: &mut BitStream) {
+        for val in self {
+            stream.append_bit(*val);
+        }
+    }
+}
+
+impl AppendableToBitStream for u8 {
+    fn append(&self, stream: &mut BitStream) {
+        stream.append_byte(*self);
+    }
+}
+
+impl AppendableToBitStream for Vec<u8> {
+    fn append(&self, stream: &mut BitStream) {
+        for val in self {
+            stream.append_byte(*val);
+        }
+    }
+}
+
+impl AppendableToBitStream for u16 {
+    fn append(&self, stream: &mut BitStream) {
+        let bytes = self.to_be_bytes();
+        stream.append_byte(bytes[0]);
+        stream.append_byte(bytes[1]);
+    }
+}
+
+impl AppendableToBitStream for Vec<u16> {
+    fn append(&self, stream: &mut BitStream) {
+        for val in self {
+            stream.append(*val);
+        }
+    }
+}
+
+
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct BitStream {
     data: Vec<u8>,
     bits_in_last_byte: u8,
@@ -123,7 +114,6 @@ impl BitStream {
     }
 
     /// Append a byte of data to this bit stream.
-    /// TODO: Perhaps also add a generic function to append
     /// integers of any size?
     ///
     /// # Arguments
@@ -156,21 +146,19 @@ impl BitStream {
     ///     as shift_and_add_to_last_byte changes the value of bits_in_last_byte.
     pub fn append_byte(&mut self, value: u8) {
         // if the last byte in the stream is full, we can just append this one
-        if self.bits_in_last_byte == 8 {
+        if self.bits_in_last_byte == 8 || self.bits_in_last_byte == 0 {
             self.data.push(value);
+            self.bits_in_last_byte = 8;
             return;
         }
 
         let previous_bits_in_last_byte = self.bits_in_last_byte;
 
-        let upper_value =
-            clear_last_n_bytes(value, self.bits_in_last_byte) >> self.bits_in_last_byte;
+        let upper_value = value >> self.bits_in_last_byte;
         let bits_still_available_in_last_byte = 8 - self.bits_in_last_byte;
         self.shift_and_add_to_last_byte(upper_value, bits_still_available_in_last_byte);
-        let lower_value = clear_first_n_bytes(value, bits_still_available_in_last_byte)
-            << bits_still_available_in_last_byte;
+        let lower_value = value << bits_still_available_in_last_byte;
         self.data.push(lower_value);
-
         self.bits_in_last_byte = previous_bits_in_last_byte;
     }
 
@@ -194,13 +182,19 @@ impl BitStream {
     /// # Explanation
     /// We shift the value to the correct position given by the available space in the last byte, then add the
     /// resulting byte to the last one and replace it within the vector
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// * If more than the last `bits_to_occupy` bits of `value` are set
     fn shift_and_add_to_last_byte(&mut self, mut value: u8, bits_to_occupy: u8) {
-        let index = self.data.len() - 1;
-        let mut last_byte = self.data[index];
+        let mut index = 0;
+        let mut last_byte = 0;
+        if self.data.len() > 0 {
+            index = self.data.len() - 1;
+            last_byte = self.data[index];
+        } else {
+            self.data.push(last_byte);
+        }
         let bits_available = 8 - bits_to_occupy - self.bits_in_last_byte;
         value = value << bits_available;
         last_byte += value;
@@ -225,14 +219,15 @@ impl BitStream {
     pub fn flush_to_file(&self, filename: &str) -> std::io::Result<()> {
         fs::write(filename, &self.data)
     }
-}
 
-impl Default for BitStream {
-    fn default() -> BitStream {
-        BitStream {
-            data: vec![],
-            bits_in_last_byte: 8,
-        }
+    pub fn append<T: AppendableToBitStream>(&mut self, value: T) {
+        value.append(self);
+    }
+    pub fn data(&self) -> &Vec<u8> {
+        &self.data
+    }
+    pub fn bits_in_last_byte(&self) -> u8 {
+        self.bits_in_last_byte
     }
 }
 

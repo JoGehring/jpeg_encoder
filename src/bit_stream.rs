@@ -2,64 +2,6 @@ use std::fs;
 
 use crate::appendable_to_bit_stream::AppendableToBitStream;
 
-/// Clear the last n bytes of the value.
-/// TODO: find a better/not ugly way to do this.
-///
-/// # Arguments
-///
-/// * `value`: The value to work on.
-/// * `n`: The amount of bytes to clear.
-///
-/// # Example
-///
-/// ```
-/// let result = clear_last_n_bytes(7, 2);
-/// assert_eq!(4, result);
-/// ```
-fn clear_last_n_bytes(value: u8, n: u8) -> u8 {
-    let to_and = match n {
-        0 => 0b11111111,
-        1 => 0b11111110,
-        2 => 0b11111100,
-        3 => 0b11111000,
-        4 => 0b11110000,
-        5 => 0b11100000,
-        6 => 0b11000000,
-        7 => 0b10000000,
-        _ => 0,
-    };
-    value & to_and
-}
-
-/// Clear the first n bytes of the value.
-/// TODO: find a better/not ugly way to do this.
-///
-/// # Arguments
-///
-/// * `value`: The value to work on.
-/// * `n`: The amount of bytes to clear.
-///
-/// # Example
-///
-/// ```
-/// let result = clear_first_n_bytes(255, 2);
-/// assert_eq!(63, result);
-/// ```
-fn clear_first_n_bytes(value: u8, n: u8) -> u8 {
-    let to_and = match n {
-        0 => 0b11111111,
-        1 => 0b01111111,
-        2 => 0b00111111,
-        3 => 0b00011111,
-        4 => 0b00001111,
-        5 => 0b00000111,
-        6 => 0b00000011,
-        7 => 0b00000001,
-        _ => 0,
-    };
-    value & to_and
-}
-
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct BitStream {
     data: Vec<u8>,
@@ -161,12 +103,10 @@ impl BitStream {
 
         let previous_bits_in_last_byte = self.bits_in_last_byte;
 
-        let upper_value =
-            clear_last_n_bytes(value, self.bits_in_last_byte) >> self.bits_in_last_byte;
+        let upper_value = value >> self.bits_in_last_byte;
         let bits_still_available_in_last_byte = 8 - self.bits_in_last_byte;
         self.shift_and_add_to_last_byte(upper_value, bits_still_available_in_last_byte);
-        let lower_value = clear_first_n_bytes(value, bits_still_available_in_last_byte)
-            << bits_still_available_in_last_byte;
+        let lower_value = value << bits_still_available_in_last_byte;
         self.data.push(lower_value);
         self.bits_in_last_byte = previous_bits_in_last_byte;
     }
@@ -244,33 +184,7 @@ impl BitStream {
 mod tests {
     use std::fs;
 
-    use super::{BitStream, clear_first_n_bytes, clear_last_n_bytes};
-
-    #[test]
-    fn test_clear_first_n_bytes() {
-        assert_eq!(0b11111111, clear_first_n_bytes(0b11111111, 0));
-        assert_eq!(0b01111111, clear_first_n_bytes(0b11111111, 1));
-        assert_eq!(0b00111111, clear_first_n_bytes(0b11111111, 2));
-        assert_eq!(0b00011111, clear_first_n_bytes(0b11111111, 3));
-        assert_eq!(0b00001111, clear_first_n_bytes(0b11111111, 4));
-        assert_eq!(0b00000111, clear_first_n_bytes(0b11111111, 5));
-        assert_eq!(0b00000011, clear_first_n_bytes(0b11111111, 6));
-        assert_eq!(0b00000001, clear_first_n_bytes(0b11111111, 7));
-        assert_eq!(0b00000000, clear_first_n_bytes(0b11111111, 8));
-    }
-
-    #[test]
-    fn test_clear_last_n_bytes() {
-        assert_eq!(0b11111111, clear_last_n_bytes(0b11111111, 0));
-        assert_eq!(0b11111110, clear_last_n_bytes(0b11111111, 1));
-        assert_eq!(0b11111100, clear_last_n_bytes(0b11111111, 2));
-        assert_eq!(0b11111000, clear_last_n_bytes(0b11111111, 3));
-        assert_eq!(0b11110000, clear_last_n_bytes(0b11111111, 4));
-        assert_eq!(0b11100000, clear_last_n_bytes(0b11111111, 5));
-        assert_eq!(0b11000000, clear_last_n_bytes(0b11111111, 6));
-        assert_eq!(0b10000000, clear_last_n_bytes(0b11111111, 7));
-        assert_eq!(0b00000000, clear_last_n_bytes(0b11111111, 8));
-    }
+    use super::BitStream;
 
     #[test]
     fn test_flush_to_file() -> std::io::Result<()> {
