@@ -240,7 +240,7 @@ pub fn criterion_bit_benchmark(c: &mut Criterion) {
     c.bench_function("Test append_bit", |b| {
         b.iter(|| {
             let mut stream = BitStream::open();
-            for _ in 0..10000000 {
+            for _ in 0..10_000_000 {
                 stream.append_bit(black_box(true));
             }
         })
@@ -253,7 +253,7 @@ pub fn criterion_byte_benchmark(c: &mut Criterion) {
             let mut stream = BitStream::open();
             stream.append_bit(black_box(true));
             stream.append_bit(black_box(true));
-            for _ in 0..10000000 {
+            for _ in 0..10_000_000 {
                 stream.append_byte(black_box(170));
             }
         })
@@ -266,7 +266,7 @@ pub fn criterion_byte_and_write_benchmark(c: &mut Criterion) {
             let mut stream = BitStream::open();
             stream.append_bit(black_box(true));
             stream.append_bit(black_box(true));
-            for _ in 0..10000000 {
+            for _ in 0..10_000_000 {
                 stream.append_byte(black_box(170));
             }
             stream.flush_to_file(black_box("test/test.bin")).expect("bit stream could not be flushed to file");
@@ -277,7 +277,7 @@ pub fn criterion_byte_and_write_benchmark(c: &mut Criterion) {
 
 pub fn criterion_read_benchmark(c: &mut Criterion) {
     let mut stream = BitStream::open();
-    for _ in 0..10000000 {
+    for _ in 0..10_000_000 {
         stream.append_byte(170);
     }
     stream.flush_to_file(black_box("test/test.bin")).expect("bit stream could not be flushed to file");
@@ -292,14 +292,14 @@ pub fn criterion_read_benchmark(c: &mut Criterion) {
 
 pub fn criterion_read_and_write_benchmark(c: &mut Criterion) {
     let mut stream = BitStream::open();
-    for _ in 0..10000000 {
+    for _ in 0..10_000_000 {
         stream.append_byte(170);
     }
     stream.flush_to_file(black_box("test/test.bin")).expect("bit stream could not be flushed to file");
     c.bench_function("Test reading and writing bitstream from/to file", |b| {
         b.iter(|| {
             let mut read_stream = BitStream::read_bit_stream_from_file(black_box("test/test.bin"));
-            for _ in 0..10000000 {
+            for _ in 0..10_000_000 {
                 read_stream.append_bit(false);
                 read_stream.append_byte(black_box(170));
             }
