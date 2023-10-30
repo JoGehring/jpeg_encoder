@@ -1,5 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::fs;
+
+use criterion::{black_box, Criterion, criterion_group, criterion_main};
 
 // Due to limitations with Criterion, we need to copy/paste bit_stream.rs here.
 // We can only use code from src/ if we are creating a library :/
@@ -246,8 +247,8 @@ pub fn criterion_byte_benchmark(c: &mut Criterion) {
     c.bench_function("Test append_byte", |b| {
         b.iter(|| {
             let mut stream = BitStream::open();
-            stream.append_bit(true);
-            stream.append_bit(true);
+            stream.append_bit(black_box(true));
+            stream.append_bit(black_box(true));
             for _ in 0..10000000 {
                 stream.append_byte(black_box(170));
             }
@@ -255,5 +256,54 @@ pub fn criterion_byte_benchmark(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, criterion_bit_benchmark, criterion_byte_benchmark);
+pub fn criterion_byte_and_write_benchmark(c: &mut Criterion) {
+    c.bench_function("Test append_byte and flush to file", |b| {
+        b.iter(|| {
+            let mut stream = BitStream::open();
+            stream.append_bit(black_box(true));
+            stream.append_bit(black_box(true));
+            for _ in 0..10000000 {
+                stream.append_byte(black_box(170));
+            }
+            stream.flush_to_file(black_box("test/test.bin")).expect("bit stream could not be flushed to file");
+        })
+    });
+    fs::remove_file("test/test.bin").expect("file could not be removed");
+}
+
+pub fn criterion_read_benchmark(c: &mut Criterion) {
+    let mut stream = BitStream::open();
+    for _ in 0..10000000 {
+        stream.append_byte(170);
+    }
+    stream.flush_to_file(black_box("test/test.bin")).expect("bit stream could not be flushed to file");
+    c.bench_function("Test reading bitstream from file", |b| {
+        b.iter(|| {
+            let mut read_stream = BitStream::read_bit_stream_from_file(black_box("test/test.bin"));
+            read_stream.append(black_box(true));
+        })
+    });
+    fs::remove_file("test/test.bin").expect("file could not be removed");
+}
+
+pub fn criterion_read_and_write_benchmark(c: &mut Criterion) {
+    let mut stream = BitStream::open();
+    for _ in 0..10000000 {
+        stream.append_byte(170);
+    }
+    stream.flush_to_file(black_box("test/test.bin")).expect("bit stream could not be flushed to file");
+    c.bench_function("Test reading and writing bitstream from/to file", |b| {
+        b.iter(|| {
+            let mut read_stream = BitStream::read_bit_stream_from_file(black_box("test/test.bin"));
+            for _ in 0..10000000 {
+                read_stream.append_bit(false);
+                read_stream.append_byte(black_box(170));
+            }
+            stream.flush_to_file(black_box("test/test.bin")).expect("bit stream could not be flushed to file");
+        })
+    });
+    fs::remove_file("test/test.bin").expect("file could not be removed");
+}
+
+criterion_group!(benches, criterion_bit_benchmark, criterion_byte_benchmark, criterion_byte_and_write_benchmark, criterion_read_benchmark, criterion_read_and_write_benchmark);
 criterion_main!(benches);
