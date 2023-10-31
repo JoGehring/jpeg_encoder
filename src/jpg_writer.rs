@@ -25,33 +25,24 @@ pub enum SegmentType {
 /// # Panics
 /// * If the requested segment type isn't implemented yet.
 pub fn write_segment_to_stream(stream: &mut BitStream, image: &Image, segment_type: SegmentType) {
+    write_marker_for_segment(stream, &segment_type);
     match segment_type {
-        SegmentType::SOI => write_soi_segment(stream),
+        SegmentType::SOI => return,
         SegmentType::APP0 => write_app0_segment(stream, image),
         SegmentType::SOF0 => write_sof0_segment(stream, image),
-        SegmentType::EOI => write_eoi_segment(stream),
+        SegmentType::EOI => return,
         _ => panic!("Not implemented yet!"),
     };
 }
 
-/// Write the SOI segment of the JPG file.
-/// This denotes the start of the file.
-///
-/// # Arguments
-///
-/// * `stream`: The BitStream to append the segment to.
-fn write_soi_segment(stream: &mut BitStream) {
-    stream.append::<u16>(0xffd8);
-}
-
-/// Write the EOI segment of the JPG file.
-/// This denotes the end of the file.
-///
-/// # Arguments
-///
-/// * `stream`: The BitStream to append the segment to.
-fn write_eoi_segment(stream: &mut BitStream) {
-    stream.append::<u16>(0xffd9);
+fn write_marker_for_segment(stream: &mut BitStream, segment_type: &SegmentType) {
+    stream.append::<u16>(match segment_type {
+        SegmentType::SOI => 0xffd8,
+        SegmentType::APP0 => 0xffe0,
+        SegmentType::SOF0 => 0xffc0,
+        SegmentType::EOI => 0xffd9,
+        _ => panic!("Not implemented yet!"),
+    });
 }
 
 /// Write the APP0 segment of the JPG file.
@@ -63,8 +54,6 @@ fn write_eoi_segment(stream: &mut BitStream) {
 /// * `stream`: The BitStream to append the segment to.
 /// * `image`: The image to take the data from.
 fn write_app0_segment(stream: &mut BitStream, image: &Image) {
-    // marker: 0xff 0xe0
-    stream.append::<u16>(0xffe0);
     // length of segment: 16
     stream.append::<u16>(16);
     // string "JFIF": 0x4a 0x46 0x49 0x46 0x00
@@ -91,8 +80,6 @@ fn write_app0_segment(stream: &mut BitStream, image: &Image) {
 /// * `stream`: The BitStream to append the segment to.
 /// * `image`: The image to take the data from.
 fn write_sof0_segment(stream: &mut BitStream, image: &Image) {
-    // marker: 0xff 0xc0
-    stream.append::<u16>(0xffc0);
     // length, we always do coloured so 8 + 3*3
     stream.append::<u16>(17);
     // accuracy - we default to 8 as 12 and 16 aren't commonly supported
@@ -155,22 +142,22 @@ fn write_sof0_segment_component(
 #[cfg(test)]
 mod tests {
     use crate::bit_stream::BitStream;
-    use crate::jpg_writer::{SegmentType, write_app0_segment, write_eoi_segment, write_segment_to_stream, write_sof0_segment, write_sof0_segment_component, write_soi_segment};
+    use crate::jpg_writer::{SegmentType, write_app0_segment, write_segment_to_stream, write_sof0_segment, write_sof0_segment_component, write_marker_for_segment};
     use crate::ppm_parser::read_ppm_from_file;
 
     #[test]
-    fn test_write_soi_segment_successful() {
+    fn test_write_soi_marker_successful() {
         let mut stream = BitStream::open();
-        write_soi_segment(&mut stream);
+        write_marker_for_segment(&mut stream, &SegmentType::SOI);
         let data = vec![0xff, 0xd8];
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
     }
 
     #[test]
-    fn test_write_eoi_segment_successful() {
+    fn test_write_eoi_marker_successful() {
         let mut stream = BitStream::open();
-        write_eoi_segment(&mut stream);
+        write_marker_for_segment(&mut stream, &SegmentType::EOI);
         let data = vec![0xff, 0xd9];
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
@@ -181,7 +168,7 @@ mod tests {
         let mut stream = BitStream::open();
         let image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         write_app0_segment(&mut stream, &image);
-        let data: Vec<u8> = vec![0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 1, 0, 1, 0, 0];
+        let data: Vec<u8> = vec![0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 1, 0, 1, 0, 0];
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
     }
@@ -209,7 +196,7 @@ mod tests {
         let mut stream = BitStream::open();
         let image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         write_sof0_segment(&mut stream, &image);
-        let data: Vec<u8> = vec![0xff, 0xc0, 0, 17, 8, 0, 4, 0, 4, 3, 1, 0x22, 0, 2, 0x22, 0, 3, 0x22, 0];
+        let data: Vec<u8> = vec![0, 17, 8, 0, 4, 0, 4, 3, 1, 0x22, 0, 2, 0x22, 0, 3, 0x22, 0];
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
     }
@@ -220,7 +207,7 @@ mod tests {
         let mut image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         image.downsample(4, 2, 0);
         write_sof0_segment(&mut stream, &image);
-        let data: Vec<u8> = vec![0xff, 0xc0, 0, 17, 8, 0, 4, 0, 4, 3, 1, 0x22, 0, 2, 0x11, 0, 3, 0x11, 0];
+        let data: Vec<u8> = vec![0, 17, 8, 0, 4, 0, 4, 3, 1, 0x22, 0, 2, 0x11, 0, 3, 0x11, 0];
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
     }
