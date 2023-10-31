@@ -1,7 +1,7 @@
 use std::fs;
 
 use crate::appendable_to_bit_stream::AppendableToBitStream;
-
+// TODO: funktion, die 1..n bit appendet (also man gibt n byte rein und sagt, wie viele bit significant sind, ähnlich wie bei shift_and_add_to_last_byte
 #[derive(Clone, Debug, PartialEq)]
 pub struct BitStream {
     data: Vec<u8>,
@@ -189,7 +189,7 @@ mod tests {
     use std::fs;
 
     use super::BitStream;
-
+//TODO: test für sehr langen bitstream
     #[test]
     fn test_flush_to_file() -> std::io::Result<()> {
         let stream = BitStream {
