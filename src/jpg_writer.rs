@@ -89,6 +89,8 @@ fn write_sof0_segment(stream: &mut BitStream, image: &Image) {
     stream.append(image.width());
     // number of components - we always do coloured so 3
     stream.append::<u8>(3);
+
+    let max_downsample_factor = std::cmp::max(std::cmp::max(image.y_downsample_factor(), image.cb_downsample_factor()), image.cr_downsample_factor()) as u8;
     // TODO: quantising tables, once they're implemented
     write_sof0_segment_component(
         stream,
@@ -96,6 +98,7 @@ fn write_sof0_segment(stream: &mut BitStream, image: &Image) {
         image.y_downsample_factor() as u8,
         false, // we don't downsample the Y component, ever
         0,
+        max_downsample_factor,
     );
     write_sof0_segment_component(
         stream,
@@ -103,6 +106,7 @@ fn write_sof0_segment(stream: &mut BitStream, image: &Image) {
         image.cb_downsample_factor() as u8,
         image.downsampled_vertically(),
         0,
+        max_downsample_factor,
     );
     write_sof0_segment_component(
         stream,
@@ -110,6 +114,7 @@ fn write_sof0_segment(stream: &mut BitStream, image: &Image) {
         image.cr_downsample_factor() as u8,
         image.downsampled_vertically(),
         0,
+        max_downsample_factor,
     );
 }
 
@@ -128,12 +133,13 @@ fn write_sof0_segment_component(
     downsample_factor: u8,
     downsampled_vertically: bool,
     quantise_table: u8,
+    max_downsample_factor: u8,
 ) {
     stream.append(id);
     // the four bits for vertical
-    let mut downsample_value: u8 = if downsampled_vertically { 0x10 } else { 0x20 };
+    let mut downsample_value: u8 = if downsampled_vertically { max_downsample_factor / 2 } else { max_downsample_factor };
     // the four bits for horizontal
-    downsample_value += 2 / downsample_factor;
+    downsample_value += max_downsample_factor / downsample_factor << 4;
     stream.append(downsample_value);
     stream.append(quantise_table);
 }
@@ -176,7 +182,7 @@ mod tests {
     #[test]
     fn test_write_sof0_segment_component_downsampled_vertically_true_factor2() {
         let mut stream = BitStream::open();
-        write_sof0_segment_component(&mut stream, 1, 2, true, 0);
+        write_sof0_segment_component(&mut stream, 1, 2, true, 0, 2);
         let data: Vec<u8> = vec![1, 0x11, 0];
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
@@ -185,18 +191,35 @@ mod tests {
     #[test]
     fn test_write_sof0_segment_component_downsampled_vertically_false_factor2() {
         let mut stream = BitStream::open();
-        write_sof0_segment_component(&mut stream, 1, 2, false, 0);
-        let data: Vec<u8> = vec![1, 0x21, 0];
+        write_sof0_segment_component(&mut stream, 1, 2, false, 0, 2);
+        let data: Vec<u8> = vec![1, 0x12, 0];
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
     }
 
     #[test]
+    fn test_write_sof0_segment_component_downsampled_vertically_true_factor2_max4() {
+        let mut stream = BitStream::open();
+        write_sof0_segment_component(&mut stream, 1, 2, true, 0, 4);
+        let data: Vec<u8> = vec![1, 0x22, 0];
+        assert_eq!(data, *stream.data());
+        assert_eq!(8, stream.bits_in_last_byte());
+    }
+
+    #[test]
+    fn test_write_sof0_segment_component_downsampled_vertically_false_factor2_max4() {
+        let mut stream = BitStream::open();
+        write_sof0_segment_component(&mut stream, 1, 2, false, 0, 4);
+        let data: Vec<u8> = vec![1, 0x24, 0];
+        assert_eq!(data, *stream.data());
+        assert_eq!(8, stream.bits_in_last_byte());
+    }
+    #[test]
     fn test_write_sof0_segment_no_downsampling() {
         let mut stream = BitStream::open();
         let image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         write_sof0_segment(&mut stream, &image);
-        let data: Vec<u8> = vec![0, 17, 8, 0, 4, 0, 4, 3, 1, 0x22, 0, 2, 0x22, 0, 3, 0x22, 0];
+        let data: Vec<u8> = vec![0, 17, 8, 0, 4, 0, 4, 3, 1, 0x11, 0, 2, 0x11, 0, 3, 0x11, 0];
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
     }
@@ -234,7 +257,7 @@ mod tests {
         write_segment_to_stream(&mut stream, &image, SegmentType::APP0);
         write_segment_to_stream(&mut stream, &image, SegmentType::SOF0);
         write_segment_to_stream(&mut stream, &image, SegmentType::EOI);
-        let data: Vec<u8> = vec![0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 1, 0, 1, 0, 0, 0xff, 0xc0, 0, 17, 8, 0, 4, 0, 4, 3, 1, 0x22, 0, 2, 0x22, 0, 3, 0x22, 0, 0xff, 0xd9];
+        let data: Vec<u8> = vec![0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 1, 0, 1, 0, 0, 0xff, 0xc0, 0, 17, 8, 0, 4, 0, 4, 3, 1, 0x11, 0, 2, 0x11, 0, 3, 0x11, 0, 0xff, 0xd9];
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
     }
