@@ -1,6 +1,7 @@
 use std::fs;
 
 use crate::appendable_to_bit_stream::AppendableToBitStream;
+
 // TODO: funktion, die 1..n bit appendet (also man gibt n byte rein und sagt, wie viele bit significant sind, ähnlich wie bei shift_and_add_to_last_byte
 #[derive(Clone, Debug, PartialEq)]
 pub struct BitStream {
@@ -112,6 +113,35 @@ impl BitStream {
         self.bits_in_last_byte = previous_bits_in_last_byte;
     }
 
+
+    /// Append the given amount of bits in value to the bit stream, starting from the MSB
+    ///
+    /// # Arguments
+    ///
+    /// * `value`: The value the bits are taken from
+    /// * `amount`: The amount of bits to add to the stream
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let mut stream = BitStream::open();
+    /// stream.append_n_bits(128u8, 3); // necessary because shift_and_add_to_last_byte assumes a byte exists
+    /// assert_eq!(vec![0b1000_0000], stream.data);
+    /// assert_eq!(3, stream.bits_in_last_byte);
+    /// ```
+    ///
+    /// # Explanation
+    /// Mask all bits of value except at the respective position, then check if true or false. Then
+    /// append the bit to the stream
+    ///
+    /// # Panics
+    ///
+    /// * Not implemented for Vecs or bools because not sensible
+    /// * Amount bigger than bits in value
+    pub fn append_n_bits<T: AppendableToBitStream>(&mut self, value: T, amount: u8) {
+        value.append_n_bits(self, amount);
+    }
+
     /// Shift the provided value to the correct position, then store it in the last byte.
     /// This should be used to write data to the stream.
     ///
@@ -189,7 +219,8 @@ mod tests {
     use std::fs;
 
     use super::BitStream;
-//TODO: test für sehr langen bitstream
+
+    //TODO: test für sehr langen bitstream (mit random Daten)
     #[test]
     fn test_flush_to_file() -> std::io::Result<()> {
         let stream = BitStream {
@@ -287,15 +318,15 @@ mod tests {
         assert_eq!(2, stream.bits_in_last_byte);
     }
 
-        #[test]
+    #[test]
     fn test_generic_append_first_bits_then_bytes() {
         let mut stream = BitStream::open();
         stream.append(true);
         stream.append(false);
         stream.append(true);
         stream.append::<u8>(255);
-            stream.append(false);
-            stream.append_byte(9);
+        stream.append(false);
+        stream.append_byte(9);
         assert_eq!(vec![0b1011_1111, 0b1110_0000, 0b1001_0000], stream.data);
         assert_eq!(4, stream.bits_in_last_byte);
     }
@@ -328,5 +359,65 @@ mod tests {
         stream.append::<u16>(0xfef0);
         assert_eq!(vec![0x12, 0x34, 0xfe, 0xf0], stream.data);
         assert_eq!(8, stream.bits_in_last_byte);
+    }
+
+    #[test]
+    fn test_append_n_bits_u8() {
+        let mut stream = BitStream::open();
+        stream.append_n_bits(0b1011_1111u8, 3);
+        assert_eq!(vec![0b1010_0000], stream.data);
+        assert_eq!(3, stream.bits_in_last_byte);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_append_n_bits_u8_amount_to_big() {
+        let mut stream = BitStream::open();
+        stream.append_n_bits(0b1011_1111u8, 12);
+    }
+
+    #[test]
+    fn test_append_n_bits_u16() {
+        let mut stream = BitStream::open();
+        stream.append_n_bits::<u16>(0b1011_0000_0000_0000, 3);
+        assert_eq!(vec![0b1010_0000], stream.data);
+        assert_eq!(3, stream.bits_in_last_byte);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_append_n_bits_u16_amount_to_big() {
+        let mut stream = BitStream::open();
+        stream.append_n_bits::<u16>(0b1011_0000_0000_0000, 29);
+    }
+
+        #[test]
+    fn test_append_n_bits_vec8() {
+        let mut stream = BitStream::open();
+        stream.append_n_bits::<Vec<u8>>(vec![0b1010_1010, 0b1010_1010, 0b1010_1010], 19);
+        assert_eq!(vec![0b1010_1010, 0b1010_1010, 0b1010_0000], stream.data);
+        assert_eq!(3, stream.bits_in_last_byte);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_append_n_bits_vec8_amount_to_big() {
+        let mut stream = BitStream::open();
+        stream.append_n_bits::<Vec<u8>>(vec![0b1010_1010, 0b1010_1010, 0b1010_1010], 59);
+    }
+
+            #[test]
+    fn test_append_n_bits_vec16() {
+        let mut stream = BitStream::open();
+        stream.append_n_bits::<Vec<u16>>(vec![0b1010_1010_1010_1010, 0b1010_1010_1010_1010, 0b1010_1010_1010_1010], 35);
+        assert_eq!(vec![0b1010_1010, 0b1010_1010, 0b1010_1010, 0b1010_1010, 0b1010_0000], stream.data);
+        assert_eq!(3, stream.bits_in_last_byte);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_append_n_bits_vec16_amount_to_big() {
+        let mut stream = BitStream::open();
+        stream.append_n_bits::<Vec<u16>>(vec![0b1010_1010, 0b1010_1010, 0b1010_1010], 59);
     }
 }
