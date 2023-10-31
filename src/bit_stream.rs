@@ -218,6 +218,8 @@ impl Default for BitStream {
 mod tests {
     use std::fs;
 
+    use rand::Rng;
+
     use super::BitStream;
 
     //TODO: test für sehr langen bitstream (mit random Daten)
@@ -419,5 +421,24 @@ mod tests {
     fn test_append_n_bits_vec16_amount_to_big() {
         let mut stream = BitStream::open();
         stream.append_n_bits::<Vec<u16>>(vec![0b1010_1010, 0b1010_1010, 0b1010_1010], 59);
+    }
+
+    #[test]
+    #[ignore]
+    fn test_append_large_random_data() {
+        let mut stream = BitStream::open();
+        let mut rng = rand::thread_rng();
+        let tested_capacity: u64 = 10_000_000_000;
+        let mut bit_vec: Vec<bool> = Vec::with_capacity(tested_capacity as usize);
+        for _ in 0..tested_capacity {
+            let n1: bool = rng.gen();
+            bit_vec.push(n1);
+            stream.append(n1);
+        }
+        for i in 0..tested_capacity {
+            let expected_val = bit_vec[i as usize];
+            let actual_val = (stream.data()[(i / 8) as usize] & (0b1000_0000 >> i % 8)) != 0;
+            assert_eq!(expected_val, actual_val);
+        }
     }
 }
