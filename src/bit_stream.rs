@@ -391,7 +391,7 @@ mod tests {
         stream.append_n_bits::<u16>(0b1011_0000_0000_0000, 29);
     }
 
-        #[test]
+    #[test]
     fn test_append_n_bits_vec8() {
         let mut stream = BitStream::open();
         stream.append_n_bits::<Vec<u8>>(vec![0b1010_1010, 0b1010_1010, 0b1010_1010], 19);
@@ -406,7 +406,7 @@ mod tests {
         stream.append_n_bits::<Vec<u8>>(vec![0b1010_1010, 0b1010_1010, 0b1010_1010], 59);
     }
 
-            #[test]
+    #[test]
     fn test_append_n_bits_vec16() {
         let mut stream = BitStream::open();
         stream.append_n_bits::<Vec<u16>>(vec![0b1010_1010_1010_1010, 0b1010_1010_1010_1010, 0b1010_1010_1010_1010], 35);
