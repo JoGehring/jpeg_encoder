@@ -65,7 +65,6 @@ impl BitStream {
     }
 
     /// Append a byte of data to this bit stream.
-    /// integers of any size?
     ///
     /// # Arguments
     ///
@@ -112,7 +111,6 @@ impl BitStream {
         self.data.push(lower_value);
         self.bits_in_last_byte = previous_bits_in_last_byte;
     }
-
 
     /// Append the given amount of bits in value to the bit stream, starting from the MSB
     ///
@@ -194,16 +192,42 @@ impl BitStream {
         fs::write(filename, &self.data)
     }
 
+    /// Take the first byte out of the stream and return it.
+    /// If the stream is empty, return None instead.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// let mut stream = BitStream.open();
+    /// stream.append_byte(20);
+    /// assert_eq!(Some(20), stream.pop_first_byte());
+    /// assert_eq!(None, stream.pop_first_byte());
+    /// ```
     pub fn pop_first_byte(&mut self) -> Option<u8> {
-    if self.data.is_empty() {
-        return None;
-    }
-    Some(self.data.remove(0))
+        if self.data.is_empty() {
+            return None;
+        }
+        Some(self.data.remove(0))
     }
 
+    /// Append the given data to this bit stream.
+    /// This is a wrapper function for AppendableToBitStream::append().
+    ///
+    /// # Arguments
+    ///
+    /// * value: The data to append.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let mut stream = BitStream.open();
+    /// stream.append(244u8);
+    /// stream.append(244u16);
+    /// ```
     pub fn append<T: AppendableToBitStream>(&mut self, value: T) {
         value.append(self);
     }
+
     pub fn data(&self) -> &Vec<u8> {
         &self.data
     }
@@ -418,8 +442,24 @@ mod tests {
     #[test]
     fn test_append_n_bits_vec16() {
         let mut stream = BitStream::open();
-        stream.append_n_bits::<Vec<u16>>(vec![0b1010_1010_1010_1010, 0b1010_1010_1010_1010, 0b1010_1010_1010_1010], 35);
-        assert_eq!(vec![0b1010_1010, 0b1010_1010, 0b1010_1010, 0b1010_1010, 0b1010_0000], stream.data);
+        stream.append_n_bits::<Vec<u16>>(
+            vec![
+                0b1010_1010_1010_1010,
+                0b1010_1010_1010_1010,
+                0b1010_1010_1010_1010,
+            ],
+            35,
+        );
+        assert_eq!(
+            vec![
+                0b1010_1010,
+                0b1010_1010,
+                0b1010_1010,
+                0b1010_1010,
+                0b1010_0000
+            ],
+            stream.data
+        );
         assert_eq!(3, stream.bits_in_last_byte);
     }
 

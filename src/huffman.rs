@@ -1,6 +1,7 @@
 use crate::bit_stream::BitStream;
+use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct HuffmanNode<T: PartialEq> {
     chance: u16,
     max_depth: u16,
@@ -9,8 +10,13 @@ pub struct HuffmanNode<T: PartialEq> {
     right: Option<Box<HuffmanNode<T>>>,
 }
 
-//TODO: doc comments
-
+/// Parse a stream of u8 values and create a huffman tree for them.
+/// Each non-leaf node will always have a leaf on the left and a non-leaf node
+/// or none on its right.
+/// 
+/// # Arguments
+/// 
+/// * stream: The stream of data to read.
 pub fn parse_u8_stream(stream: &mut BitStream) -> HuffmanNode<u8> {
     let mut nodes: Vec<HuffmanNode<u8>> = vec![];
     while let Some(byte) = stream.pop_first_byte() {
@@ -20,12 +26,22 @@ pub fn parse_u8_stream(stream: &mut BitStream) -> HuffmanNode<u8> {
         nodes.sort_by_key(|node| node.chance());
         let mut bigger_node = nodes.remove(1);
         let smaller_node = nodes.remove(0);
-        bigger_node = combine(Box::from(bigger_node), Box::from(smaller_node));
+        bigger_node = combine_nodes(bigger_node, smaller_node);
         nodes.push(bigger_node);
+    }
+    if nodes.len() == 0 {
+        return HuffmanNode::default();
     }
     nodes.remove(0)
 }
 
+/// With a vec of huffman nodes, either increment the chance of the node with the given value
+/// or create a new node with the value if none exists yet.
+/// 
+/// # Arguments
+/// 
+/// * nodes: The vec of nodes to alter.
+/// * value: The value to add or increment.
 fn increment_or_append(nodes: &mut Vec<HuffmanNode<u8>>, value: u8) {
     if let Some(node) = nodes.into_iter().find(|n| n.content.unwrap() == value) {
         node.chance += 1;
@@ -40,7 +56,52 @@ fn increment_or_append(nodes: &mut Vec<HuffmanNode<u8>>, value: u8) {
     }
 }
 
+/// Combine two nodes and make them leaves of a new node (or append one to the other).
+/// This also keeps the structure outlined in parse_u8_stream:
+/// Each non-leaf node will always have a leaf on the left and a non-leaf node
+/// or none on its right.
+/// 
+/// # Arguments
+/// 
+/// * bigger: The node with the bigger chance/frequency of symbols in it appearing.
+/// * smaller: The node with the smaller chance/frequency of symbols in it appearing.
+fn combine_nodes(bigger: HuffmanNode<u8>, smaller: HuffmanNode<u8>) -> HuffmanNode<u8> {
+    let mut bigger_tree: HuffmanNode<u8> = HuffmanNode::default();
+    if bigger.content.is_some() {
+        bigger_tree.left = Some(Box::from(bigger));
+    } else {
+        bigger_tree = bigger;
+    }
+
+    let smaller_tree;
+    if smaller.content.is_some() {
+        smaller_tree = HuffmanNode {
+            left: Some(Box::from(smaller)),
+            ..Default::default()
+        }
+    } else {
+        smaller_tree = smaller;
+    }
+
+    if bigger_tree.right.is_none() {
+        bigger_tree.right = Some(Box::from(smaller_tree));
+    } else {
+        let mut node_to_append_to = &mut bigger_tree.right;
+        while node_to_append_to
+            .as_ref()
+            .is_some_and(|n| n.right.is_some())
+        {
+            let new_right_node = node_to_append_to.as_mut().unwrap();
+            node_to_append_to = &mut (new_right_node.right);
+        }
+        node_to_append_to.as_mut().unwrap().right = Some(Box::from(smaller_tree));
+    }
+
+    return bigger_tree;
+}
+
 impl HuffmanNode<u8> {
+    /// Calculate the chance/frequency for all symbols in this node and its child nodes.
     fn chance(&self) -> u16 {
         let mut result = self.chance;
         if self.left.is_some() {
@@ -51,69 +112,49 @@ impl HuffmanNode<u8> {
         }
         result
     }
-}
 
-fn combine(bigger: Box<HuffmanNode<u8>>, smaller: Box<HuffmanNode<u8>>) -> HuffmanNode<u8> {
-    // TODO: refactor if possible
-    let mut node: HuffmanNode<u8> = HuffmanNode::default();
-    if bigger.content.is_some() && smaller.content.is_some() {
-        // both single nodes, new tree with bigger left and smaller right
-        node.left = Some(bigger);
-        node.right = Some(smaller);
-        node.max_depth += 1;
-    } else if bigger.content.is_none() && smaller.content.is_some() {
-        // bigger is tree, smaller only node --> smaller as leaf to the left
-        let bigger_depth = bigger.max_depth;
-        node.left = Some(smaller);
-        node.right = Some(bigger);
-        node.max_depth += bigger_depth;
-    } else if bigger.content.is_some() && smaller.content.is_none() {
-        // smaller is tree, bigger only node --> bigger as leaf to the left
-        let smaller_depth = smaller.max_depth;
-        node.left = Some(bigger);
-        node.right = Some(smaller);
-        node.max_depth += smaller_depth;
-    } else if bigger.content.is_none() && smaller.content.is_none() {
-        // both trees, new tree with smaller depth left and bigger right
-        let mut depth: u16 = 0;
-        if bigger.max_depth > smaller.max_depth {
-            depth = bigger.max_depth;
-            node.left = Some(smaller);
-            node.right = Some(bigger);
-        } else {
-            depth = smaller.max_depth;
-            node.left = Some(bigger);
-            node.right = Some(smaller);
+    /// Create a code map from this tree. The result is a HashMap
+    /// with the values as keys and the codewords as values.
+    /// 
+    /// This will need to be altered if trees don't strictly follow the
+    /// "Leaves to the left, extending to the right" structure.
+    fn create_code(&self) -> HashMap<u8, u32> {
+        let mut map = HashMap::with_capacity(self.max_depth as usize);
+        if self.content.is_some() {
+            map.insert(self.content.unwrap(), 0);
+            return map;
         }
-        node.max_depth += depth;
-    } else {
-        panic!("lol");
-    }
 
-    return node;
-    //     if self.left.is_some() {
-    //         if self.right.is_none() {
-    //             let node: HuffmanNode<u8> = HuffmanNode {
-    //                 chance: 0,
-    //                 content: None,
-    //                 left: Some(value),
-    //                 right: None,
-    //             };
-    //             self.right = Some(Box::from(node));
-    //         } else {
-    //             self.right.as_mut().unwrap().append(value);
-    //         }
-    //     } else {
-    //         self.left = Some(value);
-    //     }
+        let mut node = self;
+        if self.left.is_some() {
+            map.insert(self.left.as_ref().unwrap().content.unwrap(), 0);
+        }
+
+        let mut code = 1;
+        while node.right.is_some() {
+            node = node.right.as_ref().unwrap();
+            if node.left.is_some() {
+                map.insert(node.left.as_ref().unwrap().content.unwrap(), code << 1);
+            }
+            // increment code as depth increments
+            code = (code << 1) + 1;
+        }
+
+        map
+    }
 }
 
 impl Default for HuffmanNode<u8> {
     fn default() -> Self {
-        HuffmanNode { chance: 0, max_depth: 1, content: None, left: None, right: None }
+        HuffmanNode {
+            chance: 0,
+            max_depth: 1,
+            content: None,
+            left: None,
+            right: None,
+        }
     }
 }
-
 
 // TODO: remove or improve
 // impl fmt::Debug for HuffmanNode<u8> {
@@ -141,50 +182,95 @@ impl Default for HuffmanNode<u8> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::bit_stream::BitStream;
 
-    use super::{combine, HuffmanNode, parse_u8_stream};
+    use super::{parse_u8_stream, HuffmanNode};
 
-    //TODO: do a lot of testing
+    //TODO: test append, create_code
+
     #[test]
-    fn test_append_manually() {
-        //TODO: replace this with actual testing
-        let mut tree = HuffmanNode::default();
-        let node1: HuffmanNode<u8> = HuffmanNode { chance: 0, max_depth: 1, content: Some(1), left: None, right: None };
-        tree = combine(Box::from(tree), Box::from(node1));
-
-        let node2: HuffmanNode<u8> = HuffmanNode { chance: 0, max_depth: 1, content: Some(2), left: None, right: None };
-        tree = combine(Box::from(tree), Box::from(node2));
-
-        let node3: HuffmanNode<u8> = HuffmanNode { chance: 0, max_depth: 1, content: Some(3), left: None, right: None };
-        tree = combine(Box::from(tree), Box::from(node3));
-
-        let node4: HuffmanNode<u8> = HuffmanNode { chance: 0, max_depth: 1, content: Some(4), left: None, right: None };
-        tree = combine(Box::from(tree), Box::from(node4));
-        println!("{:?}", tree);
-        assert!(true);
+    fn test_parse_empty_stream() {
+        let mut stream = BitStream::open();
+        let tree = parse_u8_stream(&mut stream);
+        assert_eq!(HuffmanNode::default(), tree);
+        let code = tree.create_code();
+        let correct_code: HashMap<u8, u32> = HashMap::new();
+        assert_eq!(correct_code, code);
     }
 
     #[test]
-    fn test_parse_stream_manually() {
-        //TODO: replace this with actual testing
+    fn test_parse_stream_with_one_byte() {
         let mut stream = BitStream::open();
-        stream.append(1u8);
-        stream.append(1u8);
-        stream.append(1u8);
-        stream.append(1u8);
-        stream.append(1u8);
-
-        stream.append(2u8);
-        stream.append(2u8);
-        stream.append(2u8);
-
-        stream.append(3u8);
-        stream.append(4u8);
-        stream.append(5u8);
-        stream.append(6u8);
+        stream.append_byte(1);
         let tree = parse_u8_stream(&mut stream);
-        println!("{:?}", tree);
-        assert!(true);
+        assert_eq!(
+            HuffmanNode {
+                chance: 1,
+                max_depth: 1,
+                content: Some(1),
+                ..Default::default()
+            },
+            tree
+        );
+        let code = tree.create_code();
+        let mut correct_code: HashMap<u8, u32> = HashMap::new();
+        correct_code.insert(1u8, 0b0);
+        assert_eq!(correct_code, code);
+    }
+
+    #[test]
+    fn test_parse_bigger_stream() {
+        /*
+        test with the following likelihoods:
+        - 1: 4
+        - 2: 4
+        - 3: 6
+        - 4: 6
+        - 5: 7
+        - 6: 9
+        */
+        let mut stream = BitStream::open();
+        stream.append_byte(1);
+        stream.append_byte(1);
+        stream.append_byte(2);
+        stream.append_byte(2);
+        stream.append_byte(3);
+        stream.append_byte(3);
+        stream.append_byte(4);
+        stream.append_byte(4);
+        stream.append_byte(5);
+        stream.append_byte(5);
+        stream.append_byte(6);
+        stream.append_byte(6);
+
+        for _ in 1..2 {
+            stream.append_byte(1);
+            stream.append_byte(2);
+        }
+        for _ in 1..4 {
+            stream.append_byte(3);
+            stream.append_byte(4);
+        }
+        for _ in 1..5 {
+            stream.append_byte(5);
+        }
+        for _ in 1..7 {
+            stream.append_byte(6);
+        }
+
+        let tree = parse_u8_stream(&mut stream);
+
+        let code = tree.create_code();
+
+        let mut correct_code: HashMap<u8, u32> = HashMap::new();
+        correct_code.insert(5u8, 0b111110);
+        correct_code.insert(1u8, 0b11110);
+        correct_code.insert(2u8, 0b1110);
+        correct_code.insert(6u8, 0b110);
+        correct_code.insert(3u8, 0b10);
+        correct_code.insert(4u8, 0b0);
+        assert_eq!(correct_code, code);
     }
 }
