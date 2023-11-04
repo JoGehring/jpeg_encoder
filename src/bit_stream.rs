@@ -194,6 +194,13 @@ impl BitStream {
         fs::write(filename, &self.data)
     }
 
+    pub fn pop_first_byte(&mut self) -> Option<u8> {
+    if self.data.is_empty() {
+        return None;
+    }
+    Some(self.data.remove(0))
+    }
+
     pub fn append<T: AppendableToBitStream>(&mut self, value: T) {
         value.append(self);
     }
