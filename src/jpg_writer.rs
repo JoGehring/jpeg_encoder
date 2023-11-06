@@ -2,6 +2,7 @@ use modinverse::egcd;
 
 use crate::bit_stream::BitStream;
 use crate::image::Image;
+
 //TODO: marker für segmente direkt im enum speichern
 /// Enum describing the different types of segments in a JPG file.
 pub enum SegmentType {
@@ -71,6 +72,7 @@ fn write_app0_segment(stream: &mut BitStream, image: &Image) {
     // no thumbnail: 0x00 0x00
     stream.append::<u16>(0)
 }
+
 //TODO CR: downsampling in SOF0 rewriten
 /// Write the SOF0 segment of the JPG file.
 /// This includes metadata regarding the image compression.
@@ -148,7 +150,7 @@ fn write_sof0_segment_component(
 #[cfg(test)]
 mod tests {
     use crate::bit_stream::BitStream;
-    use crate::jpg_writer::{SegmentType, write_app0_segment, write_segment_to_stream, write_sof0_segment, write_sof0_segment_component, write_marker_for_segment};
+    use crate::jpg_writer::{SegmentType, write_app0_segment, write_marker_for_segment, write_segment_to_stream, write_sof0_segment, write_sof0_segment_component};
     use crate::ppm_parser::read_ppm_from_file;
 
     #[test]
@@ -214,6 +216,7 @@ mod tests {
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
     }
+
     #[test]
     fn test_write_sof0_segment_no_downsampling() {
         let mut stream = BitStream::open();
@@ -258,6 +261,27 @@ mod tests {
         write_segment_to_stream(&mut stream, &image, SegmentType::SOF0);
         write_segment_to_stream(&mut stream, &image, SegmentType::EOI);
         let data: Vec<u8> = vec![0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 1, 0, 1, 0, 0, 0xff, 0xc0, 0, 17, 8, 0, 4, 0, 4, 3, 1, 0x11, 0, 2, 0x11, 0, 3, 0x11, 0, 0xff, 0xd9];
+        assert_eq!(data, *stream.data());
+        assert_eq!(8, stream.bits_in_last_byte());
+    }
+
+    #[test]
+    fn test_write_whole_image_4k_with_downsampling() {
+        let mut stream = BitStream::open();
+        let mut image = read_ppm_from_file("test/dwsample-ppm-4k.ppm");
+        image.downsample(4, 2, 0);
+        write_segment_to_stream(&mut stream, &image, SegmentType::SOI);
+        write_segment_to_stream(&mut stream, &image, SegmentType::APP0);
+        write_segment_to_stream(&mut stream, &image, SegmentType::SOF0);
+        write_segment_to_stream(&mut stream, &image, SegmentType::EOI);
+        //SOI
+        let data: Vec<u8> = vec![0xff, 0xd8,
+                                 //APP0: length 2 byte, JFIF0, major revision 1 byte, minor revision 1 byte, pixel ratio mode 1byte, x density 2 byte, y density 2 byte, thumbnail
+                                 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 16, 0, 9, 0, 0,
+                                 //SOF0
+                                 0xff, 0xc0, 0, 17, 8, 8, 112, 15, 0, 3, 1, 0x22, 0, 2, 0x11, 0, 3, 0x11, 0,
+                                 //EOI
+                                 0xff, 0xd9];
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
     }
