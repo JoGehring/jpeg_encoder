@@ -63,9 +63,9 @@ fn write_app0_segment(stream: &mut BitStream, image: &Image) {
     // of pixel size (0 => no unit, aspect ratio instead)
     stream.append::<u8>(0);
     // aspect ratio
-    let (gcd, _1, _2) = egcd(image.width(), image.height());
-    let aspect_width = image.width() / gcd;
-    let aspect_height = image.height() / gcd;
+    let (gcd, _1, _2) = egcd(image.width() as i32, image.height() as i32);
+    let aspect_width = image.width() / gcd as u16;
+    let aspect_height = image.height() / gcd as u16;
     stream.append(aspect_width);
     stream.append(aspect_height);
     // no thumbnail: 0x00 0x00

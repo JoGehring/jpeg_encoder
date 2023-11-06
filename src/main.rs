@@ -14,23 +14,23 @@ mod huffman;
 
 fn main() {
     // keep this in to avoid loads of "unused" warnings
-    let mut image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
-    println!("{:?}", image);
+    let mut image = read_ppm_from_file("test/dwsample-ppm-4k.ppm");
+    // println!("{:?}", image);
     image.rgb_to_ycbcr();
-    println!("{:?}", image);
+    // println!("{:?}", image);
     image.downsample(4, 2, 0);
-    println!("{:?}", image);
+    // println!("{:?}", image);
 
-    let mut stream = BitStream::open();
-    stream.append_bit(true);
-    stream.append_bit(true);
-    stream.append_bit(true);
-    stream.append_bit(true);
-    stream.append_bit(true);
-    stream.append_bit(true);
-    stream.append_bit(true);
-
-    stream.append_byte(3);
+    // let mut stream = BitStream::open();
+    // stream.append_bit(true);
+    // stream.append_bit(true);
+    // stream.append_bit(true);
+    // stream.append_bit(true);
+    // stream.append_bit(true);
+    // stream.append_bit(true);
+    // stream.append_bit(true);
+    //
+    // stream.append_byte(3);
     // stream.append_bit(true);
     // stream.append_byte(4);
     // stream.append_byte(5);
@@ -39,13 +39,13 @@ fn main() {
     // stream.append_byte(8);
     // stream.flush_to_file("test/binary_stream_test_file.bin").expect("TODO: panic message");
     // // let test = fs::read("binary_stream_test_file.bin").expect("TODO: panic message");
-    println!("{:?}", stream);
+    // println!("{:?}", stream);
 
     let mut target_stream = BitStream::open();
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOI);
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::APP0);
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOF0);
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::EOI);
-    target_stream.flush_to_file("test/test.jpg").expect("TODO: Panic message");
+    target_stream.flush_to_file("test/test4k.jpg").expect("TODO: Panic message");
 
 }

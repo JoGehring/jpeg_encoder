@@ -37,8 +37,8 @@ pub fn read_ppm_from_file(filename: &str) -> Image {
         panic!("Unsupported PPM format");
     }
 
-    let height: usize = result[1].parse().unwrap();
-    let width: usize = result[2].parse().unwrap();
+    let width: usize = result[1].parse().unwrap();
+    let height: usize = result[2].parse().unwrap();
 
     let max_value_in_ppm: u16 = result[3].parse().unwrap();
     let scaling_factor = u16::MAX as f32 / max_value_in_ppm as f32;
