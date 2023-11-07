@@ -140,6 +140,29 @@ impl BitStream {
         value.append_n_bits(self, amount);
     }
 
+    /// Pad the last byte with the specified value
+    ///
+    /// # Arguments
+    ///
+    /// * `value`: Wether it should be padded with ones or zeros
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let mut stream = BitStream::open();
+    /// stream.append_bit(false);
+    /// stream.append_bit(true);
+    /// stream.pad_last_byte(true);
+    /// assert_eq!(vec![0b0111_1111], stream.data);
+    /// assert_eq!(8, stream.bits_in_last_byte);
+    /// ```
+    pub fn pad_last_byte(&mut self, value: bool) {
+        let amount = 8 - self.bits_in_last_byte;
+        for _ in 0..amount {
+            self.append_bit(value);
+        }
+    }
+
     /// Shift the provided value to the correct position, then store it in the last byte.
     /// This should be used to write data to the stream.
     ///
@@ -194,9 +217,9 @@ impl BitStream {
 
     /// Take the first byte out of the stream and return it.
     /// If the stream is empty, return None instead.
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// let mut stream = BitStream.open();
     /// stream.append_byte(20);
@@ -433,6 +456,30 @@ mod tests {
     }
 
     #[test]
+    fn test_pad_last_byte_true() {
+        let mut stream = BitStream::open();
+        stream.append_bit(true);
+        stream.append_bit(false);
+        stream.append_bit(true);
+        stream.pad_last_byte(true);
+
+        assert_eq!(vec![0b101_1_1111], stream.data);
+        assert_eq!(8, stream.bits_in_last_byte);
+    }
+
+    #[test]
+    fn test_pad_last_byte_false() {
+        let mut stream = BitStream::open();
+        stream.append_bit(true);
+        stream.append_bit(false);
+        stream.append_bit(true);
+        stream.pad_last_byte(false);
+
+        assert_eq!(vec![0b101_0_0000], stream.data);
+        assert_eq!(8, stream.bits_in_last_byte);
+    }
+
+    #[test]
     #[should_panic]
     fn test_append_n_bits_vec8_amount_to_big() {
         let mut stream = BitStream::open();
@@ -456,7 +503,7 @@ mod tests {
                 0b1010_1010,
                 0b1010_1010,
                 0b1010_1010,
-                0b1010_0000
+                0b1010_0000,
             ],
             stream.data
         );
@@ -473,6 +520,7 @@ mod tests {
     #[test]
     #[ignore]
     fn test_append_large_random_data() {
+        // TODO: simplify, as rng automatically generates random vecs
         let mut stream = BitStream::open();
         let mut rng = rand::thread_rng();
         let tested_capacity: u64 = 10_000_000_000;

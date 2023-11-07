@@ -3,7 +3,6 @@ use modinverse::egcd;
 use crate::bit_stream::BitStream;
 use crate::image::Image;
 
-//TODO: marker für segmente direkt im enum speichern
 /// Enum describing the different types of segments in a JPG file.
 pub enum SegmentType {
     SOI,
@@ -73,7 +72,6 @@ fn write_app0_segment(stream: &mut BitStream, image: &Image) {
     stream.append::<u16>(0)
 }
 
-//TODO CR: downsampling in SOF0 rewriten
 /// Write the SOF0 segment of the JPG file.
 /// This includes metadata regarding the image compression.
 ///
