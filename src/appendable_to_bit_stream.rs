@@ -26,8 +26,8 @@ impl AppendableToBitStream for u8 {
     }
     fn append_n_bits(&self, stream: &mut BitStream, amount: u8) {
         if amount > 8 { panic!("Not enough bits in value to append") }
-        for pos in 0..amount {
-            let i = 0b1000_0000 >> pos;
+        for pos in (0..amount).rev() {
+            let i = 0b0000_0001 << pos;
             let bit = self & i != 0;
             stream.append_bit(bit);
         }
@@ -61,8 +61,8 @@ impl AppendableToBitStream for u16 {
 
     fn append_n_bits(&self, stream: &mut BitStream, amount: u8) {
         if amount > 16 { panic!("Not enough bits in value to append") }
-        for pos in 0..amount {
-            let i = 0b1000_0000_0000_0000 >> pos;
+        for pos in (0..amount).rev() {
+            let i = 0b0000_0000_0000_0001 << pos;
             let bit = self & i != 0;
             stream.append_bit(bit);
         }
