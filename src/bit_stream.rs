@@ -2,7 +2,6 @@ use std::fs;
 
 use crate::appendable_to_bit_stream::AppendableToBitStream;
 
-// TODO: funktion, die 1..n bit appendet (also man gibt n byte rein und sagt, wie viele bit significant sind, ähnlich wie bei shift_and_add_to_last_byte
 #[derive(Clone, Debug, PartialEq)]
 pub struct BitStream {
     data: Vec<u8>,
@@ -420,9 +419,9 @@ mod tests {
     #[test]
     fn test_append_n_bits_u8() {
         let mut stream = BitStream::open();
-        stream.append_n_bits(0b1011_1111u8, 3);
-        assert_eq!(vec![0b1010_0000], stream.data);
-        assert_eq!(3, stream.bits_in_last_byte);
+        stream.append_n_bits(0b1011_1111u8, 7);
+        assert_eq!(vec![0b0111_1110], stream.data);
+        assert_eq!(7, stream.bits_in_last_byte);
     }
 
     #[test]
@@ -435,9 +434,9 @@ mod tests {
     #[test]
     fn test_append_n_bits_u16() {
         let mut stream = BitStream::open();
-        stream.append_n_bits::<u16>(0b1011_0000_0000_0000, 3);
-        assert_eq!(vec![0b1010_0000], stream.data);
-        assert_eq!(3, stream.bits_in_last_byte);
+        stream.append_n_bits::<u16>(0b1011_1100_1010_1011, 13);
+        assert_eq!(vec![0b1110_0101, 0b0101_1000], stream.data);
+        assert_eq!(5, stream.bits_in_last_byte);
     }
 
     #[test]

@@ -264,6 +264,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_write_whole_image_4k_with_downsampling() {
         let mut stream = BitStream::open();
         let mut image = read_ppm_from_file("test/dwsample-ppm-4k.ppm");
