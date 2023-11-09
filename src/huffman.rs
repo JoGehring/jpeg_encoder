@@ -299,8 +299,13 @@ mod tests {
         let tree = parse_u8_stream(&mut stream);
         assert_eq!(
             HuffmanNode {
-                chance: 1,
-                content: Some(1),
+                chance: 0,
+                content: None,
+                left: Some(Box::from(HuffmanNode {
+                    chance: 1,
+                    content: Some(1),
+                    ..Default::default()
+                })),
                 ..Default::default()
             },
             tree
