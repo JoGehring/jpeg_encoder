@@ -3,7 +3,7 @@ use crate::bit_stream::BitStream;
 pub trait AppendableToBitStream {
     fn append(&self, stream: &mut BitStream);
 
-    fn append_n_bits(&self, stream: &mut BitStream, amount: u8) { panic!("Not implemented for this type!") }
+    fn append_n_bits(&self, _stream: &mut BitStream, _amount: u8) { panic!("Not implemented for this type!") }
 }
 
 impl AppendableToBitStream for bool {

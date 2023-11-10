@@ -338,7 +338,7 @@ mod tests {
 
     use crate::bit_stream::BitStream;
 
-    use super::{parse_u8_stream, HuffmanNode, encode};
+    use super::{encode, parse_u8_stream, HuffmanNode};
 
     //TODO: test append, create_code, create_map, encode
 
