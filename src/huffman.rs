@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use debug_tree::{add_branch, add_leaf, defer_print};
 
@@ -12,6 +12,24 @@ pub struct HuffmanNode<T: PartialEq> {
     right: Option<Box<HuffmanNode<T>>>,
 }
 
+/// Parse a stream of values, create a huffman tree and encode the values.
+/// Returns the stream of encoded data and the map used for encoding.
+///
+/// # Arguments
+///
+/// * stream: The stream of data to read.
+pub fn encode(stream: &mut BitStream) -> (BitStream, HashMap<u8, (u8, u16)>) {
+    let code_map = parse_u8_stream(stream).code_map();
+    let mut result = BitStream::open();
+
+    for byte in stream.data() {
+        let (len, code) = code_map.get(byte).unwrap();
+        result.append_n_bits(*code, *len);
+    }
+
+    (result, code_map)
+}
+
 /// Parse a stream of u8 values and create a huffman tree for them.
 /// The tree grows to the right, meaning no left node ever has a bigger max_path() than the corresponding
 /// right node's max_path().
@@ -21,8 +39,8 @@ pub struct HuffmanNode<T: PartialEq> {
 /// * stream: The stream of data to read.
 pub fn parse_u8_stream(stream: &mut BitStream) -> HuffmanNode<u8> {
     let mut nodes: Vec<HuffmanNode<u8>> = vec![];
-    while let Some(byte) = stream.pop_first_byte() {
-        increment_or_append(&mut nodes, byte);
+    for byte in stream.data() {
+        increment_or_append(&mut nodes, *byte);
     }
 
     while nodes.len() > 1 {
@@ -188,9 +206,43 @@ impl HuffmanNode<u8> {
         );
     }
 
+    /// Create a code from this tree. The result is a HashMap
+    /// with the values as keys and a tuple of code length and code as values.
+    pub fn code_map(&self) -> HashMap<u8, (u8, u16)> {
+        let mut map = HashMap::with_capacity((self.max_depth() * 2) as usize);
+        self.append_to_map(&mut map, 0, 0);
+        map
+    }
+
+    /// Append this node's data to the map. Then recursively call
+    /// child nodes to append their data.
+    ///
+    /// # Arguments
+    ///
+    /// * `map`: The map to append codes to.
+    /// * `code`: The code bits for this node.
+    /// * `code_len`: The length of the code for this node.
+    fn append_to_map(&self, map: &mut HashMap<u8, (u8, u16)>, code: u16, code_len: u8) {
+        if self.content.is_some() {
+            map.insert(self.content.unwrap(), (code_len, code));
+        }
+        if self.left.is_some() {
+            self.left
+                .as_ref()
+                .unwrap()
+                .append_to_map(map, code << 1, code_len + 1);
+        }
+        if self.right.is_some() {
+            self.right
+                .as_ref()
+                .unwrap()
+                .append_to_map(map, (code << 1) + 1, code_len + 1);
+        }
+    }
+
     /// Create a code from this tree. The result is a BitStream
     /// containing the values.
-    fn create_code(&self) -> BitStream {
+    pub fn create_code(&self) -> BitStream {
         let mut stream = BitStream::open();
         self.append_to_code(&mut stream, 0, 0);
         stream
@@ -206,11 +258,7 @@ impl HuffmanNode<u8> {
     /// * `code_len`: The length of the code for this node.
     fn append_to_code(&self, stream: &mut BitStream, code: u16, code_len: u8) {
         if self.content.is_some() {
-            println!("===============================");
-            println!("{:?}", code);
-            println!("{:?}", code_len);
             stream.append_n_bits(code, code_len);
-            println!("{:?}", stream.data());
         }
         if self.left.is_some() {
             self.left
@@ -232,7 +280,12 @@ impl HuffmanNode<u8> {
         while current.left.is_some() && current.right.is_some() {
             current = current.right.as_mut().unwrap();
         }
-        let new_left_node = HuffmanNode { chance: current.chance, content: current.content, left: None, right: None };
+        let new_left_node = HuffmanNode {
+            chance: current.chance,
+            content: current.content,
+            left: None,
+            right: None,
+        };
         current.content = None;
         current.chance = 0;
         current.left = Some(Box::from(new_left_node));
@@ -250,12 +303,14 @@ impl Default for HuffmanNode<u8> {
     }
 }
 
-// TODO: remove or improve
 impl fmt::Debug for HuffmanNode<u8> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         defer_print!();
         build_debug_tree(self, true);
-        write!(f, "=========================================================\n")
+        write!(
+            f,
+            "=========================================================\n"
+        )
     }
 }
 
@@ -279,11 +334,13 @@ fn build_debug_tree(current: &HuffmanNode<u8>, is_left: bool) {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::bit_stream::BitStream;
 
-    use super::{HuffmanNode, parse_u8_stream};
+    use super::{parse_u8_stream, HuffmanNode, encode};
 
-//TODO: test append, create_code
+    //TODO: test append, create_code, create_map, encode
 
     #[test]
     fn test_parse_empty_stream() {
@@ -337,34 +394,104 @@ mod tests {
         stream.append_byte(6);
         stream.append_byte(6);
 
-        for _ in 1..2 {
+        for _ in 0..2 {
             stream.append_byte(1);
             stream.append_byte(2);
         }
-        for _ in 1..4 {
+        for _ in 0..4 {
             stream.append_byte(3);
             stream.append_byte(4);
         }
-        for _ in 1..5 {
+        for _ in 0..5 {
             stream.append_byte(5);
         }
-        for _ in 1..7 {
+        for _ in 0..7 {
             stream.append_byte(6);
         }
 
         let tree = parse_u8_stream(&mut stream);
         let code = tree.create_code();
-        println!("{:?}", tree);
         let correct_code: Vec<u8> = vec![0b00_01_100_1, 0b01_110_111, 0b0_0000000];
         assert_eq!(&correct_code, code.data());
     }
 
     #[test]
     fn test_tree_growing() {
-        let expected_tree = HuffmanNode { chance: 0, content: None, left: None, right: None };
+        let expected_tree = HuffmanNode {
+            chance: 0,
+            content: None,
+            left: None,
+            right: None,
+        };
         let mut stream = BitStream::open();
 
         let actual_tree = parse_u8_stream(&mut stream);
         assert_eq!(expected_tree, actual_tree)
+    }
+
+    #[test]
+    fn test_encode_example() {
+        /*
+        test with the following likelihoods:
+        - 1: 4
+        - 2: 4
+        - 3: 6
+        - 4: 6
+        - 5: 7
+        - 6: 9
+        */
+        let mut stream = BitStream::open();
+        stream.append_byte(1);
+        stream.append_byte(1);
+        stream.append_byte(2);
+        stream.append_byte(2);
+        stream.append_byte(3);
+        stream.append_byte(3);
+        stream.append_byte(4);
+        stream.append_byte(4);
+        stream.append_byte(5);
+        stream.append_byte(5);
+        stream.append_byte(6);
+        stream.append_byte(6);
+
+        for _ in 0..7 {
+            stream.append_byte(6);
+        }
+        for _ in 0..4 {
+            stream.append_byte(3);
+            stream.append_byte(4);
+        }
+        for _ in 0..2 {
+            stream.append_byte(1);
+            stream.append_byte(2);
+        }
+        for _ in 0..5 {
+            stream.append_byte(5);
+        }
+
+        let (code, map) = encode(&mut stream);
+        let correct_code: Vec<u8> = vec![
+            0b110_110_11,
+            0b10_1110_10,
+            0b0_100_101_1,
+            0b01_01_01_00,
+            0b00_00_00_00,
+            0b00_00_00_00,
+            0b100_101_10,
+            0b0_101_100_1,
+            0b01_100_101,
+            0b110_1110_1,
+            0b10_1110_01,
+            0b01_01_01_01,
+        ];
+        assert_eq!(correct_code, *code.data());
+        let mut correct_map: HashMap<u8, (u8, u16)> = HashMap::with_capacity(6);
+        correct_map.insert(4, (3, 0b101));
+        correct_map.insert(5, (2, 0b01));
+        correct_map.insert(2, (4, 0b1110));
+        correct_map.insert(6, (2, 0b00));
+        correct_map.insert(3, (3, 0b100));
+        correct_map.insert(1, (3, 0b110));
+        assert_eq!(correct_map, map);
     }
 }
