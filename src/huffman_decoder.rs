@@ -123,9 +123,12 @@ mod tests {
         plain_text.append_byte(2);
         plain_text.append_byte(1);
         plain_text.append_byte(2);
+        plain_text.append_byte(2);
+        plain_text.append_byte(1);
+        plain_text.append_byte(255);
 
         let (mut encoded_text, map) = encode(&mut plain_text);
         let decoded_stream = decode(&mut encoded_text, map);
-        assert_eq!(vec![1, 2, 255, 2, 1, 2], *decoded_stream.data());
+        assert_eq!(vec![1, 2, 255, 2, 1, 2, 2, 1, 255], *decoded_stream.data());
     }
 }

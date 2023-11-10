@@ -241,13 +241,13 @@ impl BitStream {
     /// * When adding to `result`, we bit shift it first and then add the new data at its "end".
     pub fn read_n_bits_padded(&self, amount: u8, pad: bool) -> u16 {
         if self.is_empty() {
-            return if pad { u16::MAX } else { u16::MIN };
+            let result = if pad { u16::MAX } else { u16::MIN };
+            return result >> (16 - amount);
         }
         if self.bits_read_from_first_byte + amount < 8
             && (self.data.len() != 1 || self.bits_in_last_byte == 8 || self.bits_in_last_byte == 0)
         {
-            return ((self.data[0] << self.bits_read_from_first_byte)
-                >> (8 - amount)) as u16;
+            return ((self.data[0] << self.bits_read_from_first_byte) >> (8 - amount)) as u16;
         }
         let mut result;
         let mut bits_in_result: u8;
@@ -268,8 +268,13 @@ impl BitStream {
             bits_in_result = 8 - self.bits_read_from_first_byte;
         }
 
+        // if we already have more data than we need, remove unneeded data and return
+        if bits_in_result > amount {
+            return result >> (bits_in_result - amount);
+        }
+
         // if we don't have further data, pad and return
-        if self.data.len() <= byte_index + 1 {
+        if self.data.len() <= byte_index {
             return pad_read_bit_result(result, amount - bits_in_result, pad);
         }
 
@@ -289,7 +294,7 @@ impl BitStream {
             }
 
             // if we don't have further data, pad and return
-            if self.data.len() <= byte_index + 1{
+            if self.data.len() <= byte_index {
                 return pad_read_bit_result(result, amount - bits_in_result, pad);
             }
         }
@@ -328,13 +333,18 @@ impl BitStream {
             self.data.remove(0);
         }
         self.bits_read_from_first_byte = amount;
-        if self.data.len() == 1 && self.bits_in_last_byte == self.bits_read_from_first_byte {
-            self.data.remove(0);
+        if self.data.len() == 1 {
+            if self.bits_in_last_byte <= self.bits_read_from_first_byte {
+                self.data.remove(0);
+                self.bits_in_last_byte = 0;
+                self.bits_read_from_first_byte = 0;
+            }
         }
     }
 
     pub fn is_empty(&self) -> bool {
-        return self.data.len() == 0 || (self.data.len() == 1 && self.bits_in_last_byte == self.bits_read_from_first_byte);
+        return self.data.len() == 0
+            || (self.data.len() == 1 && self.bits_in_last_byte == self.bits_read_from_first_byte);
     }
 
     /// Append the given data to this bit stream.
