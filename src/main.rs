@@ -13,6 +13,7 @@ mod jpg_writer;
 mod appendable_to_bit_stream;
 mod huffman;
 mod huffman_decoder;
+mod utils;
 
 fn main() {
     // keep this in to avoid loads of "unused" warnings
