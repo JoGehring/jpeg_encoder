@@ -1,10 +1,11 @@
-use crate::bit_stream::BitStream;
 use std::collections::HashMap;
 
+use crate::bit_stream::BitStream;
+
 /// Decode a huffman encoded bit stream.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `stream`: The stream of data to decode.
 /// * `code`: The code to decode it with, which should be output by huffman::encode().
 pub fn decode(stream: &mut BitStream, code: HashMap<u8, (u8, u16)>) -> BitStream {
@@ -31,9 +32,9 @@ pub fn decode(stream: &mut BitStream, code: HashMap<u8, (u8, u16)>) -> BitStream
 }
 
 /// Create the table needed for canonical search.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `code`: The code to create a canonical table for.
 fn create_canonical_table(code: HashMap<u8, (u8, u16)>) -> (Vec<(u16, u8, u8)>, u8) {
     let max_len = get_max_len_from_code(&code);
@@ -48,23 +49,23 @@ fn create_canonical_table(code: HashMap<u8, (u8, u16)>) -> (Vec<(u16, u8, u8)>, 
 }
 
 /// Extract the maximum codeword length from the code.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `code`: The code to work with.
 fn get_max_len_from_code(code: &HashMap<u8, (u8, u16)>) -> u8 {
     code.iter()
         .max_by(|value1, value2| value1.1.cmp(value2.1))
         .unwrap()
         .1
-         .0
+        .0
 }
 
 /// Turn a HashMap mapping symbols to their code into a vector with both symbols and code.
 /// The vector contains tuples of (code, symbol, code_length).
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `code`: The code to convert.
 fn create_code_vec_from_map(code: &HashMap<u8, (u8, u16)>) -> Vec<(u16, u8, u8)> {
     code.into_iter()
@@ -73,9 +74,9 @@ fn create_code_vec_from_map(code: &HashMap<u8, (u8, u16)>) -> Vec<(u16, u8, u8)>
 }
 
 /// Sort the code vector by length first, and by the code if length is equal.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `all_codes`: The vector to sort.
 fn sort_code_vector_by_length_and_code(all_codes: &mut Vec<(u16, u8, u8)>) {
     all_codes.sort_by(|a, b| {
@@ -87,9 +88,9 @@ fn sort_code_vector_by_length_and_code(all_codes: &mut Vec<(u16, u8, u8)>) {
 }
 
 /// Pad each code in the given code vector with 1, until all codes are of the length max_len.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `all_codes`: The vector to work on.
 /// * `max_len`: The length of the longest code in `all_codes`.
 fn pad_code_with_ones(all_codes: &mut Vec<(u16, u8, u8)>, max_len: u8) -> Vec<(u16, u8, u8)> {
@@ -112,7 +113,7 @@ fn pad_code_with_ones(all_codes: &mut Vec<(u16, u8, u8)>, max_len: u8) -> Vec<(u
 mod tests {
     use std::collections::HashMap;
 
-    use crate::{bit_stream::BitStream, huffman::encode, huffman_decoder::{get_max_len_from_code, sort_code_vector_by_length_and_code, create_code_vec_from_map}};
+    use crate::{bit_stream::BitStream, huffman::encode, huffman_decoder::{create_code_vec_from_map, get_max_len_from_code, sort_code_vector_by_length_and_code}};
 
     use super::{create_canonical_table, decode, pad_code_with_ones};
 
@@ -135,6 +136,20 @@ mod tests {
     }
 
     #[test]
+    fn test_create_canonical_table() {
+        let mut code = HashMap::new();
+        code.insert(1, (2, 16));
+        code.insert(2, (3, 32));
+        code.insert(3, (4, 64));
+        code.insert(4, (5, 128));
+
+        let (canonical_table, max_len) = create_canonical_table(code);
+
+        assert_eq!(canonical_table, vec![(135, 1, 2), (131, 2, 3), (129, 3, 4), (128, 4, 5)]);
+        assert_eq!(max_len, 5);
+    }
+
+    #[test]
     fn test_get_max_len_from_code() {
         let mut code = HashMap::new();
         code.insert(1, (5, 100));
@@ -142,23 +157,6 @@ mod tests {
         code.insert(3, (6, 300));
 
         assert_eq!(get_max_len_from_code(&code), 7);
-    }
-
-    #[test]
-    fn test_pad_code_with_ones() {
-        let mut all_codes = vec![(1, 2, 3), (4, 5, 6)];
-        let max_len = 8;
-        let result = pad_code_with_ones(&mut all_codes, max_len);
-
-        assert_eq!(result, vec![(63, 2, 3), (19, 5, 6)]);
-    }
-
-    #[test]
-    fn test_sort_code_vector_by_length_and_code() {
-        let mut all_codes = vec![(1, 2, 3), (4, 5, 6), (7, 8, 2), (9, 10, 2)];
-        sort_code_vector_by_length_and_code(&mut all_codes);
-
-        assert_eq!(all_codes, vec![(7, 8, 2), (9, 10, 2), (1, 2, 3), (4, 5, 6)]);
     }
 
     #[test]
@@ -172,5 +170,22 @@ mod tests {
         result.sort();
 
         assert_eq!(result, vec![(100, 1, 5), (200, 2, 7), (300, 3, 6)]);
+    }
+
+    #[test]
+    fn test_sort_code_vector_by_length_and_code() {
+        let mut all_codes = vec![(1, 2, 3), (4, 5, 6), (7, 8, 2), (9, 10, 2)];
+        sort_code_vector_by_length_and_code(&mut all_codes);
+
+        assert_eq!(all_codes, vec![(7, 8, 2), (9, 10, 2), (1, 2, 3), (4, 5, 6)]);
+    }
+
+    #[test]
+    fn test_pad_code_with_ones() {
+        let mut all_codes = vec![(1, 2, 3), (4, 5, 6)];
+        let max_len = 8;
+        let result = pad_code_with_ones(&mut all_codes, max_len);
+
+        assert_eq!(result, vec![(63, 2, 3), (19, 5, 6)]);
     }
 }
