@@ -336,11 +336,11 @@ fn build_debug_tree(current: &HuffmanNode<u8>, is_left: bool) {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::bit_stream::BitStream;
+    use crate::{bit_stream::BitStream, huffman::increment_or_append};
 
-    use super::{encode, HuffmanNode, parse_u8_stream};
+    use super::{encode, parse_u8_stream, HuffmanNode};
 
-    //TODO: test append, create_code, create_map, encode
+    //TODO: test create_map, encode
     #[test]
     fn test_parse_empty_stream() {
         let mut stream = BitStream::open();
@@ -493,4 +493,103 @@ mod tests {
         correct_map.insert(1, (3, 0b110));
         assert_eq!(correct_map, map);
     }
+
+    #[test]
+    fn test_append_to_code() {
+        let mut stream = BitStream::open();
+        let node = HuffmanNode {
+            chance: 1,
+            content: Some(1),
+            left: None,
+            right: None,
+        };
+        node.append_to_code(&mut stream, 2, 3);
+
+        assert_eq!(stream.data(), &vec![64]);
+    }
+
+    #[test]
+    fn test_append_to_map() {
+        let mut map = HashMap::new();
+        let node = HuffmanNode {
+            chance: 1,
+            content: Some(1),
+            left: None,
+            right: None,
+        };
+        node.append_to_map(&mut map, 2, 3);
+
+        assert_eq!(map.get(&1), Some(&(3, 2)));
+    }
+
+    #[test]
+    fn test_create_code() {
+        let node = HuffmanNode {
+            chance: 1,
+            content: Some(1),
+            left: None,
+            right: None,
+        };
+        let stream = node.create_code();
+
+        assert_eq!(stream.data(), &vec![]);
+    }
+
+    #[test]
+    fn test_create_code_with_left_child() {
+        let left_child = Box::new(HuffmanNode {
+            chance: 1,
+            content: Some(2),
+            left: None,
+            right: None,
+        });
+        let node = HuffmanNode {
+            chance: 2,
+            content: Some(1),
+            left: None,
+            right: Some(left_child),
+        };
+        let stream = node.create_code();
+
+        assert_eq!(stream.data(), &vec![128]);
+    }
+
+    #[test]
+    fn test_code_map() {
+        let node = HuffmanNode {
+            chance: 1,
+            content: Some(1),
+            left: None,
+            right: None,
+        };
+        let map = node.code_map();
+
+        assert_eq!(map.get(&1), Some(&(0, 0)));
+    }
+
+    #[test]
+    fn test_increment_or_append() {
+        let mut nodes = vec![
+            HuffmanNode {
+                chance: 1,
+                content: Some(1),
+                left: None,
+                right: None,
+            },
+            HuffmanNode {
+                chance: 2,
+                content: Some(2),
+                left: None,
+                right: None,
+            },
+        ];
+        increment_or_append(&mut nodes, 1);
+        increment_or_append(&mut nodes, 3);
+
+        assert_eq!(nodes[0].chance, 2);
+        assert_eq!(nodes[1].chance, 2);
+        assert_eq!(nodes[2].chance, 1);
+        assert_eq!(nodes[2].content, Some(3));
+    }
+
 }
