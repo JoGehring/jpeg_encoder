@@ -110,9 +110,11 @@ fn pad_code_with_ones(all_codes: &mut Vec<(u16, u8, u8)>, max_len: u8) -> Vec<(u
 
 #[cfg(test)]
 mod tests {
-    use crate::{bit_stream::BitStream, huffman::encode};
+    use std::collections::HashMap;
 
-    use super::decode;
+    use crate::{bit_stream::BitStream, huffman::encode, huffman_decoder::{get_max_len_from_code, sort_code_vector_by_length_and_code, create_code_vec_from_map}};
+
+    use super::{create_canonical_table, decode, pad_code_with_ones};
 
     #[test]
     fn test_encode_and_decode() {
@@ -130,5 +132,45 @@ mod tests {
         let (mut encoded_text, map) = encode(&mut plain_text);
         let decoded_stream = decode(&mut encoded_text, map);
         assert_eq!(vec![1, 2, 255, 2, 1, 2, 2, 1, 255], *decoded_stream.data());
+    }
+
+    #[test]
+    fn test_get_max_len_from_code() {
+        let mut code = HashMap::new();
+        code.insert(1, (5, 100));
+        code.insert(2, (7, 200));
+        code.insert(3, (6, 300));
+
+        assert_eq!(get_max_len_from_code(&code), 7);
+    }
+
+    #[test]
+    fn test_pad_code_with_ones() {
+        let mut all_codes = vec![(1, 2, 3), (4, 5, 6)];
+        let max_len = 8;
+        let result = pad_code_with_ones(&mut all_codes, max_len);
+
+        assert_eq!(result, vec![(63, 2, 3), (19, 5, 6)]);
+    }
+
+    #[test]
+    fn test_sort_code_vector_by_length_and_code() {
+        let mut all_codes = vec![(1, 2, 3), (4, 5, 6), (7, 8, 2), (9, 10, 2)];
+        sort_code_vector_by_length_and_code(&mut all_codes);
+
+        assert_eq!(all_codes, vec![(7, 8, 2), (9, 10, 2), (1, 2, 3), (4, 5, 6)]);
+    }
+
+    #[test]
+    fn test_create_code_vec_from_map() {
+        let mut code = HashMap::new();
+        code.insert(1, (5, 100));
+        code.insert(2, (7, 200));
+        code.insert(3, (6, 300));
+
+        let mut result = create_code_vec_from_map(&code);
+        result.sort();
+
+        assert_eq!(result, vec![(100, 1, 5), (200, 2, 7), (300, 3, 6)]);
     }
 }

@@ -99,19 +99,19 @@ fn combine_nodes(
     lower_chance_node: HuffmanNode<u8>,
 ) -> HuffmanNode<u8> {
     if higher_chance_node.min_depth() >= lower_chance_node.max_depth() {
-        return HuffmanNode {
+        HuffmanNode {
             left: Some(Box::from(lower_chance_node)),
             right: Some(Box::from(higher_chance_node)),
             ..Default::default()
-        };
+        }
     } else if higher_chance_node.max_depth() <= lower_chance_node.min_depth() {
-        return HuffmanNode {
+        HuffmanNode {
             left: Some(Box::from(higher_chance_node)),
             right: Some(Box::from(lower_chance_node)),
             ..Default::default()
-        };
+        }
     } else {
-        return combine_and_swap_inner_nodes(higher_chance_node, lower_chance_node);
+        combine_and_swap_inner_nodes(higher_chance_node, lower_chance_node)
     }
 }
 
@@ -338,10 +338,9 @@ mod tests {
 
     use crate::bit_stream::BitStream;
 
-    use super::{encode, parse_u8_stream, HuffmanNode};
+    use super::{encode, HuffmanNode, parse_u8_stream};
 
     //TODO: test append, create_code, create_map, encode
-
     #[test]
     fn test_parse_empty_stream() {
         let mut stream = BitStream::open();
