@@ -107,8 +107,6 @@ fn pad_code_with_ones(all_codes: &mut Vec<(u16, u8, u8)>, max_len: u8) -> Vec<(u
         .collect()
 }
 
-// TODO unit tests
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
