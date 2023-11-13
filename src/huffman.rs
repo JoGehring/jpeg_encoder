@@ -6,7 +6,7 @@ use crate::bit_stream::BitStream;
 
 #[derive(PartialEq)]
 pub struct HuffmanNode<T: PartialEq> {
-    chance: u16,
+    chance: u64,
     content: Option<T>,
     left: Option<Box<HuffmanNode<T>>>,
     right: Option<Box<HuffmanNode<T>>>,
@@ -150,7 +150,7 @@ fn combine_and_swap_inner_nodes(
 
 impl HuffmanNode<u8> {
     /// Calculate the chance/frequency for all symbols in this node and its child nodes.
-    fn chance(&self) -> u16 {
+    fn chance(&self) -> u64 {
         let mut result = self.chance;
         if self.left.is_some() {
             result += self.left.as_ref().unwrap().chance();
@@ -209,7 +209,7 @@ impl HuffmanNode<u8> {
     /// Create a code from this tree. The result is a HashMap
     /// with the values as keys and a tuple of code length and code as values.
     pub fn code_map(&self) -> HashMap<u8, (u8, u16)> {
-        let mut map = HashMap::with_capacity((self.max_depth() * 2) as usize);
+        let mut map = HashMap::with_capacity(2_i32.pow(self.max_depth() as u32) as usize);
         self.append_to_map(&mut map, 0, 0);
         map
     }
@@ -336,9 +336,11 @@ fn build_debug_tree(current: &HuffmanNode<u8>, is_left: bool) {
 mod tests {
     use std::collections::HashMap;
 
+    use rand::Rng;
+
     use crate::{bit_stream::BitStream, huffman::increment_or_append};
 
-    use super::{encode, parse_u8_stream, HuffmanNode};
+    use super::{encode, HuffmanNode, parse_u8_stream};
 
     //TODO: test create_map, encode
     #[test]
@@ -592,4 +594,59 @@ mod tests {
         assert_eq!(nodes[2].content, Some(3));
     }
 
+    #[test]
+    #[ignore]
+    fn test_huge_bit_stream_six_symbols() {
+        let mut stream = BitStream::open();
+        let mut rng = rand::thread_rng();
+        let six_occurence = rng.gen::<u32>();
+        for _ in 0..six_occurence {
+            stream.append_byte(6);
+        }
+        let three_four_occurence = rng.gen::<u32>();
+        for _ in 0..three_four_occurence {
+            stream.append_byte(3);
+            stream.append_byte(4);
+        }
+        let one_two_occurence = rng.gen::<u32>();
+        for _ in 0..one_two_occurence {
+            stream.append_byte(1);
+            stream.append_byte(2);
+        }
+        let five_occurence = rng.gen::<u32>();
+        for _ in 0..five_occurence {
+            stream.append_byte(5);
+        }
+        let tree = parse_u8_stream(&mut stream);
+        let (code, map) = encode(&mut stream);
+        println!("ones: {}", one_two_occurence);
+        println!("twos: {}", one_two_occurence);
+        println!("threes: {}", three_four_occurence);
+        println!("fours: {}", three_four_occurence);
+        println!("fives: {}", five_occurence);
+        println!("sixes: {}", six_occurence);
+        println!("{:?}", tree);
+        println!("{:?}", map);
+    }
+
+    #[test]
+    #[ignore]
+    fn test_huge_bit_stream() {
+        let mut stream = BitStream::open();
+        let mut rng = rand::thread_rng();
+        let amount_of_symbols = rng.gen::<u8>();
+        for _ in 0..amount_of_symbols {
+            let symbol = rng.gen::<u8>();
+            let amount = rng.gen::<u8>();
+            for _ in 0..amount {
+                stream.append(symbol);
+            }
+            println!("Number {}: {}", symbol, amount);
+        }
+        let tree = parse_u8_stream(&mut stream);
+        let (code, map) = encode(&mut stream);
+        println!("Amount of symbols: {}", amount_of_symbols);
+        println!("{:?}", tree);
+        println!("{:?}", map);
+    }
 }

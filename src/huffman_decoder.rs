@@ -9,16 +9,17 @@ use crate::bit_stream::BitStream;
 /// * `stream`: The stream of data to decode.
 /// * `code`: The code to decode it with, which should be output by huffman::encode().
 pub fn decode(stream: &mut BitStream, code: HashMap<u8, (u8, u16)>) -> BitStream {
+    // TODO: Check if last_code is necessary
     let mut result = BitStream::open();
 
     let (canonical_table, max_len) = create_canonical_table(code);
 
-    let last_code = canonical_table.last().unwrap().0;
+    // let last_code = canonical_table.last().unwrap().0;
     while !stream.is_empty() {
         let value = stream.read_n_bits_padded(max_len, true);
         let mut symbol = 0;
         for (code, sym, len) in &canonical_table {
-            if *code < value && *code != last_code {
+            if *code < value {
                 continue;
             }
             symbol = *sym;
