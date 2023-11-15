@@ -1,8 +1,7 @@
 #![allow(dead_code)]
 // remove this once integrating - this is to avoid exessive and useless warnings for the time being
 
-use crate::bit_stream::BitStream;
-use crate::huffman::{package_merge, parse_u8_stream};
+use crate::{bit_stream::BitStream, huffman::parse_u8_stream};
 
 mod image;
 mod downsample;
@@ -115,9 +114,8 @@ fn main() {
         stream.append_byte(12);
     }
 
-    // let mut tree = parse_u8_stream(&mut stream, true);
-    // println!("before: {:?}", tree);
-    // tree.restrict_height(4);
-    // println!("after: {:?}", tree);
-    package_merge(&mut stream, 5);
+    let mut tree = parse_u8_stream(&mut stream);
+    println!("before: {:?}", tree);
+    tree.restrict_height(5);
+    println!("after: {:?}", tree);
 }
