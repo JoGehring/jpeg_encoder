@@ -1,4 +1,5 @@
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, mem};
+use std::ops::Deref;
 
 use debug_tree::{add_branch, add_leaf, defer_print};
 
@@ -19,7 +20,7 @@ pub struct HuffmanNode<T: PartialEq> {
 ///
 /// * stream: The stream of data to read.
 pub fn encode(stream: &mut BitStream) -> (BitStream, HashMap<u8, (u8, u16)>) {
-    let code_map = parse_u8_stream(stream).code_map();
+    let code_map = parse_u8_stream(stream, true).code_map();
     let mut result = BitStream::open();
 
     for byte in stream.data() {
@@ -37,12 +38,13 @@ pub fn encode(stream: &mut BitStream) -> (BitStream, HashMap<u8, (u8, u16)>) {
 /// # Arguments
 ///
 /// * stream: The stream of data to read.
-pub fn parse_u8_stream(stream: &mut BitStream) -> HuffmanNode<u8> {
-    let mut nodes: Vec<HuffmanNode<u8>> = vec![];
-    for byte in stream.data() {
-        increment_or_append(&mut nodes, *byte);
-    }
+pub fn parse_u8_stream(stream: &mut BitStream, remove_one_codes: bool) -> HuffmanNode<u8> {
+    let mut nodes = get_single_leafs(stream);
 
+    build_tree_from_nodes(&mut nodes, remove_one_codes)
+}
+
+fn build_tree_from_nodes(nodes: &mut Vec<HuffmanNode<u8>>, remove_one_codes: bool) -> HuffmanNode<u8> {
     while nodes.len() > 1 {
         nodes.sort_by_key(|node| node.chance());
         let mut bigger_node = nodes.remove(1);
@@ -54,8 +56,77 @@ pub fn parse_u8_stream(stream: &mut BitStream) -> HuffmanNode<u8> {
         return HuffmanNode::default();
     }
     let mut tree = nodes.remove(0);
-    tree.remove_only_ones_code();
+    if remove_one_codes {
+        tree.remove_only_ones_code();
+    }
     tree
+}
+
+fn get_single_leafs(stream: &mut BitStream) -> Vec<HuffmanNode<u8>> {
+    let mut nodes: Vec<HuffmanNode<u8>> = vec![];
+    for byte in stream.data() {
+        increment_or_append(&mut nodes, *byte);
+    }
+    nodes
+}
+
+pub fn package_merge(stream: &mut BitStream, height: u16) {
+    let mut nodes: Vec<HuffmanNode<u8>> = vec![];
+    for byte in stream.data() {
+        increment_or_append(&mut nodes, *byte);
+    }
+    if (nodes.len() as f64).log2().ceil() > height as f64 {
+        panic!("Package merge not possible");
+    }
+    nodes.sort_by_key(|node| node.chance);
+    let p: Vec<(u8, u64)> = nodes.iter().map(|node| (node.content.unwrap(), node.chance)).collect();
+    let mut lookup: HashMap<u8, (u8, u64)> = HashMap::with_capacity(p.len());
+    let mut l = vec![0; nodes.len()];
+    let mut q: Vec<Vec<Vec<(u8, u64)>>> = Vec::with_capacity((height - 1) as usize);
+    q.push(vec![]);
+    let mut index = 0;
+
+    for i in &p {
+        lookup.insert(i.0, (index, i.1));
+        q[0].push(vec![*i]);
+        index += 1;
+    }
+    index = 0;
+    let mut q_0 = q[0].clone();
+    while q[index as usize].len() < (2 * p.len() - 2) {
+        let next = package(&mut q[index as usize], &mut q_0);
+        q.push(next);
+        index += 1;
+    }
+    for node in &q[q.len() - 1] {
+        for entry in node {
+            let index = lookup.get(&entry.0).unwrap().0;
+            l[index as usize] += 1;
+        }
+    }
+    let mut map: HashMap<u8, (u8, u16)> = HashMap::with_capacity(p.len());
+    for i in &p {
+        map.insert(i.0, (l[lookup.get(&i.0).unwrap().0 as usize], 0));
+    }
+    println!("{:?}", map);
+}
+
+fn package(q: &mut Vec<Vec<(u8, u64)>>, q_0: &mut Vec<Vec<(u8, u64)>>) -> Vec<Vec<(u8, u64)>> {
+    let mut next_row = q_0.clone();
+    for i in (0..q.len() - q.len() % 2).step_by(2) {
+        let mut node: Vec<(u8, u64)> = vec![];
+        let mut left: Vec<(u8, u64)> = q[i].clone();
+        node.append(&mut left);
+        let mut right: Vec<(u8, u64)> = q[i + 1].clone();
+        node.append(&mut right);
+        next_row.push(node);
+    }
+    next_row.sort_by_key(|nodes| {
+        let mut x = 0;
+        nodes.iter().for_each(|n| x += n.1);
+        x
+    });
+    next_row
 }
 
 /// With a vec of huffman nodes, either increment the chance of the node with the given value
@@ -290,6 +361,157 @@ impl HuffmanNode<u8> {
         current.chance = 0;
         current.left = Some(Box::from(new_left_node));
     }
+
+
+    pub fn restrict_height(&mut self, height: u16) {
+        // TODO: kill me
+        if self.max_depth() - 1 <= height {
+            return;
+        }
+        if height < ((self.count_leafs() as f64).log2().ceil()) as u16 {
+            panic!("Restriction to this height not possible");
+        }
+        let mut stream = BitStream::open();
+        trim_tree(self, &mut stream, 1, height);
+        println!("trimmed: {:?}", self);
+        let mut leafs = get_single_leafs(&mut stream);
+        self.fill_empty_nodes(&mut leafs);
+        println!("trimmed and filled: {:?}", self);
+        let mut t2 = build_tree_from_nodes(&mut leafs, false);
+        println!("t2: {:?}", t2);
+        let level = height as i32 - (t2.max_depth() - 1) as i32 - 1;
+        let mut y_p = self;
+        let mut left_chance: u64 = 0;
+        let mut right_chance: u64 = 0;
+        let mut y_new = HuffmanNode::default();
+        if level > 0 {
+            for _ in 0..level - 1 {
+                if y_p.left.is_some() {
+                    left_chance = y_p.left.as_ref().unwrap().chance();
+                } else {
+                    left_chance = u64::MAX;
+                }
+                if y_p.right.is_some() {
+                    right_chance = y_p.right.as_ref().unwrap().chance();
+                } else {
+                    right_chance = u64::MAX;
+                }
+                if left_chance <= right_chance {
+                    y_p = y_p.left.as_mut().unwrap();
+                } else {
+                    y_p = y_p.right.as_mut().unwrap();
+                }
+            }
+            if y_p.left.is_some() {
+                left_chance = y_p.left.as_ref().unwrap().chance();
+            } else {
+                left_chance = u64::MAX;
+            }
+            if y_p.right.is_some() {
+                right_chance = y_p.right.as_ref().unwrap().chance();
+            } else {
+                right_chance = u64::MAX;
+            }
+            if left_chance <= right_chance {
+                let y_p_left = mem::replace(&mut y_p.left, None);
+                y_new.left = y_p_left;
+                y_new.right = Some(Box::from(t2));
+                y_p.left = Some(Box::from(y_new));
+            } else {
+                let y_p_right = mem::replace(&mut y_p.right, None);
+                y_new.right = y_p_right;
+                y_new.left = Some(Box::from(t2));
+
+                y_p.right = Some(Box::from(y_new));
+            }
+        } else {
+            let mut t1 = HuffmanNode::default();
+            let left = mem::replace(&mut y_p.left, None);
+            t1.left = left;
+            let right = mem::replace(&mut y_p.right, None);
+            t1.right = right;
+            // y_p.left = Some(Box::from(t2));
+            // y_p.right = Some(Box::from(t1));
+            let y_new = combine_and_swap_inner_nodes(t1, t2);
+            let _ = mem::replace(&mut y_p.left, y_new.left);
+            let _ = mem::replace(&mut y_p.right, y_new.right);
+        }
+
+        // println!("Current: {:?}", y_p);
+    }
+
+    pub fn count_leafs(&self) -> usize {
+        if self.content.is_some() {
+            return 1;
+        } else {
+            return
+                match &self.left {
+                    Some(left) => left.count_leafs(),
+                    None => 0,
+                } +
+                    match &self.right {
+                        Some(right) => right.count_leafs(),
+                        None => 0,
+                    };
+        }
+    }
+
+    fn fill_empty_nodes(&mut self, leafs: &mut Vec<HuffmanNode<u8>>) {
+        if leafs.len() == 0 {
+            return;
+        }
+        if self.content.is_none() && self.left.is_none() && self.right.is_none() {
+            let _ = mem::replace(self, leafs.pop().unwrap());
+            return;
+        }
+        if self.left.as_ref().is_some() {
+            self.left.as_mut().unwrap().fill_empty_nodes(leafs);
+        }
+        if self.right.as_ref().is_some() {
+            self.right.as_mut().unwrap().fill_empty_nodes(leafs);
+        }
+    }
+}
+
+fn trim_tree(current: &mut HuffmanNode<u8>, stream: &mut BitStream, current_height: u16, height: u16) {
+    if current.content.is_some() && current_height > height {
+        for _ in 0..current.chance {
+            stream.append(current.content.unwrap());
+        }
+        return;
+    } else if current.left.is_some() && current_height + 1 > height {
+        // if current.left.as_ref().unwrap().content.is_some() {
+        //     let left = current.left.as_ref().unwrap();
+        //     let new_left = HuffmanNode { chance: left.chance, content: left.content, left: None, right: None };
+        //     let _ = mem::replace(current, HuffmanNode { chance: left.chance, content: left.content, left: None, right: None });
+        //     return;
+        // }
+        let partial_tree = mem::replace(&mut current.left, None).unwrap();
+        get_leafs_from_partial_tree(&partial_tree, stream);
+    } else if current.left.is_some() {
+        trim_tree(current.left.as_mut().unwrap(), stream, current_height + 1, height);
+    }
+    if current.right.is_some() && current_height + 1 > height {
+        let partial_tree = mem::replace(&mut current.right, None).unwrap();
+        get_leafs_from_partial_tree(&partial_tree, stream);
+    } else if current.right.is_some() {
+        trim_tree(current.right.as_mut().unwrap(), stream, current_height + 1, height);
+    }
+}
+
+fn get_leafs_from_partial_tree(partial_tree: &Box<HuffmanNode<u8>>, stream: &mut BitStream) {
+    if partial_tree.content.is_some() {
+        for _ in 0..partial_tree.chance {
+            stream.append(partial_tree.content.unwrap());
+        }
+        return;
+    }
+    if partial_tree.left.is_some() {
+        get_leafs_from_partial_tree(partial_tree.left.as_ref().unwrap(), stream);
+    }
+    if partial_tree.right.is_some() {
+        get_leafs_from_partial_tree(partial_tree.right.as_ref().unwrap(), stream);
+    }
 }
 
 impl Default for HuffmanNode<u8> {
@@ -332,6 +554,7 @@ fn build_debug_tree(current: &HuffmanNode<u8>, is_left: bool) {
     }
 }
 
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -340,13 +563,13 @@ mod tests {
 
     use crate::{bit_stream::BitStream, huffman::increment_or_append};
 
-    use super::{encode, HuffmanNode, parse_u8_stream};
+    use super::{encode, HuffmanNode, package_merge, parse_u8_stream};
 
     //TODO: test create_map, encode
     #[test]
     fn test_parse_empty_stream() {
         let mut stream = BitStream::open();
-        let tree = parse_u8_stream(&mut stream);
+        let tree = parse_u8_stream(&mut stream, true);
         assert_eq!(HuffmanNode::default(), tree);
     }
 
@@ -354,7 +577,7 @@ mod tests {
     fn test_parse_stream_with_one_byte() {
         let mut stream = BitStream::open();
         stream.append_byte(1);
-        let tree = parse_u8_stream(&mut stream);
+        let tree = parse_u8_stream(&mut stream, true);
         assert_eq!(
             HuffmanNode {
                 chance: 0,
@@ -410,7 +633,7 @@ mod tests {
             stream.append_byte(6);
         }
 
-        let tree = parse_u8_stream(&mut stream);
+        let tree = parse_u8_stream(&mut stream, true);
         let code = tree.create_code();
         let correct_code: Vec<u8> = vec![0b00_01_100_1, 0b01_110_111, 0b0_0000000];
         assert_eq!(&correct_code, code.data());
@@ -426,7 +649,7 @@ mod tests {
         };
         let mut stream = BitStream::open();
 
-        let actual_tree = parse_u8_stream(&mut stream);
+        let actual_tree = parse_u8_stream(&mut stream, true);
         assert_eq!(expected_tree, actual_tree)
     }
 
@@ -617,7 +840,7 @@ mod tests {
         for _ in 0..five_occurence {
             stream.append_byte(5);
         }
-        let tree = parse_u8_stream(&mut stream);
+        let tree = parse_u8_stream(&mut stream, true);
         let (code, map) = encode(&mut stream);
         println!("ones: {}", one_two_occurence);
         println!("twos: {}", one_two_occurence);
@@ -643,10 +866,11 @@ mod tests {
             }
             println!("Number {}: {}", symbol, amount);
         }
-        let tree = parse_u8_stream(&mut stream);
-        let (code, map) = encode(&mut stream);
+        // let tree = parse_u8_stream(&mut stream, true);
+        // let (code, map) = encode(&mut stream);
         println!("Amount of symbols: {}", amount_of_symbols);
-        println!("{:?}", tree);
-        println!("{:?}", map);
+        package_merge(&mut stream, 16);
+        // println!("{:?}", tree);
+        // println!("{:?}", map);
     }
 }

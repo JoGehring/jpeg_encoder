@@ -2,8 +2,7 @@
 // remove this once integrating - this is to avoid exessive and useless warnings for the time being
 
 use crate::bit_stream::BitStream;
-use crate::huffman::parse_u8_stream;
-use crate::ppm_parser::read_ppm_from_file;
+use crate::huffman::{package_merge, parse_u8_stream};
 
 mod image;
 mod downsample;
@@ -51,36 +50,74 @@ fn main() {
     // jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::EOI);
     // target_stream.flush_to_file("test/test_result.jpg").expect("TODO: Panic message");
 
-            let mut stream = BitStream::open();
-        stream.append_byte(1);
+    let mut stream = BitStream::open();
+    // stream.append_byte(1);
+    // stream.append_byte(1);
+    // stream.append_byte(2);
+    // stream.append_byte(2);
+    // stream.append_byte(3);
+    // stream.append_byte(3);
+    // stream.append_byte(4);
+    // stream.append_byte(4);
+    // stream.append_byte(5);
+    // stream.append_byte(5);
+    // stream.append_byte(6);
+    // stream.append_byte(6);
+
+    for _ in 0..2 {
         stream.append_byte(1);
         stream.append_byte(2);
-        stream.append_byte(2);
-        stream.append_byte(3);
+    }
+    for _ in 0..3 {
         stream.append_byte(3);
         stream.append_byte(4);
-        stream.append_byte(4);
+    }
+    for _ in 0..4 {
         stream.append_byte(5);
-        stream.append_byte(5);
+    }
+    for _ in 0..5 {
         stream.append_byte(6);
-        stream.append_byte(6);
+    }
 
-        for _ in 1..2 {
-            stream.append_byte(1);
-            stream.append_byte(2);
-        }
-        for _ in 1..4 {
-            stream.append_byte(3);
-            stream.append_byte(4);
-        }
-        for _ in 1..5 {
-            stream.append_byte(5);
-        }
-        for _ in 1..7 {
-            stream.append_byte(6);
-        }
+    for _ in 0..6 {
+        stream.append_byte(7);
+    }
 
-        let tree = parse_u8_stream(&mut stream);
-        println!("{:?}", tree);
+    for _ in 0..7 {
+        stream.append_byte(8);
+    }
+        for _ in 0..7 {
+        stream.append_byte(56);
+    }
+        for _ in 0..7 {
+        stream.append_byte(44);
+    }
+        for _ in 0..7 {
+        stream.append_byte(33);
+    }
+        for _ in 0..7 {
+        stream.append_byte(81);
+    }
+            for _ in 0..7 {
+        stream.append_byte(21);
+    }
 
+        for _ in 0..7 {
+        stream.append_byte(9);
+    }
+        for _ in 0..17 {
+        stream.append_byte(10);
+    }
+        for _ in 0..71 {
+        stream.append_byte(11);
+    }
+        for _ in 0..74 {
+        stream.append_byte(12);
+    }
+
+    // let mut tree = parse_u8_stream(&mut stream, true);
+    // println!("before: {:?}", tree);
+    // tree.restrict_height(4);
+    // println!("after: {:?}", tree);
+    package_merge(&mut stream, 5);
 }
