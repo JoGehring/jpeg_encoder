@@ -31,25 +31,33 @@ pub fn encode(stream: &mut BitStream) -> (BitStream, HashMap<u8, (u8, u16)>) {
 }
 
 /// Parse a stream of u8 values and create a huffman tree for them.
-/// The tree grows to the right, meaning no left node ever has a bigger max_path() than the corresponding
-/// right node's max_path().
+/// The tree grows to the right, meaning no left node ever has a bigger max_depth() than the corresponding
+/// right node's max_depth().
+/// The tree's height/code length is also restricted to 16 bits.
 ///
 /// # Arguments
 ///
-/// * stream: The stream of data to read.
+/// * `stream`: The stream of data to read.
+///
+/// # Panics
+/// * If there are more symbols than can be encoded in 16 bit codes.
 pub fn parse_u8_stream(stream: &mut BitStream) -> HuffmanNode<u8> {
     let mut nodes = get_single_leaves(stream);
 
     let mut tree = build_huffman_tree(&mut nodes);
 
     tree.restrict_height(16);
-    // TODO right growing constraint here
     tree.ensure_tree_grows_right();
     tree.remove_only_ones_code();
 
     tree
 }
 
+/// Create all huffman leaves for a stream of u8 values.
+///
+/// # Arguments
+///
+/// * `stream`: The stream of data to read.
 fn get_single_leaves(stream: &mut BitStream) -> Vec<HuffmanNode<u8>> {
     let mut nodes: Vec<HuffmanNode<u8>> = vec![];
     for byte in stream.data() {
@@ -78,16 +86,36 @@ fn increment_or_append(nodes: &mut Vec<HuffmanNode<u8>>, value: u8) {
     }
 }
 
+/// Build a huffman tree from a vector of leaf nodes.
+///
+/// # Arguments
+///
+/// * `nodes`: The leaf nodes to build a tree from.
 fn build_huffman_tree(nodes: &mut Vec<HuffmanNode<u8>>) -> HuffmanNode<u8> {
     let mut sort_lambda = |node: &HuffmanNode<u8>| node.chance();
     build_tree(nodes, &mut sort_lambda)
 }
 
+/// Build a binary tree from a vector of leaf nodes.
+/// Only leaf nodes will contain values.
+///
+/// # Arguments
+///
+/// * `nodes`: The leaf nodes to build a tree from.
 fn build_binary_tree(nodes: &mut Vec<HuffmanNode<u8>>) -> HuffmanNode<u8> {
     let mut sort_lambda = |node: &HuffmanNode<u8>| node.min_depth();
     build_tree(nodes, &mut sort_lambda)
 }
 
+/// Build a tree from a vector of leaf nodes, using the provided sort function.
+/// The two nodes with the smallest result from the sort function will be combined with a parent node that's put
+/// back in the vector, then it again gets the two nodes with the smallest result, etc.
+/// Only leaf nodes will contain values.
+///
+/// # Arguments
+///
+/// * `nodes`: The leaf nodes to build a tree from.
+/// * `sort_lambda`: The function to sort nodes with.
 fn build_tree<K, F>(nodes: &mut Vec<HuffmanNode<u8>>, sort_lambda: &mut F) -> HuffmanNode<u8>
 where
     F: FnMut(&HuffmanNode<u8>) -> K,
@@ -107,28 +135,14 @@ where
 }
 
 /// Combine two nodes and make them leaves of a new node.
-///
 /// # Arguments
 ///
-/// * higher_chance_node: The node with the bigger chance/frequency of symbols in it appearing.
-/// * lower_chance_node: The node with the smaller chance/frequency of symbols in it appearing.
-///
-/// # Explanation
-///
-/// If the condition of "one node's maximum depth <= the other's minimum depth" is already fulfilled,
-/// we can simply append the nodes to a new node and return that.
-///
-/// The only case in which this condition doesn't apply, assuming both incoming nodes are right growing trees,
-/// is if the right child of the node with the lower maximum depth is bigger than the left child of the other
-/// node. The solution is thus to swap these child nodes and then append the two nodes to a parent node, which
-/// is done in combine_and_swap_inner_nodes.
-fn combine_nodes(
-    higher_chance_node: HuffmanNode<u8>,
-    lower_chance_node: HuffmanNode<u8>,
-) -> HuffmanNode<u8> {
+/// * node_1: The first node to include.
+/// * node_2: The second node to include.
+fn combine_nodes(node_1: HuffmanNode<u8>, node_2: HuffmanNode<u8>) -> HuffmanNode<u8> {
     HuffmanNode {
-        left: Some(Box::from(lower_chance_node)),
-        right: Some(Box::from(higher_chance_node)),
+        left: Some(Box::from(node_2)),
+        right: Some(Box::from(node_1)),
         ..Default::default()
     }
 }
@@ -191,6 +205,8 @@ impl HuffmanNode<u8> {
         );
     }
 
+    /// Create a clone of this leaf node.
+    /// Only content and chance are kept, left and right child nodes are not included in the clone.
     fn clone_leaf(&self) -> HuffmanNode<u8> {
         HuffmanNode {
             content: self.content,
@@ -267,6 +283,8 @@ impl HuffmanNode<u8> {
         }
     }
 
+    /// Update this tree to ensure it grows to the right, i.e. at any child node, the left child's maximum depth is not larger than
+    /// its right child's minimum depth.
     fn ensure_tree_grows_right(&mut self) {
         if self.left.is_some() && self.right.is_none() {
             let left = mem::replace(&mut self.left, None);
@@ -278,10 +296,11 @@ impl HuffmanNode<u8> {
                 {
                     mem::swap(&mut self.right, &mut self.left);
                 } else {
+                    self.swap_inner_nodes();
                 }
             }
         }
-        
+
         if self.left.is_some() {
             self.left.as_mut().unwrap().ensure_tree_grows_right();
         }
@@ -290,11 +309,16 @@ impl HuffmanNode<u8> {
         }
     }
 
+    /// swap this node's right child's left child with the left child's right child node.
+    /// If this node's left child's max depth is greated than this node's right child's, swap them too.
     fn swap_inner_nodes(&mut self) {
         if self.left.as_ref().unwrap().max_depth() > self.right.as_ref().unwrap().max_depth() {
             mem::swap(&mut self.right, &mut self.left);
         }
-        mem::swap(&mut self.right.as_mut().unwrap().left, &mut self.left.as_mut().unwrap().right);
+        mem::swap(
+            &mut self.right.as_mut().unwrap().left,
+            &mut self.left.as_mut().unwrap().right,
+        );
     }
 
     /// Remove the lower right leaf (1*) and replace it with a node which has only a leaf on the left
@@ -315,6 +339,17 @@ impl HuffmanNode<u8> {
         current.left = Some(Box::from(new_left_node));
     }
 
+    /// Restrict this tree's height to only the specified height.
+    /// If it is already at or less than the specified height, do nothing.
+    ///
+    /// This uses the BRCI algorithm.
+    ///
+    /// # Arguments
+    ///
+    /// * `height`: The height to restrict the tree to.
+    ///
+    /// # Panics
+    /// * If this tree has more leaves than can be included in the given height.
     pub fn restrict_height(&mut self, height: u16) {
         if self.max_depth() - 1 <= height {
             return;
@@ -323,21 +358,26 @@ impl HuffmanNode<u8> {
             panic!("Restriction to this height not possible");
         }
 
+        // step 1 of BRCI
         let mut leaves: Vec<HuffmanNode<u8>> = vec![];
         trim_tree(self, &mut leaves, 1, height - 1);
 
+        // step 2 of BRCI
         self.fill_empty_nodes(&mut leaves);
         let t2 = build_binary_tree(&mut leaves);
 
+        // level for step 3 of BRCI
         let level = height - (t2.max_depth() - 1) - 1;
 
         if level <= 0 {
+            // replacing the root doesn't need to do the complicated stuff below, we just do this
             let mut t1 = HuffmanNode::default();
             let left = mem::replace(&mut self.left, None);
             t1.left = left;
             let right = mem::replace(&mut self.right, None);
             t1.right = right;
 
+            // adding t2 here is step 4 of BRCI
             self.left = Some(Box::from(t2));
             self.right = Some(Box::from(t1));
             return;
@@ -348,6 +388,7 @@ impl HuffmanNode<u8> {
         let mut right_chance: u64;
         let mut y_new = HuffmanNode::default();
 
+        // step 3 of BRCI: find y_p
         for l in 0..level - 1 {
             left_chance = determine_child_chance(&y_p.left, level, l);
             right_chance = determine_child_chance(&y_p.left, level, l);
@@ -362,6 +403,7 @@ impl HuffmanNode<u8> {
         left_chance = determine_child_chance(&y_p.left, 0, 0);
         right_chance = determine_child_chance(&y_p.left, 0, 0);
 
+        // insert y_new (step 3) and append t2 (step 4)
         if left_chance <= right_chance {
             let y_p_left = mem::replace(&mut y_p.left, None);
             y_new.left = y_p_left;
@@ -374,10 +416,9 @@ impl HuffmanNode<u8> {
 
             y_p.right = Some(Box::from(y_new));
         }
-
-        // println!("Current: {:?}", y_p);
     }
 
+    /// Count the amount of leaves this tree has recursively.
     pub fn count_leaves(&self) -> usize {
         if self.content.is_some() {
             return 1;
@@ -392,6 +433,14 @@ impl HuffmanNode<u8> {
         }
     }
 
+    /// If this tree has empty leaf nodes, replace them with nodes from `leaves`.
+    ///
+    /// This is a simple optimisation for the BRCI algorithm as described in section 2.2
+    /// of Luiz, Pessoa, Laber - In-place Length Restricted Prefix Coding.
+    ///
+    /// # Arguments
+    ///
+    /// * `leaves`: Leaves to add back to the tree.
     fn fill_empty_nodes(&mut self, leaves: &mut Vec<HuffmanNode<u8>>) {
         if leaves.len() == 0 {
             return;
@@ -409,6 +458,15 @@ impl HuffmanNode<u8> {
     }
 }
 
+/// Trim a tree to the specified height and write leaves trimmed out to
+/// `leaves`.
+///
+/// # Arguments
+///
+/// * `current`: The node to trim to the given height.
+/// * `leaves`: The Vec to write removed nodes to.
+/// * `current_height`: The height of this node in the tree.
+/// * `height`: The target height.
 fn trim_tree(
     current: &mut HuffmanNode<u8>,
     leaves: &mut Vec<HuffmanNode<u8>>,
@@ -426,6 +484,15 @@ fn trim_tree(
     trim_child_node(&mut current.right, leaves, current_height, height);
 }
 
+/// Trim the given child node and write leaves trimmed out to `leaves`.
+/// If the child node is outside the trimming limit, just write its leaves
+/// to `leaves` and discard it.
+///
+/// # Arguments
+/// * `child`: The child node to trim to the given height.
+/// * `leaves`: The Vec to write removed nodes to.
+/// * `current_height`: The height of this node in the tree.
+/// * `height`: The target height.
 fn trim_child_node(
     child: &mut Option<Box<HuffmanNode<u8>>>,
     leaves: &mut Vec<HuffmanNode<u8>>,
@@ -440,6 +507,11 @@ fn trim_child_node(
     }
 }
 
+/// Get all leaves from this tree and append them to `leaves`.
+///
+/// # Arguments
+/// * `partial_tree`: The node to retrieve leaves from.
+/// * `leaves`: The Vec to write leaves to.
 fn get_leaves_from_partial_tree(
     partial_tree: &Box<HuffmanNode<u8>>,
     leaves: &mut Vec<HuffmanNode<u8>>,
@@ -456,6 +528,8 @@ fn get_leaves_from_partial_tree(
     }
 }
 
+/// Determine the chance of this child, or return u64::MAX if it can't be used.
+/// This is only used for the BRCI algorithm.
 fn determine_child_chance(child: &Option<Box<HuffmanNode<u8>>>, level: u16, l: u16) -> u64 {
     if child.is_some() && child.as_ref().unwrap().max_depth() >= level - l {
         return child.as_ref().unwrap().chance();
@@ -513,12 +587,26 @@ mod tests {
 
     use super::{encode, parse_u8_stream, HuffmanNode};
 
-    //TODO: test create_map, encode
+    // TODO: tests zumindest für trim_tree, count_leaves, restrict_height, remove_only_ones_code, ensure_tree_grows_right
+    // TODO: tests für parse_u8_stream() müssen auch nach rechtswachsendheit prüfen!
+
     #[test]
     fn test_parse_empty_stream() {
+        let expected_tree = HuffmanNode {
+            chance: 0,
+            content: None,
+            right: None,
+            left: Some(Box::from(HuffmanNode {
+                chance: 0,
+                content: None,
+                left: None,
+                right: None,
+            })),
+        };
         let mut stream = BitStream::open();
-        let tree = parse_u8_stream(&mut stream);
-        assert_eq!(HuffmanNode::default(), tree);
+
+        let actual_tree = parse_u8_stream(&mut stream);
+        assert_eq!(expected_tree, actual_tree)
     }
 
     #[test]
@@ -588,20 +676,6 @@ mod tests {
     }
 
     #[test]
-    fn test_tree_growing() {
-        let expected_tree = HuffmanNode {
-            chance: 0,
-            content: None,
-            left: None,
-            right: None,
-        };
-        let mut stream = BitStream::open();
-
-        let actual_tree = parse_u8_stream(&mut stream);
-        assert_eq!(expected_tree, actual_tree)
-    }
-
-    #[test]
     fn test_encode_example() {
         /*
         test with the following likelihoods:
@@ -643,27 +717,28 @@ mod tests {
 
         let (code, map) = encode(&mut stream);
         let correct_code: Vec<u8> = vec![
-            0b110_110_11,
-            0b10_1110_10,
-            0b0_100_101_1,
-            0b01_01_01_00,
-            0b00_00_00_00,
-            0b00_00_00_00,
-            0b100_101_10,
-            0b0_101_100_1,
-            0b01_100_101,
-            0b110_1110_1,
-            0b10_1110_01,
+            0b100_100_10,
+            0b1_101_110_1,
+            0b10_1110_11,
+            0b10_00_00_01,
             0b01_01_01_01,
+            0b01_01_01_01,
+            0b110_1110_1,
+            0b10_1110_11,
+            0b0_1110_110,
+            0b1110_100_1,
+            0b01_100_101,
+            0b00_00_00_00,
+            0b00_00_00_00,
         ];
         assert_eq!(correct_code, *code.data());
         let mut correct_map: HashMap<u8, (u8, u16)> = HashMap::with_capacity(6);
-        correct_map.insert(4, (3, 0b101));
-        correct_map.insert(5, (2, 0b01));
-        correct_map.insert(2, (4, 0b1110));
-        correct_map.insert(6, (2, 0b00));
-        correct_map.insert(3, (3, 0b100));
-        correct_map.insert(1, (3, 0b110));
+        correct_map.insert(1, (3, 0b100));
+        correct_map.insert(4, (4, 0b1110));
+        correct_map.insert(6, (2, 0b01));
+        correct_map.insert(2, (3, 0b101));
+        correct_map.insert(5, (2, 0b00));
+        correct_map.insert(3, (3, 0b110));
         assert_eq!(correct_map, map);
     }
 
