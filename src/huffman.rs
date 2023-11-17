@@ -57,9 +57,7 @@ pub fn parse_u8_stream(stream: &mut BitStream) -> HuffmanNode<u8> {
     let mut nodes = get_single_leaves(stream);
 
     let mut tree = build_huffman_tree(&mut nodes);
-
-    tree.restrict_height(16);
-    tree.ensure_tree_grows_right();
+    // tree.ensure_tree_grows_right();
     tree.remove_only_ones_code();
 
     tree
@@ -378,10 +376,12 @@ impl HuffmanNode<u8> {
         if leaves.len() == 0 {
             return;
         }
+        println!("after trim and fill: {:?}", self);
         let t2 = build_binary_tree(&mut leaves);
-
+        println!("t2: {:?}", t2);
         // level for step 3 of BRCI
-        let level = height - (t2.max_depth() - 1) - 1;
+        let t2_depth = (t2.max_depth() - 1) - 1;
+        let level = height - t2_depth - 1;
 
         if level <= 0 {
             // replacing the root doesn't need to do the complicated stuff below, we just do this
@@ -468,6 +468,18 @@ impl HuffmanNode<u8> {
         }
         if self.right.as_ref().is_some() {
             self.right.as_mut().unwrap().fill_empty_nodes(leaves);
+        }
+    }
+
+    fn has_space_at_depth(&self, depth: u16) -> bool {
+        if self.content.is_some() {
+            return false;
+        } else if self.right.is_none() || self.left.is_none() {
+            return true;
+        } else if depth == 0 {
+            return false;
+        } else {
+            return self.left.as_ref().unwrap().has_space_at_depth(depth - 1) || self.right.as_ref().unwrap().has_space_at_depth(depth - 1);
         }
     }
 }
@@ -588,6 +600,43 @@ fn build_debug_tree(current: &HuffmanNode<u8>, is_left: bool) {
             build_debug_tree(current.right.as_ref().unwrap(), false);
         }
     }
+}
+
+pub fn code_len_to_tree(nodes: &mut Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, (u8, u16)>) -> HuffmanNode<u8> {
+    let mut root = HuffmanNode::default();
+    let mut current = &mut root;
+    let mut current_height = 0;
+    while nodes.len() > 0 {
+        let leaf = nodes.remove(0);
+        let destination = map.get(&leaf.content().unwrap()).unwrap().0 - 1;
+        while current_height < destination {
+            if current.right().is_none() && current.left().is_none() {
+                current.right = Some(Box::from(HuffmanNode::default()));
+                current = current.right.as_mut().unwrap();
+            } else if current.right().is_some() && current.right().as_ref().unwrap().has_space_at_depth((destination - current_height - 1) as u16) {
+                current = current.right.as_mut().unwrap();
+            } else if current.left().is_some() && current.left().as_ref().unwrap().has_space_at_depth((destination - current_height - 1) as u16) {
+                current = current.left.as_mut().unwrap();
+            } else if current.left().is_none() {
+                current.left = Some(Box::from(HuffmanNode::default()));
+                current = current.left.as_mut().unwrap();
+            } else {
+                panic!("Tree path error smth");
+            }
+            current_height += 1;
+        }
+        if current.right().is_none() {
+            current.right = Some(Box::from(leaf));
+        } else if current.left().is_none() {
+            current.left = Some(Box::from(leaf));
+        } else {
+            println!("{:?}", root);
+            panic!("Leaf error");
+        }
+        current = &mut root;
+        current_height = 0;
+    }
+    root
 }
 
 #[cfg(test)]

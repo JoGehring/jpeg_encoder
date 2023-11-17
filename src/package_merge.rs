@@ -1,6 +1,7 @@
 use std::collections::HashMap;
+
 use crate::bit_stream::BitStream;
-use crate::huffman::{HuffmanNode, increment_or_append};
+use crate::huffman::{code_len_to_tree, HuffmanNode, increment_or_append};
 
 pub fn package_merge(stream: &mut BitStream, height: u16) {
     let mut nodes: Vec<HuffmanNode<u8>> = vec![];
@@ -13,7 +14,7 @@ pub fn package_merge(stream: &mut BitStream, height: u16) {
     nodes.sort_by_key(|node| node.chance());
     let p: Vec<(u8, u64)> = nodes.iter().map(|node| (node.content().unwrap(), node.chance())).collect();
     let mut lookup: HashMap<u8, (u8, u64)> = HashMap::with_capacity(p.len());
-    let mut l = vec![0; nodes.len()];
+    let mut l = vec![0u64; nodes.len()];
     let mut q: Vec<Vec<Vec<(u8, u64)>>> = Vec::with_capacity((height - 1) as usize);
     q.push(vec![]);
     let mut index = 0;
@@ -37,10 +38,19 @@ pub fn package_merge(stream: &mut BitStream, height: u16) {
         }
     }
     let mut map: HashMap<u8, (u8, u16)> = HashMap::with_capacity(p.len());
-    for i in &p {
-        map.insert(i.0, (l[lookup.get(&i.0).unwrap().0 as usize], 0));
+    for (i, el) in p.iter().enumerate() {
+        let code_length = l[lookup.get(&el.0).unwrap().0 as usize];
+        if code_length > height as u64 {
+            panic!("Something went wrong, code length bigger than height");
+        }
+        map.insert(el.0, (code_length as u8, 0));
+        nodes[i].set_chance(u64::MAX - code_length);
     }
+    nodes.sort_by_key(|node| node.chance());
     println!("{:?}", map);
+    let tree = code_len_to_tree(&mut nodes, &mut map);
+
+    println!("{:?}", tree);
 }
 
 fn package(q: &mut Vec<Vec<(u8, u64)>>, q_0: &mut Vec<Vec<(u8, u64)>>) -> Vec<Vec<(u8, u64)>> {
@@ -60,3 +70,4 @@ fn package(q: &mut Vec<Vec<(u8, u64)>>, q_0: &mut Vec<Vec<(u8, u64)>>) -> Vec<Ve
     });
     next_row
 }
+
