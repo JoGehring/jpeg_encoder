@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::bit_stream::BitStream;
-use crate::huffman::{code_len_to_tree, HuffmanNode, get_single_leaves};
+use crate::huffman::{code_len_to_tree, get_single_leaves, HuffmanNode};
 
 pub fn package_merge(stream: &mut BitStream, height: u16) -> HuffmanNode<u8> {
     let mut nodes = get_single_leaves(stream);
@@ -11,47 +11,57 @@ pub fn package_merge(stream: &mut BitStream, height: u16) -> HuffmanNode<u8> {
     if (nodes.len() as f64).log2().ceil() > height as f64 {
         panic!("Package merge not possible");
     }
+
     nodes.sort_by_key(|node| node.chance());
-    let p: Vec<(u8, u64)> = nodes
-        .iter()
-        .map(|node| (node.content().unwrap(), node.chance()))
-        .collect();
+    let p = create_p(&mut nodes);
+
     let mut lookup: HashMap<u8, (u8, u64)> = HashMap::with_capacity(p.len());
-    let mut l = vec![0u64; nodes.len()];
     let mut q: Vec<Vec<Vec<(u8, u64)>>> = Vec::with_capacity((height - 1) as usize);
     q.push(vec![]);
+
+    populate_first_q_row(&p, &mut lookup, &mut q);
+
+    calculate_further_q_rows(&p, &mut q);
+
+    let l = calculate_code_lengths(&mut q, &mut lookup, nodes.len());
+
+    let mut map = map_codes_to_code_length(&p, &l, &lookup, &mut nodes, height);
+
+    nodes.sort_by_key(|node| node.chance());
+
+    code_len_to_tree(&mut nodes, &mut map)
+}
+
+fn create_p(nodes: &mut Vec<HuffmanNode<u8>>) -> Vec<(u8, u64)> {
+    nodes
+        .iter()
+        .map(|node| (node.content().unwrap(), node.chance()))
+        .collect()
+}
+
+fn populate_first_q_row(
+    p: &Vec<(u8, u64)>,
+    lookup: &mut HashMap<u8, (u8, u64)>,
+    q: &mut Vec<Vec<Vec<(u8, u64)>>>,
+) {
     let mut index = 0;
 
-    for i in &p {
+    for i in p {
         lookup.insert(i.0, (index, i.1));
         q[0].push(vec![*i]);
         index += 1;
     }
-    index = 0;
+}
+
+fn calculate_further_q_rows(p: &Vec<(u8, u64)>, q: &mut Vec<Vec<Vec<(u8, u64)>>>) {
+    let mut index: usize = 0;
     let mut q_0 = q[0].clone();
-    while q[index as usize].len() < (2 * p.len() - 2) {
-        let next = package(&mut q[index as usize], &mut q_0);
+
+    while q[index].len() < (2 * p.len() - 2) {
+        let next = package(&mut q[index], &mut q_0);
         q.push(next);
         index += 1;
     }
-    for node in &q[q.len() - 1] {
-        for entry in node {
-            let index = lookup.get(&entry.0).unwrap().0;
-            l[index as usize] += 1;
-        }
-    }
-    let mut map: HashMap<u8, (u8, u16)> = HashMap::with_capacity(p.len());
-    for (i, el) in p.iter().enumerate() {
-        let code_length = l[lookup.get(&el.0).unwrap().0 as usize];
-        if code_length > height as u64 {
-            panic!("Something went wrong, code length bigger than height");
-        }
-        map.insert(el.0, (code_length as u8, 0));
-        nodes[i].set_chance(u64::MAX - code_length);
-    }
-    nodes.sort_by_key(|node| node.chance());
-
-    code_len_to_tree(&mut nodes, &mut map)
 }
 
 fn package(q: &mut Vec<Vec<(u8, u64)>>, q_0: &mut Vec<Vec<(u8, u64)>>) -> Vec<Vec<(u8, u64)>> {
@@ -70,6 +80,40 @@ fn package(q: &mut Vec<Vec<(u8, u64)>>, q_0: &mut Vec<Vec<(u8, u64)>>) -> Vec<Ve
         x
     });
     next_row
+}
+
+fn calculate_code_lengths(
+    q: &mut Vec<Vec<Vec<(u8, u64)>>>,
+    lookup: &mut HashMap<u8, (u8, u64)>,
+    number_of_nodes: usize,
+) -> Vec<u64> {
+    let mut l = vec![0u64; number_of_nodes];
+    for node in &q[q.len() - 1] {
+        for entry in node {
+            let index = lookup.get(&entry.0).unwrap().0 as usize;
+            l[index] += 1;
+        }
+    }
+    l
+}
+
+fn map_codes_to_code_length(
+    p: &Vec<(u8, u64)>,
+    l: &Vec<u64>,
+    lookup: &HashMap<u8, (u8, u64)>,
+    nodes: &mut Vec<HuffmanNode<u8>>,
+    height: u16,
+) -> HashMap<u8, (u8, u16)> {
+    let mut map: HashMap<u8, (u8, u16)> = HashMap::with_capacity(p.len());
+    for (i, el) in p.iter().enumerate() {
+        let code_length = l[lookup.get(&el.0).unwrap().0 as usize];
+        if code_length > height as u64 {
+            panic!("Something went wrong, code length bigger than height");
+        }
+        map.insert(el.0, (code_length as u8, 0));
+        nodes[i].set_chance(u64::MAX - code_length);
+    }
+    map
 }
 
 #[cfg(test)]
@@ -196,7 +240,13 @@ mod tests {
         assert_eq!(5, tree.max_depth() - 1);
         assert_eq!(4, tree.min_depth() - 1);
         let map = tree.code_map();
-        let shortest_code_len = map.clone().into_iter().min_by_key(|(_, value)| value.0).unwrap().1.0;
+        let shortest_code_len = map
+            .clone()
+            .into_iter()
+            .min_by_key(|(_, value)| value.0)
+            .unwrap()
+            .1
+             .0;
         // 27 is the most likely symbol so it should have the shortest code
         assert_eq!(shortest_code_len, map.get(&27u8).unwrap().0)
     }
