@@ -145,6 +145,7 @@ fn combine_nodes(node_1: HuffmanNode<u8>, node_2: HuffmanNode<u8>) -> HuffmanNod
     }
 }
 
+/// TODO: doc comment
 pub fn code_len_to_tree(
     nodes: &mut Vec<HuffmanNode<u8>>,
     map: &mut HashMap<u8, (u8, u16)>,
@@ -193,15 +194,34 @@ pub fn code_len_to_tree(
 }
 
 impl HuffmanNode<u8> {
+    /// get an immutable reference to this node's left child.
+    ///
+    /// # Panics
+    /// * if the left child is None.
     pub fn left_unchecked(&self) -> &Box<HuffmanNode<u8>> {
         self.left.as_ref().unwrap()
     }
+
+    /// get an immutable reference to this node's right child.
+    ///
+    /// # Panics
+    /// * if the right child is None.
     pub fn right_unchecked(&self) -> &Box<HuffmanNode<u8>> {
         self.right.as_ref().unwrap()
     }
+
+    /// get a mutable reference to this node's left child.
+    ///
+    /// # Panics
+    /// * if the left child is None.
     pub fn left_unchecked_mut(&mut self) -> &mut Box<HuffmanNode<u8>> {
         self.left.as_mut().unwrap()
     }
+
+    /// get a mutable reference to this node's right child.
+    ///
+    /// # Panics
+    /// * if the right child is None.
     pub fn right_unchecked_mut(&mut self) -> &mut Box<HuffmanNode<u8>> {
         self.right.as_mut().unwrap()
     }
@@ -352,6 +372,7 @@ impl HuffmanNode<u8> {
         }
     }
 
+    /// Recursively iterate through nodes to retrieve the node with the code 1* and put it elsewhere.
     fn get_or_append_only_ones_code(&mut self) -> Option<(HuffmanNode<u8>, u16)> {
         if self.right.is_none() {
             return None;
@@ -371,21 +392,17 @@ impl HuffmanNode<u8> {
         if ones_node_option.is_none() {
             return None;
         }
+
         let ones_node = ones_node_option.as_ref().unwrap().0.clone_leaf();
         let mut depth = ones_node_option.unwrap().1;
         if self.left.is_none() {
             let _ = mem::replace(&mut self.left.as_mut(), Some(&mut Box::from(ones_node)));
             return None;
         }
-        if self.left_unchecked().content.is_some() {
-            let left = mem::replace(&mut self.left, None);
-            self.left = Some(Box::from(HuffmanNode {
-                right: Some(Box::from(ones_node)),
-                left: left,
-                ..Default::default()
-            }));
+        if self.replace_left_leaf_with_root(&ones_node) {
             return None;
         }
+
         if self.left_unchecked().has_space_at_depth(depth, true) {
             let mut current = self.left_unchecked_mut();
             while depth > 0 {
@@ -396,26 +413,14 @@ impl HuffmanNode<u8> {
                     current.left = Some(Box::from(ones_node));
                     return None;
                 } else if depth > 1 {
-                    if current.right_unchecked().content.is_some() {
-                        let right = mem::replace(&mut current.right, None);
-                        current.right = Some(Box::from(HuffmanNode {
-                            left: Some(Box::from(ones_node)),
-                            right: right,
-                            ..Default::default()
-                        }));
+                    if current.replace_right_leaf_with_root(&ones_node) {
                         return None;
-                    } else if current.left_unchecked().content.is_some() {
-                        let left = mem::replace(&mut current.left, None);
-                        current.left = Some(Box::from(HuffmanNode {
-                            right: Some(Box::from(ones_node)),
-                            left: left,
-                            ..Default::default()
-                        }));
+                    } else if current.replace_left_leaf_with_root(&ones_node) {
                         return None;
                     }
                 } else if current.right_unchecked().has_space_at_depth(depth, true) {
                     current = current.right_unchecked_mut();
-                // this check is unnecessary as this must be true, so it's commented out for understandability
+                // this check is unnecessary as this will always be true, so it's commented out for understandability
                 // } else if current.left_unchecked().has_space_at_depth(depth, true) {
                 } else {
                     current = current.left_unchecked_mut();
@@ -426,6 +431,45 @@ impl HuffmanNode<u8> {
         return Some((ones_node, depth + 1));
     }
 
+    /// if this node has a right leaf, replace it with a root that in turn has both
+    /// the old right leaf and `ones_node` as its left leaf.
+    ///
+    /// # Arguments
+    ///
+    /// * `ones_node`: The node to attach.
+    fn replace_right_leaf_with_root(&mut self, ones_node: &HuffmanNode<u8>) -> bool {
+        if self.right_unchecked().content.is_some() {
+            let right = mem::replace(&mut self.right, None);
+            self.right = Some(Box::from(HuffmanNode {
+                left: Some(Box::from(ones_node.clone_leaf())),
+                right: right,
+                ..Default::default()
+            }));
+            return true;
+        }
+        return false;
+    }
+
+    /// if this node has a left leaf, replace it with a root that in turn has both
+    /// the old left leaf and `ones_node` as its right leaf.
+    ///
+    /// # Arguments
+    ///
+    /// * `ones_node`: The node to attach.
+    fn replace_left_leaf_with_root(&mut self, ones_node: &HuffmanNode<u8>) -> bool {
+        if self.left_unchecked().content.is_some() {
+            let left = mem::replace(&mut self.left, None);
+            self.left = Some(Box::from(HuffmanNode {
+                right: Some(Box::from(ones_node.clone_leaf())),
+                left: left,
+                ..Default::default()
+            }));
+            return true;
+        }
+        return false;
+    }
+
+    /// TODO: doc comment
     fn has_space_at_depth(&self, depth: u16, leaves_count_as_space: bool) -> bool {
         if self.content.is_some() {
             return if leaves_count_as_space {
