@@ -12,6 +12,18 @@ pub struct HuffmanNode<T: PartialEq> {
     right: Option<Box<HuffmanNode<T>>>,
 }
 
+impl<T: PartialEq> HuffmanNode<T> {
+    pub fn content(&self) -> &Option<T> {
+        &self.content
+    }
+    pub fn left(&self) -> &Option<Box<HuffmanNode<T>>> {
+        &self.left
+    }
+    pub fn right(&self) -> &Option<Box<HuffmanNode<T>>> {
+        &self.right
+    }
+}
+
 /// Parse a stream of values, create a huffman tree and encode the values.
 /// Returns the stream of encoded data and the map used for encoding.
 ///
@@ -73,7 +85,7 @@ fn get_single_leaves(stream: &mut BitStream) -> Vec<HuffmanNode<u8>> {
 ///
 /// * nodes: The vec of nodes to alter.
 /// * value: The value to add or increment.
-fn increment_or_append(nodes: &mut Vec<HuffmanNode<u8>>, value: u8) {
+pub(crate) fn increment_or_append(nodes: &mut Vec<HuffmanNode<u8>>, value: u8) {
     if let Some(node) = nodes.into_iter().find(|n| n.content.unwrap() == value) {
         node.chance += 1;
     } else {
@@ -117,9 +129,9 @@ fn build_binary_tree(nodes: &mut Vec<HuffmanNode<u8>>) -> HuffmanNode<u8> {
 /// * `nodes`: The leaf nodes to build a tree from.
 /// * `sort_lambda`: The function to sort nodes with.
 fn build_tree<K, F>(nodes: &mut Vec<HuffmanNode<u8>>, sort_lambda: &mut F) -> HuffmanNode<u8>
-where
-    F: FnMut(&HuffmanNode<u8>) -> K,
-    K: Ord,
+    where
+        F: FnMut(&HuffmanNode<u8>) -> K,
+        K: Ord,
 {
     while nodes.len() > 1 {
         nodes.sort_by_key(&mut *sort_lambda);
@@ -149,7 +161,7 @@ fn combine_nodes(node_1: HuffmanNode<u8>, node_2: HuffmanNode<u8>) -> HuffmanNod
 
 impl HuffmanNode<u8> {
     /// Calculate the chance/frequency for all symbols in this node and its child nodes.
-    fn chance(&self) -> u64 {
+    pub(crate) fn chance(&self) -> u64 {
         let mut result = self.chance;
         if self.left.is_some() {
             result += self.left.as_ref().unwrap().chance();
@@ -360,10 +372,12 @@ impl HuffmanNode<u8> {
 
         // step 1 of BRCI
         let mut leaves: Vec<HuffmanNode<u8>> = vec![];
-        trim_tree(self, &mut leaves, 1, height - 1);
-
+        trim_tree(self, &mut leaves, 0, height - 1);
         // step 2 of BRCI
         self.fill_empty_nodes(&mut leaves);
+        if leaves.len() == 0 {
+            return;
+        }
         let t2 = build_binary_tree(&mut leaves);
 
         // level for step 3 of BRCI
@@ -473,13 +487,6 @@ fn trim_tree(
     current_height: u16,
     height: u16,
 ) {
-    if current.content.is_some() {
-        if current_height > height {
-            leaves.push(current.clone_leaf());
-        }
-        return;
-    }
-
     trim_child_node(&mut current.left, leaves, current_height, height);
     trim_child_node(&mut current.right, leaves, current_height, height);
 }
@@ -500,8 +507,14 @@ fn trim_child_node(
     height: u16,
 ) {
     if child.is_some() && current_height + 1 > height {
-        let partial_tree = mem::replace(&mut child.as_mut(), None).unwrap();
+        let partial_tree = mem::replace(child, None).unwrap();
         get_leaves_from_partial_tree(&partial_tree, leaves);
+    } else if child.is_some() && child.as_ref().unwrap().content.is_some() {
+        if current_height + 1 > height {
+            leaves.push(child.as_ref().unwrap().clone_leaf());
+            let _ = mem::replace(child, None);
+        }
+        return;
     } else if child.is_some() {
         trim_tree(child.as_mut().unwrap(), leaves, current_height + 1, height);
     }
@@ -585,9 +598,9 @@ mod tests {
 
     use crate::{bit_stream::BitStream, huffman::increment_or_append};
 
-    use super::{encode, parse_u8_stream, HuffmanNode};
+    use super::{encode, HuffmanNode, parse_u8_stream};
 
-    // TODO: tests zumindest für trim_tree, count_leaves, restrict_height, remove_only_ones_code, ensure_tree_grows_right
+// TODO: tests zumindest für trim_tree, count_leaves, restrict_height, remove_only_ones_code, ensure_tree_grows_right
     // TODO: tests für parse_u8_stream() müssen auch nach rechtswachsendheit prüfen!
 
     #[test]

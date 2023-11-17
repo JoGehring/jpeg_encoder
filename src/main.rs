@@ -12,6 +12,7 @@ mod appendable_to_bit_stream;
 mod huffman;
 mod huffman_decoder;
 mod utils;
+mod package_merge;
 
 fn main() {
     // keep this in to avoid loads of "unused" warnings
@@ -85,35 +86,80 @@ fn main() {
     for _ in 0..7 {
         stream.append_byte(8);
     }
-        for _ in 0..7 {
-        stream.append_byte(56);
-    }
-        for _ in 0..7 {
-        stream.append_byte(44);
-    }
-        for _ in 0..7 {
-        stream.append_byte(33);
-    }
-        for _ in 0..7 {
-        stream.append_byte(81);
-    }
-            for _ in 0..7 {
-        stream.append_byte(21);
-    }
-
-        for _ in 0..7 {
+    for _ in 0..7 {
         stream.append_byte(9);
     }
-        for _ in 0..17 {
+    for _ in 0..7 {
         stream.append_byte(10);
     }
-        for _ in 0..71 {
+    for _ in 0..7 {
         stream.append_byte(11);
     }
-        for _ in 0..74 {
+    for _ in 0..7 {
         stream.append_byte(12);
     }
+    for _ in 0..7 {
+        stream.append_byte(13);
+    }
 
+    for _ in 0..7 {
+        stream.append_byte(14);
+    }
+    for _ in 0..17 {
+        stream.append_byte(15);
+    }
+    for _ in 0..71 {
+        stream.append_byte(16);
+    }
+    for _ in 0..74 {
+        stream.append_byte(17);
+    }
+    for _ in 0..17 {
+        stream.append_byte(18);
+    }
+    for _ in 0..71 {
+        stream.append_byte(19);
+    }
+    for _ in 0..74 {
+        stream.append_byte(20);
+    }
+    for _ in 0..7 {
+        stream.append_byte(21);
+    }
+    for _ in 0..7 {
+        stream.append_byte(22);
+    }
+    for _ in 0..7 {
+        stream.append_byte(23);
+    }
+
+    for _ in 0..7 {
+        stream.append_byte(24);
+    }
+    for _ in 0..17 {
+        stream.append_byte(25);
+    }
+    for _ in 0..71 {
+        stream.append_byte(26);
+    }
+    for _ in 0..74 {
+        stream.append_byte(27);
+    }
+    // for _ in 0..17 {
+    //     stream.append_byte(28);
+    // }
+    // for _ in 0..71 {
+    //     stream.append_byte(29);
+    // }
+    // for _ in 0..74 {
+    //     stream.append_byte(30);
+    // }
+    // for _ in 0..71 {
+    //     stream.append_byte(31);
+    // }
+    // for _ in 0..74 {
+    //     stream.append_byte(32);
+    // }
     let mut tree = parse_u8_stream(&mut stream);
     println!("before: {:?}", tree);
     tree.restrict_height(5);
