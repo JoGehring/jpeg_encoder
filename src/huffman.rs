@@ -2,14 +2,14 @@ use std::{collections::HashMap, fmt, mem};
 
 use debug_tree::{add_branch, add_leaf, defer_print};
 
-use crate::bit_stream::BitStream;
+use crate::{bit_stream::BitStream, package_merge::package_merge};
 
 #[derive(PartialEq)]
 pub struct HuffmanNode<T: PartialEq> {
-    chance: u64,
-    content: Option<T>,
-    left: Option<Box<HuffmanNode<T>>>,
-    right: Option<Box<HuffmanNode<T>>>,
+    pub chance: u64,
+    pub content: Option<T>,
+    pub left: Option<Box<HuffmanNode<T>>>,
+    pub right: Option<Box<HuffmanNode<T>>>,
 }
 
 impl<T: PartialEq> HuffmanNode<T> {
@@ -54,10 +54,7 @@ pub fn encode(stream: &mut BitStream) -> (BitStream, HashMap<u8, (u8, u16)>) {
 /// # Panics
 /// * If there are more symbols than can be encoded in 16 bit codes.
 pub fn parse_u8_stream(stream: &mut BitStream) -> HuffmanNode<u8> {
-    let mut nodes = get_single_leaves(stream);
-
-    let mut tree = build_huffman_tree(&mut nodes);
-    // tree.ensure_tree_grows_right();
+    let mut tree = package_merge(stream, 16);
     tree.remove_only_ones_code();
 
     tree
@@ -68,7 +65,7 @@ pub fn parse_u8_stream(stream: &mut BitStream) -> HuffmanNode<u8> {
 /// # Arguments
 ///
 /// * `stream`: The stream of data to read.
-fn get_single_leaves(stream: &mut BitStream) -> Vec<HuffmanNode<u8>> {
+pub(crate) fn get_single_leaves(stream: &mut BitStream) -> Vec<HuffmanNode<u8>> {
     let mut nodes: Vec<HuffmanNode<u8>> = vec![];
     for byte in stream.data() {
         increment_or_append(&mut nodes, *byte);
@@ -83,7 +80,7 @@ fn get_single_leaves(stream: &mut BitStream) -> Vec<HuffmanNode<u8>> {
 ///
 /// * nodes: The vec of nodes to alter.
 /// * value: The value to add or increment.
-pub(crate) fn increment_or_append(nodes: &mut Vec<HuffmanNode<u8>>, value: u8) {
+fn increment_or_append(nodes: &mut Vec<HuffmanNode<u8>>, value: u8) {
     if let Some(node) = nodes.into_iter().find(|n| n.content.unwrap() == value) {
         node.chance += 1;
     } else {
@@ -103,17 +100,6 @@ pub(crate) fn increment_or_append(nodes: &mut Vec<HuffmanNode<u8>>, value: u8) {
 /// * `nodes`: The leaf nodes to build a tree from.
 fn build_huffman_tree(nodes: &mut Vec<HuffmanNode<u8>>) -> HuffmanNode<u8> {
     let mut sort_lambda = |node: &HuffmanNode<u8>| node.chance();
-    build_tree(nodes, &mut sort_lambda)
-}
-
-/// Build a binary tree from a vector of leaf nodes.
-/// Only leaf nodes will contain values.
-///
-/// # Arguments
-///
-/// * `nodes`: The leaf nodes to build a tree from.
-fn build_binary_tree(nodes: &mut Vec<HuffmanNode<u8>>) -> HuffmanNode<u8> {
-    let mut sort_lambda = |node: &HuffmanNode<u8>| node.min_depth();
     build_tree(nodes, &mut sort_lambda)
 }
 
@@ -157,6 +143,43 @@ fn combine_nodes(node_1: HuffmanNode<u8>, node_2: HuffmanNode<u8>) -> HuffmanNod
     }
 }
 
+pub fn code_len_to_tree(nodes: &mut Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, (u8, u16)>) -> HuffmanNode<u8> {
+    let mut root = HuffmanNode::default();
+    let mut current = &mut root;
+    let mut current_height = 0;
+    while nodes.len() > 0 {
+        let leaf = nodes.remove(0);
+        let destination = map.get(&leaf.content().unwrap()).unwrap().0 - 1;
+        while current_height < destination {
+            if current.right().is_none() && current.left().is_none() {
+                current.right = Some(Box::from(HuffmanNode::default()));
+                current = current.right.as_mut().unwrap();
+            } else if current.right().is_some() && current.right().as_ref().unwrap().has_space_at_depth((destination - current_height - 1) as u16) {
+                current = current.right.as_mut().unwrap();
+            } else if current.left().is_some() && current.left().as_ref().unwrap().has_space_at_depth((destination - current_height - 1) as u16) {
+                current = current.left.as_mut().unwrap();
+            } else if current.left().is_none() {
+                current.left = Some(Box::from(HuffmanNode::default()));
+                current = current.left.as_mut().unwrap();
+            } else {
+                panic!("Tree path error smth");
+            }
+            current_height += 1;
+        }
+        if current.right().is_none() {
+            current.right = Some(Box::from(leaf));
+        } else if current.left().is_none() {
+            current.left = Some(Box::from(leaf));
+        } else {
+            println!("{:?}", root);
+            panic!("Leaf error");
+        }
+        current = &mut root;
+        current_height = 0;
+    }
+    root
+}
+
 impl HuffmanNode<u8> {
     /// Calculate the chance/frequency for all symbols in this node and its child nodes.
     pub(crate) fn chance(&self) -> u64 {
@@ -170,10 +193,15 @@ impl HuffmanNode<u8> {
         result
     }
 
+    /// Set the chance for this node.
+    pub fn set_chance(&mut self, chance: u64) {
+        self.chance = chance;
+    }
+
     /// Get the maximum depth (i.e. the maximum possible amount of nodes to go through before arriving at a leaf)
     /// of this node.
     /// Leaves are counted too, so if this node is a leaf, this function returns 1.
-    fn max_depth(&self) -> u16 {
+    pub fn max_depth(&self) -> u16 {
         1 + std::cmp::max(
             match &self.left {
                 Some(left) => left.max_depth(),
@@ -189,7 +217,7 @@ impl HuffmanNode<u8> {
     /// Get the minimum depth (i.e. the minimum possible amount of nodes to go through before arriving at a leaf)
     /// of this node.
     /// Leaves are counted too, so if this node is a leaf, this function returns 1.
-    fn min_depth(&self) -> u16 {
+    pub fn min_depth(&self) -> u16 {
         let left = match &self.left {
             Some(left) => Some(left.min_depth()),
             None => None,
@@ -295,6 +323,7 @@ impl HuffmanNode<u8> {
 
     /// Update this tree to ensure it grows to the right, i.e. at any child node, the left child's maximum depth is not larger than
     /// its right child's minimum depth.
+    /// Unused but left in to show it.
     fn ensure_tree_grows_right(&mut self) {
         if self.left.is_some() && self.right.is_none() {
             let left = mem::replace(&mut self.left, None);
@@ -349,128 +378,6 @@ impl HuffmanNode<u8> {
         current.left = Some(Box::from(new_left_node));
     }
 
-    /// Restrict this tree's height to only the specified height.
-    /// If it is already at or less than the specified height, do nothing.
-    ///
-    /// This uses the BRCI algorithm.
-    ///
-    /// # Arguments
-    ///
-    /// * `height`: The height to restrict the tree to.
-    ///
-    /// # Panics
-    /// * If this tree has more leaves than can be included in the given height.
-    pub fn restrict_height(&mut self, height: u16) {
-        if self.max_depth() - 1 <= height {
-            return;
-        }
-        if height < ((self.count_leaves() as f64).log2().ceil()) as u16 {
-            panic!("Restriction to this height not possible");
-        }
-
-        // step 1 of BRCI
-        let mut leaves: Vec<HuffmanNode<u8>> = vec![];
-        trim_tree(self, &mut leaves, 0, height - 1);
-        // step 2 of BRCI
-        self.fill_empty_nodes(&mut leaves);
-        if leaves.len() == 0 {
-            return;
-        }
-        println!("after trim and fill: {:?}", self);
-        let t2 = build_binary_tree(&mut leaves);
-        println!("t2: {:?}", t2);
-        // level for step 3 of BRCI
-        let t2_depth = (t2.max_depth() - 1) - 1;
-        let level = height - t2_depth - 1;
-
-        if level <= 0 {
-            // replacing the root doesn't need to do the complicated stuff below, we just do this
-            let mut t1 = HuffmanNode::default();
-            let left = mem::replace(&mut self.left, None);
-            t1.left = left;
-            let right = mem::replace(&mut self.right, None);
-            t1.right = right;
-
-            // adding t2 here is step 4 of BRCI
-            self.left = Some(Box::from(t2));
-            self.right = Some(Box::from(t1));
-            return;
-        }
-
-        let mut y_p = self;
-        let mut left_chance: u64;
-        let mut right_chance: u64;
-        let mut y_new = HuffmanNode::default();
-
-        // step 3 of BRCI: find y_p
-        for l in 0..level - 1 {
-            left_chance = determine_child_chance(&y_p.left, level, l);
-            right_chance = determine_child_chance(&y_p.left, level, l);
-
-            if left_chance <= right_chance {
-                y_p = y_p.left.as_mut().unwrap();
-            } else {
-                y_p = y_p.right.as_mut().unwrap();
-            }
-        }
-
-        left_chance = determine_child_chance(&y_p.left, 0, 0);
-        right_chance = determine_child_chance(&y_p.left, 0, 0);
-
-        // insert y_new (step 3) and append t2 (step 4)
-        if left_chance <= right_chance {
-            let y_p_left = mem::replace(&mut y_p.left, None);
-            y_new.left = y_p_left;
-            y_new.right = Some(Box::from(t2));
-            y_p.left = Some(Box::from(y_new));
-        } else {
-            let y_p_right = mem::replace(&mut y_p.right, None);
-            y_new.right = y_p_right;
-            y_new.left = Some(Box::from(t2));
-
-            y_p.right = Some(Box::from(y_new));
-        }
-    }
-
-    /// Count the amount of leaves this tree has recursively.
-    pub fn count_leaves(&self) -> usize {
-        if self.content.is_some() {
-            return 1;
-        } else {
-            return match &self.left {
-                Some(left) => left.count_leaves(),
-                None => 0,
-            } + match &self.right {
-                Some(right) => right.count_leaves(),
-                None => 0,
-            };
-        }
-    }
-
-    /// If this tree has empty leaf nodes, replace them with nodes from `leaves`.
-    ///
-    /// This is a simple optimisation for the BRCI algorithm as described in section 2.2
-    /// of Luiz, Pessoa, Laber - In-place Length Restricted Prefix Coding.
-    ///
-    /// # Arguments
-    ///
-    /// * `leaves`: Leaves to add back to the tree.
-    fn fill_empty_nodes(&mut self, leaves: &mut Vec<HuffmanNode<u8>>) {
-        if leaves.len() == 0 {
-            return;
-        }
-        if self.content.is_none() && self.left.is_none() && self.right.is_none() {
-            let _ = mem::replace(self, leaves.pop().unwrap());
-            return;
-        }
-        if self.left.as_ref().is_some() {
-            self.left.as_mut().unwrap().fill_empty_nodes(leaves);
-        }
-        if self.right.as_ref().is_some() {
-            self.right.as_mut().unwrap().fill_empty_nodes(leaves);
-        }
-    }
-
     fn has_space_at_depth(&self, depth: u16) -> bool {
         if self.content.is_some() {
             return false;
@@ -482,84 +389,6 @@ impl HuffmanNode<u8> {
             return self.left.as_ref().unwrap().has_space_at_depth(depth - 1) || self.right.as_ref().unwrap().has_space_at_depth(depth - 1);
         }
     }
-}
-
-/// Trim a tree to the specified height and write leaves trimmed out to
-/// `leaves`.
-///
-/// # Arguments
-///
-/// * `current`: The node to trim to the given height.
-/// * `leaves`: The Vec to write removed nodes to.
-/// * `current_height`: The height of this node in the tree.
-/// * `height`: The target height.
-fn trim_tree(
-    current: &mut HuffmanNode<u8>,
-    leaves: &mut Vec<HuffmanNode<u8>>,
-    current_height: u16,
-    height: u16,
-) {
-    trim_child_node(&mut current.left, leaves, current_height, height);
-    trim_child_node(&mut current.right, leaves, current_height, height);
-}
-
-/// Trim the given child node and write leaves trimmed out to `leaves`.
-/// If the child node is outside the trimming limit, just write its leaves
-/// to `leaves` and discard it.
-///
-/// # Arguments
-/// * `child`: The child node to trim to the given height.
-/// * `leaves`: The Vec to write removed nodes to.
-/// * `current_height`: The height of this node in the tree.
-/// * `height`: The target height.
-fn trim_child_node(
-    child: &mut Option<Box<HuffmanNode<u8>>>,
-    leaves: &mut Vec<HuffmanNode<u8>>,
-    current_height: u16,
-    height: u16,
-) {
-    if child.is_some() && current_height + 1 > height {
-        let partial_tree = mem::replace(child, None).unwrap();
-        get_leaves_from_partial_tree(&partial_tree, leaves);
-    } else if child.is_some() && child.as_ref().unwrap().content.is_some() {
-        if current_height + 1 > height {
-            leaves.push(child.as_ref().unwrap().clone_leaf());
-            let _ = mem::replace(child, None);
-        }
-        return;
-    } else if child.is_some() {
-        trim_tree(child.as_mut().unwrap(), leaves, current_height + 1, height);
-    }
-}
-
-/// Get all leaves from this tree and append them to `leaves`.
-///
-/// # Arguments
-/// * `partial_tree`: The node to retrieve leaves from.
-/// * `leaves`: The Vec to write leaves to.
-fn get_leaves_from_partial_tree(
-    partial_tree: &Box<HuffmanNode<u8>>,
-    leaves: &mut Vec<HuffmanNode<u8>>,
-) {
-    if partial_tree.content.is_some() {
-        leaves.push(partial_tree.clone_leaf());
-        return;
-    }
-    if partial_tree.left.is_some() {
-        get_leaves_from_partial_tree(partial_tree.left.as_ref().unwrap(), leaves);
-    }
-    if partial_tree.right.is_some() {
-        get_leaves_from_partial_tree(partial_tree.right.as_ref().unwrap(), leaves);
-    }
-}
-
-/// Determine the chance of this child, or return u64::MAX if it can't be used.
-/// This is only used for the BRCI algorithm.
-fn determine_child_chance(child: &Option<Box<HuffmanNode<u8>>>, level: u16, l: u16) -> u64 {
-    if child.is_some() && child.as_ref().unwrap().max_depth() >= level - l {
-        return child.as_ref().unwrap().chance();
-    }
-    u64::MAX
 }
 
 impl Default for HuffmanNode<u8> {
@@ -602,42 +431,6 @@ fn build_debug_tree(current: &HuffmanNode<u8>, is_left: bool) {
     }
 }
 
-pub fn code_len_to_tree(nodes: &mut Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, (u8, u16)>) -> HuffmanNode<u8> {
-    let mut root = HuffmanNode::default();
-    let mut current = &mut root;
-    let mut current_height = 0;
-    while nodes.len() > 0 {
-        let leaf = nodes.remove(0);
-        let destination = map.get(&leaf.content().unwrap()).unwrap().0 - 1;
-        while current_height < destination {
-            if current.right().is_none() && current.left().is_none() {
-                current.right = Some(Box::from(HuffmanNode::default()));
-                current = current.right.as_mut().unwrap();
-            } else if current.right().is_some() && current.right().as_ref().unwrap().has_space_at_depth((destination - current_height - 1) as u16) {
-                current = current.right.as_mut().unwrap();
-            } else if current.left().is_some() && current.left().as_ref().unwrap().has_space_at_depth((destination - current_height - 1) as u16) {
-                current = current.left.as_mut().unwrap();
-            } else if current.left().is_none() {
-                current.left = Some(Box::from(HuffmanNode::default()));
-                current = current.left.as_mut().unwrap();
-            } else {
-                panic!("Tree path error smth");
-            }
-            current_height += 1;
-        }
-        if current.right().is_none() {
-            current.right = Some(Box::from(leaf));
-        } else if current.left().is_none() {
-            current.left = Some(Box::from(leaf));
-        } else {
-            println!("{:?}", root);
-            panic!("Leaf error");
-        }
-        current = &mut root;
-        current_height = 0;
-    }
-    root
-}
 
 #[cfg(test)]
 mod tests {
@@ -649,7 +442,7 @@ mod tests {
 
     use super::{encode, HuffmanNode, parse_u8_stream};
 
-// TODO: tests zumindest für trim_tree, count_leaves, restrict_height, remove_only_ones_code, ensure_tree_grows_right
+    // TODO: tests zumindest für remove_only_ones_code, code_len_to_tree, has_space_at_depth
     // TODO: tests für parse_u8_stream() müssen auch nach rechtswachsendheit prüfen!
 
     #[test]
@@ -778,30 +571,19 @@ mod tests {
         }
 
         let (code, map) = encode(&mut stream);
-        let correct_code: Vec<u8> = vec![
-            0b100_100_10,
-            0b1_101_110_1,
-            0b10_1110_11,
-            0b10_00_00_01,
-            0b01_01_01_01,
-            0b01_01_01_01,
-            0b110_1110_1,
-            0b10_1110_11,
-            0b0_1110_110,
-            0b1110_100_1,
-            0b01_100_101,
-            0b00_00_00_00,
-            0b00_00_00_00,
-        ];
-        assert_eq!(correct_code, *code.data());
-        let mut correct_map: HashMap<u8, (u8, u16)> = HashMap::with_capacity(6);
-        correct_map.insert(1, (3, 0b100));
-        correct_map.insert(4, (4, 0b1110));
-        correct_map.insert(6, (2, 0b01));
-        correct_map.insert(2, (3, 0b101));
-        correct_map.insert(5, (2, 0b00));
-        correct_map.insert(3, (3, 0b110));
-        assert_eq!(correct_map, map);
+
+        // code lengths should be 3 for 1, 3 for 2, 3 for 3, 4 for 4, 2 for 5, 2 for 6
+        let mut correct_code_len = 3 * 4 + // 4 1s with code length 3
+            3 * 4 + // 4 2s with code length 3
+            3 * 6 + // 6 3s with code length 3
+            3 * 6 + // 6 4s with code length 3
+            2 * 7 + // 7 5s with code length 2
+            2 * 9;  // 9 6s with code length 2
+        correct_code_len = (correct_code_len as f32 / 8 as f32).ceil() as usize;
+        assert_eq!(correct_code_len, code.data().len());
+        
+        let shortest_code_len = map.clone().into_iter().min_by_key(|(_, value)| value.0).unwrap().1.0;
+        assert_eq!(shortest_code_len, map.get(&6u8).unwrap().0)
     }
 
     #[test]
