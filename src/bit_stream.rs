@@ -228,7 +228,7 @@ impl BitStream {
 
     /// Read up to 16 bits from the stream. If the stream has less than the requested
     /// amount of bits, pad it with ones or zeroes depending on `pad`.
-    /// This does *NOT* alter the data contained in the stream. Calling this method repeatedly without 
+    /// This does *NOT* alter the data contained in the stream. Calling this method repeatedly without
     /// altering the stream inbetween leads to the same result.
     ///
     /// # Arguments
@@ -266,17 +266,19 @@ impl BitStream {
             }
         }
 
-        result = self.read_n_bits_end(&mut bits_in_result, byte_index, result, amount);
+        if amount > bits_in_result {
+            result = self.read_n_bits_end(&mut bits_in_result, byte_index, result, amount);
+        }
 
         pad_read_bit_result(result, amount - bits_in_result, pad)
     }
 
     /// Submethod of read_n_bits_padded().
-    /// 
+    ///
     /// Read bits from the first byte of the stream.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `bits_in_result`: out-parameter for the amount of bits in the resulting u16.
     fn read_n_bits_first_byte(&self, bits_in_result: &mut u8) -> u16 {
         let bits_in_first_byte = if self.data.len() == 1
@@ -296,11 +298,11 @@ impl BitStream {
     }
 
     /// Submethod of read_n_bits_padded().
-    /// 
+    ///
     /// Read bits from the byte_index'th byte of the stream.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `bits_in_result`: Out-parameter, incremented by the amount of bits added to the result.
     /// * `byte_index`: The index of the byte we are reading in the data vector, incremented by 1 afterwards.
     /// * `result`: The existing result that this method adds to.
@@ -327,12 +329,12 @@ impl BitStream {
     }
 
     /// Submethod of read_n_bits_padded().
-    /// 
+    ///
     /// Read bits from the byte_index'th byte of the stream. This is expected to result in `result` containing
     /// `amount` set bits, except if the byte does not contain that many bytes (i.e. it is at the end of the stream and incomplete).
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `bits_in_result`: Out-parameter, incremented by the amount of bits added to the result.
     /// * `byte_index`: The index of the byte we are reading in the data vector.
     /// * `result`: The existing result that this method adds to.
@@ -360,9 +362,9 @@ impl BitStream {
     }
 
     /// Flush the given number of bits from this stream.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `amount`: The amount of bits to remove from the stream.
     pub fn flush_n_bits(&mut self, mut amount: u8) {
         if self.bits_read_from_first_byte + amount <= 7 {

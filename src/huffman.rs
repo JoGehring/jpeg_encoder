@@ -1,3 +1,4 @@
+use core::panic;
 use std::{collections::HashMap, fmt, mem};
 
 use debug_tree::{add_branch, add_leaf, defer_print};
@@ -55,6 +56,7 @@ pub fn encode(stream: &mut BitStream) -> (BitStream, HashMap<u8, (u8, u16)>) {
 /// * If there are more symbols than can be encoded in 16 bit codes.
 pub fn parse_u8_stream(stream: &mut BitStream) -> HuffmanNode<u8> {
     let mut tree = package_merge(stream, 16);
+
     tree.remove_only_ones_code();
 
     tree
@@ -113,9 +115,9 @@ fn build_huffman_tree(nodes: &mut Vec<HuffmanNode<u8>>) -> HuffmanNode<u8> {
 /// * `nodes`: The leaf nodes to build a tree from.
 /// * `sort_lambda`: The function to sort nodes with.
 fn build_tree<K, F>(nodes: &mut Vec<HuffmanNode<u8>>, sort_lambda: &mut F) -> HuffmanNode<u8>
-    where
-        F: FnMut(&HuffmanNode<u8>) -> K,
-        K: Ord,
+where
+    F: FnMut(&HuffmanNode<u8>) -> K,
+    K: Ord,
 {
     while nodes.len() > 1 {
         nodes.sort_by_key(&mut *sort_lambda);
@@ -143,7 +145,10 @@ fn combine_nodes(node_1: HuffmanNode<u8>, node_2: HuffmanNode<u8>) -> HuffmanNod
     }
 }
 
-pub fn code_len_to_tree(nodes: &mut Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, (u8, u16)>) -> HuffmanNode<u8> {
+pub fn code_len_to_tree(
+    nodes: &mut Vec<HuffmanNode<u8>>,
+    map: &mut HashMap<u8, (u8, u16)>,
+) -> HuffmanNode<u8> {
     let mut root = HuffmanNode::default();
     let mut current = &mut root;
     let mut current_height = 0;
@@ -153,14 +158,22 @@ pub fn code_len_to_tree(nodes: &mut Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, 
         while current_height < destination {
             if current.right().is_none() && current.left().is_none() {
                 current.right = Some(Box::from(HuffmanNode::default()));
-                current = current.right.as_mut().unwrap();
-            } else if current.right().is_some() && current.right().as_ref().unwrap().has_space_at_depth((destination - current_height - 1) as u16) {
-                current = current.right.as_mut().unwrap();
-            } else if current.left().is_some() && current.left().as_ref().unwrap().has_space_at_depth((destination - current_height - 1) as u16) {
-                current = current.left.as_mut().unwrap();
+                current = current.right_unchecked_mut();
+            } else if current.right().is_some()
+                && current
+                    .right_unchecked()
+                    .has_space_at_depth((destination - current_height - 1) as u16, false)
+            {
+                current = current.right_unchecked_mut();
+            } else if current.left().is_some()
+                && current
+                    .left_unchecked()
+                    .has_space_at_depth((destination - current_height - 1) as u16, false)
+            {
+                current = current.left_unchecked_mut();
             } else if current.left().is_none() {
                 current.left = Some(Box::from(HuffmanNode::default()));
-                current = current.left.as_mut().unwrap();
+                current = current.left_unchecked_mut();
             } else {
                 panic!("Tree path error smth");
             }
@@ -171,7 +184,6 @@ pub fn code_len_to_tree(nodes: &mut Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, 
         } else if current.left().is_none() {
             current.left = Some(Box::from(leaf));
         } else {
-            println!("{:?}", root);
             panic!("Leaf error");
         }
         current = &mut root;
@@ -181,14 +193,26 @@ pub fn code_len_to_tree(nodes: &mut Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, 
 }
 
 impl HuffmanNode<u8> {
+    pub fn left_unchecked(&self) -> &Box<HuffmanNode<u8>> {
+        self.left.as_ref().unwrap()
+    }
+    pub fn right_unchecked(&self) -> &Box<HuffmanNode<u8>> {
+        self.right.as_ref().unwrap()
+    }
+    pub fn left_unchecked_mut(&mut self) -> &mut Box<HuffmanNode<u8>> {
+        self.left.as_mut().unwrap()
+    }
+    pub fn right_unchecked_mut(&mut self) -> &mut Box<HuffmanNode<u8>> {
+        self.right.as_mut().unwrap()
+    }
     /// Calculate the chance/frequency for all symbols in this node and its child nodes.
     pub(crate) fn chance(&self) -> u64 {
         let mut result = self.chance;
         if self.left.is_some() {
-            result += self.left.as_ref().unwrap().chance();
+            result += self.left_unchecked().chance();
         }
         if self.right.is_some() {
-            result += self.right.as_ref().unwrap().chance();
+            result += self.right_unchecked().chance();
         }
         result
     }
@@ -274,50 +298,12 @@ impl HuffmanNode<u8> {
             map.insert(self.content.unwrap(), (code_len, code));
         }
         if self.left.is_some() {
-            self.left
-                .as_ref()
-                .unwrap()
+            self.left_unchecked()
                 .append_to_map(map, code << 1, code_len + 1);
         }
         if self.right.is_some() {
-            self.right
-                .as_ref()
-                .unwrap()
+            self.right_unchecked()
                 .append_to_map(map, (code << 1) + 1, code_len + 1);
-        }
-    }
-
-    /// Create a code from this tree. The result is a BitStream
-    /// containing the values.
-    pub fn create_code(&self) -> BitStream {
-        let mut stream = BitStream::open();
-        self.append_to_code(&mut stream, 0, 0);
-        stream
-    }
-
-    /// Append this node's data to the stream. Then recursively call
-    /// child nodes to append their data.
-    ///
-    /// # Arguments
-    ///
-    /// * `stream`: The stream to append codes to.
-    /// * `code`: The code bits for this node.
-    /// * `code_len`: The length of the code for this node.
-    fn append_to_code(&self, stream: &mut BitStream, code: u16, code_len: u8) {
-        if self.content.is_some() {
-            stream.append_n_bits(code, code_len);
-        }
-        if self.left.is_some() {
-            self.left
-                .as_ref()
-                .unwrap()
-                .append_to_code(stream, code << 1, code_len + 1);
-        }
-        if self.right.is_some() {
-            self.right
-                .as_ref()
-                .unwrap()
-                .append_to_code(stream, (code << 1) + 1, code_len + 1);
         }
     }
 
@@ -329,10 +315,8 @@ impl HuffmanNode<u8> {
             let left = mem::replace(&mut self.left, None);
             self.right = left;
         } else if self.left.is_some() {
-            if self.left.as_ref().unwrap().max_depth() > self.right.as_ref().unwrap().min_depth() {
-                if self.left.as_ref().unwrap().min_depth()
-                    >= self.right.as_ref().unwrap().max_depth()
-                {
+            if self.left_unchecked().max_depth() > self.right_unchecked().min_depth() {
+                if self.left_unchecked().min_depth() >= self.right_unchecked().max_depth() {
                     mem::swap(&mut self.right, &mut self.left);
                 } else {
                     self.swap_inner_nodes();
@@ -341,17 +325,17 @@ impl HuffmanNode<u8> {
         }
 
         if self.left.is_some() {
-            self.left.as_mut().unwrap().ensure_tree_grows_right();
+            self.left_unchecked_mut().ensure_tree_grows_right();
         }
         if self.right.is_some() {
-            self.right.as_mut().unwrap().ensure_tree_grows_right();
+            self.right_unchecked_mut().ensure_tree_grows_right();
         }
     }
 
     /// swap this node's right child's left child with the left child's right child node.
     /// If this node's left child's max depth is greated than this node's right child's, swap them too.
     fn swap_inner_nodes(&mut self) {
-        if self.left.as_ref().unwrap().max_depth() > self.right.as_ref().unwrap().max_depth() {
+        if self.left_unchecked().max_depth() > self.right_unchecked().max_depth() {
             mem::swap(&mut self.right, &mut self.left);
         }
         mem::swap(
@@ -361,32 +345,105 @@ impl HuffmanNode<u8> {
     }
 
     /// Remove the lower right leaf (1*) and replace it with a node which has only a leaf on the left
-    /// TODO: different implementation that doesn't break height constraint
+    /// This *CAN* lead to a suboptimal code.
     fn remove_only_ones_code(&mut self) {
-        let mut current = self;
-        while current.left.is_some() && current.right.is_some() {
-            current = current.right.as_mut().unwrap();
+        if self.get_or_append_only_ones_code().is_some() {
+            panic!("No place found to put the 1* code!")
         }
-        let new_left_node = HuffmanNode {
-            chance: current.chance,
-            content: current.content,
-            left: None,
-            right: None,
-        };
-        current.content = None;
-        current.chance = 0;
-        current.left = Some(Box::from(new_left_node));
     }
 
-    fn has_space_at_depth(&self, depth: u16) -> bool {
+    fn get_or_append_only_ones_code(&mut self) -> Option<(HuffmanNode<u8>, u16)> {
+        if self.right.is_none() {
+            return None;
+        }
+
+        if self.right_unchecked().content.is_some() {
+            let ones_node = mem::replace(&mut self.right, None).unwrap();
+            if self.left.is_none() {
+                self.left = Some(Box::from(ones_node.clone_leaf()));
+                return None;
+            }
+            return Some((ones_node.clone_leaf(), 1));
+        }
+
+        let ones_node_option = self.right_unchecked_mut().get_or_append_only_ones_code();
+
+        if ones_node_option.is_none() {
+            return None;
+        }
+        let ones_node = ones_node_option.as_ref().unwrap().0.clone_leaf();
+        let mut depth = ones_node_option.unwrap().1;
+        if self.left.is_none() {
+            let _ = mem::replace(&mut self.left.as_mut(), Some(&mut Box::from(ones_node)));
+            return None;
+        }
+        if self.left_unchecked().content.is_some() {
+            let left = mem::replace(&mut self.left, None);
+            self.left = Some(Box::from(HuffmanNode {
+                right: Some(Box::from(ones_node)),
+                left: left,
+                ..Default::default()
+            }));
+            return None;
+        }
+        if self.left_unchecked().has_space_at_depth(depth, true) {
+            let mut current = self.left_unchecked_mut();
+            while depth > 0 {
+                if current.right.is_none() {
+                    current.right = Some(Box::from(ones_node));
+                    return None;
+                } else if current.left.is_none() {
+                    current.left = Some(Box::from(ones_node));
+                    return None;
+                } else if depth > 1 {
+                    if current.right_unchecked().content.is_some() {
+                        let right = mem::replace(&mut current.right, None);
+                        current.right = Some(Box::from(HuffmanNode {
+                            left: Some(Box::from(ones_node)),
+                            right: right,
+                            ..Default::default()
+                        }));
+                        return None;
+                    } else if current.left_unchecked().content.is_some() {
+                        let left = mem::replace(&mut current.left, None);
+                        current.left = Some(Box::from(HuffmanNode {
+                            right: Some(Box::from(ones_node)),
+                            left: left,
+                            ..Default::default()
+                        }));
+                        return None;
+                    }
+                } else if current.right_unchecked().has_space_at_depth(depth, true) {
+                    current = current.right_unchecked_mut();
+                // this check is unnecessary as this must be true, so it's commented out for understandability
+                // } else if current.left_unchecked().has_space_at_depth(depth, true) {
+                } else {
+                    current = current.left_unchecked_mut();
+                }
+                depth -= 1;
+            }
+        }
+        return Some((ones_node, depth + 1));
+    }
+
+    fn has_space_at_depth(&self, depth: u16, leaves_count_as_space: bool) -> bool {
         if self.content.is_some() {
-            return false;
+            return if leaves_count_as_space {
+                depth != 0
+            } else {
+                false
+            };
         } else if self.right.is_none() || self.left.is_none() {
             return true;
         } else if depth == 0 {
             return false;
         } else {
-            return self.left.as_ref().unwrap().has_space_at_depth(depth - 1) || self.right.as_ref().unwrap().has_space_at_depth(depth - 1);
+            return self
+                .left_unchecked()
+                .has_space_at_depth(depth - 1, leaves_count_as_space)
+                || self
+                    .right_unchecked()
+                    .has_space_at_depth(depth - 1, leaves_count_as_space);
         }
     }
 }
@@ -423,14 +480,13 @@ fn build_debug_tree(current: &HuffmanNode<u8>, is_left: bool) {
     } else {
         add_branch!("{}", u8::from(!is_left));
         if current.left.is_some() {
-            build_debug_tree(current.left.as_ref().unwrap(), true);
+            build_debug_tree(&current.left_unchecked(), true);
         }
         if current.right.is_some() {
-            build_debug_tree(current.right.as_ref().unwrap(), false);
+            build_debug_tree(&current.right_unchecked(), false);
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -440,7 +496,7 @@ mod tests {
 
     use crate::{bit_stream::BitStream, huffman::increment_or_append};
 
-    use super::{encode, HuffmanNode, parse_u8_stream};
+    use super::{encode, parse_u8_stream, HuffmanNode};
 
     // TODO: tests zumindest für remove_only_ones_code, code_len_to_tree, has_space_at_depth
     // TODO: tests für parse_u8_stream() müssen auch nach rechtswachsendheit prüfen!
@@ -451,12 +507,7 @@ mod tests {
             chance: 0,
             content: None,
             right: None,
-            left: Some(Box::from(HuffmanNode {
-                chance: 0,
-                content: None,
-                left: None,
-                right: None,
-            })),
+            left: None,
         };
         let mut stream = BitStream::open();
 
@@ -474,7 +525,7 @@ mod tests {
                 chance: 0,
                 content: None,
                 left: Some(Box::from(HuffmanNode {
-                    chance: 1,
+                    chance: u64::MAX - 1,
                     content: Some(1),
                     ..Default::default()
                 })),
@@ -482,52 +533,6 @@ mod tests {
             },
             tree
         );
-    }
-
-    #[test]
-    fn test_parse_bigger_stream() {
-        /*
-        test with the following likelihoods:
-        - 1: 4
-        - 2: 4
-        - 3: 6
-        - 4: 6
-        - 5: 7
-        - 6: 9
-        */
-        let mut stream = BitStream::open();
-        stream.append_byte(1);
-        stream.append_byte(1);
-        stream.append_byte(2);
-        stream.append_byte(2);
-        stream.append_byte(3);
-        stream.append_byte(3);
-        stream.append_byte(4);
-        stream.append_byte(4);
-        stream.append_byte(5);
-        stream.append_byte(5);
-        stream.append_byte(6);
-        stream.append_byte(6);
-
-        for _ in 0..2 {
-            stream.append_byte(1);
-            stream.append_byte(2);
-        }
-        for _ in 0..4 {
-            stream.append_byte(3);
-            stream.append_byte(4);
-        }
-        for _ in 0..5 {
-            stream.append_byte(5);
-        }
-        for _ in 0..7 {
-            stream.append_byte(6);
-        }
-
-        let tree = parse_u8_stream(&mut stream);
-        let code = tree.create_code();
-        let correct_code: Vec<u8> = vec![0b00_01_100_1, 0b01_110_111, 0b0_0000000];
-        assert_eq!(&correct_code, code.data());
     }
 
     #[test]
@@ -572,32 +577,24 @@ mod tests {
 
         let (code, map) = encode(&mut stream);
 
-        // code lengths should be 3 for 1, 3 for 2, 3 for 3, 4 for 4, 2 for 5, 2 for 6
+        // code lengths should be 3 for 1, 3 for 2, 3 for 3, 3 for 4, 3 for 5, 2 for 6
         let mut correct_code_len = 3 * 4 + // 4 1s with code length 3
             3 * 4 + // 4 2s with code length 3
             3 * 6 + // 6 3s with code length 3
             3 * 6 + // 6 4s with code length 3
-            2 * 7 + // 7 5s with code length 2
-            2 * 9;  // 9 6s with code length 2
+            3 * 7 + // 7 5s with code length 3, longer than optimal because of remove_only_ones_code()
+            2 * 9; // 9 6s with code length 2
         correct_code_len = (correct_code_len as f32 / 8 as f32).ceil() as usize;
         assert_eq!(correct_code_len, code.data().len());
-        
-        let shortest_code_len = map.clone().into_iter().min_by_key(|(_, value)| value.0).unwrap().1.0;
+
+        let shortest_code_len = map
+            .clone()
+            .into_iter()
+            .min_by_key(|(_, value)| value.0)
+            .unwrap()
+            .1
+             .0;
         assert_eq!(shortest_code_len, map.get(&6u8).unwrap().0)
-    }
-
-    #[test]
-    fn test_append_to_code() {
-        let mut stream = BitStream::open();
-        let node = HuffmanNode {
-            chance: 1,
-            content: Some(1),
-            left: None,
-            right: None,
-        };
-        node.append_to_code(&mut stream, 2, 3);
-
-        assert_eq!(stream.data(), &vec![64]);
     }
 
     #[test]
@@ -612,39 +609,6 @@ mod tests {
         node.append_to_map(&mut map, 2, 3);
 
         assert_eq!(map.get(&1), Some(&(3, 2)));
-    }
-
-    #[test]
-    fn test_create_code() {
-        let node = HuffmanNode {
-            chance: 1,
-            content: Some(1),
-            left: None,
-            right: None,
-        };
-        let stream = node.create_code();
-
-        let data: Vec<u8> = vec![];
-        assert_eq!(stream.data(), &data);
-    }
-
-    #[test]
-    fn test_create_code_with_left_child() {
-        let left_child = Box::new(HuffmanNode {
-            chance: 1,
-            content: Some(2),
-            left: None,
-            right: None,
-        });
-        let node = HuffmanNode {
-            chance: 2,
-            content: Some(1),
-            left: None,
-            right: Some(left_child),
-        };
-        let stream = node.create_code();
-
-        assert_eq!(stream.data(), &vec![128]);
     }
 
     #[test]
