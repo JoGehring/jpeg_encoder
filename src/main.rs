@@ -65,48 +65,50 @@ fn main() {
     // stream.append_byte(6);
     // stream.append_byte(6);
 
-    for _ in 0..2 {
+    for _ in 0..1 {
         stream.append_byte(1);
         stream.append_byte(2);
     }
-    for _ in 0..3 {
-        stream.append_byte(3);
-        stream.append_byte(4);
-    }
     for _ in 0..4 {
-        stream.append_byte(5);
+        stream.append_byte(3);
     }
     for _ in 0..5 {
+        stream.append_byte(4);
+    }
+    for _ in 0..8 {
+        stream.append_byte(5);
+    }
+    for _ in 0..10 {
         stream.append_byte(6);
     }
 
-    for _ in 0..6 {
+    for _ in 0..19 {
         stream.append_byte(7);
     }
 
-    for _ in 0..7 {
+    for _ in 0..27 {
         stream.append_byte(8);
     }
-    for _ in 0..7 {
+    for _ in 0..28 {
         stream.append_byte(9);
     }
-    for _ in 0..7 {
+    for _ in 0..37 {
         stream.append_byte(10);
     }
-    for _ in 0..7 {
+    for _ in 0..47 {
         stream.append_byte(11);
     }
-    for _ in 0..7 {
+    for _ in 0..57 {
         stream.append_byte(12);
     }
-    for _ in 0..7 {
+    for _ in 0..67 {
         stream.append_byte(13);
     }
 
-    for _ in 0..7 {
+    for _ in 0..77 {
         stream.append_byte(14);
     }
-    for _ in 0..17 {
+    for _ in 0..87 {
         stream.append_byte(15);
     }
     for _ in 0..71 {
@@ -165,5 +167,7 @@ fn main() {
     // println!("before: {:?}", tree);
     // tree.restrict_height(5);
     // println!("after: {:?}", tree);
-    package_merge(&mut stream, 5);
+    let mut tree = package_merge(&mut stream, 16);
+    println!("before: {:?}", tree);
+    println!("{:?}", tree);
 }

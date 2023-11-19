@@ -353,7 +353,7 @@ impl HuffmanNode<u8> {
     }
 
     /// swap this node's right child's left child with the left child's right child node.
-    /// If this node's left child's max depth is greated than this node's right child's, swap them too.
+    /// If this node's left child's max depth is greater than this node's right child's, swap them too.
     fn swap_inner_nodes(&mut self) {
         if self.left_unchecked().max_depth() > self.right_unchecked().max_depth() {
             mem::swap(&mut self.right, &mut self.left);
