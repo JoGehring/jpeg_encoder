@@ -172,11 +172,11 @@ fn nodes_to_code(nodes: &Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, (u8, u16)>,
             current_code_length += 1;
             code_length += 1;
             visited = true;
-            start = false;
-            if current_code != 0 {
+            if !start {
                 current_code += 1;
                 current_code <<= 1;
             }
+            start = false;
         } else if current_code_length != code_length && !start {
             current_code_length = code_length;
             current_code <<= 1;
