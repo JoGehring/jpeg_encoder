@@ -156,7 +156,6 @@ fn nodes_to_code(nodes: &Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, (u8, u16)>,
     let mut current_code = 0;
     current_code_length = min_code_length;
     let mut start = true;
-    let mut visited = false;
     for (i, node) in nodes.iter().rev().enumerate() {
         let val = &node.content.unwrap();
         let mut next_node_code_length: u8 = 0;
@@ -167,11 +166,10 @@ fn nodes_to_code(nodes: &Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, (u8, u16)>,
         } else {
             next_node_code_length = 0;
         }
-        if code_length != next_node_code_length && next_node_code_length == max_code_length && !visited {
+        if code_length != next_node_code_length && next_node_code_length == max_code_length {
             current_code_length = code_length;
             current_code_length += 1;
             code_length += 1;
-            visited = true;
             if !start {
                 current_code += 1;
                 current_code <<= 1;
