@@ -2,7 +2,6 @@ use std::{collections::HashMap, mem};
 use std::fs;
 
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
-use rand::Rng;
 
 // Due to limitations with Criterion, we need to copy/paste bit_stream.rs here.
 // We can only use code from src/ if we are creating a library :/
@@ -332,6 +331,7 @@ pub fn encode(stream: &mut BitStream) -> (BitStream, HashMap<u8, (u8, u16)>) {
 /// * If there are more symbols than can be encoded in 16 bit codes.
 pub fn parse_u8_stream(stream: &mut BitStream) -> HuffmanNode<u8> {
     let mut tree = package_merge(stream, 16);
+
     tree.remove_only_ones_code();
 
     tree
@@ -420,7 +420,11 @@ fn combine_nodes(node_1: HuffmanNode<u8>, node_2: HuffmanNode<u8>) -> HuffmanNod
     }
 }
 
-pub fn code_len_to_tree(nodes: &mut Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, (u8, u16)>) -> HuffmanNode<u8> {
+/// TODO: doc comment
+pub fn code_len_to_tree(
+    nodes: &mut Vec<HuffmanNode<u8>>,
+    map: &mut HashMap<u8, (u8, u16)>,
+) -> HuffmanNode<u8> {
     let mut root = HuffmanNode::default();
     let mut current = &mut root;
     let mut current_height = 0;
@@ -430,14 +434,22 @@ pub fn code_len_to_tree(nodes: &mut Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, 
         while current_height < destination {
             if current.right().is_none() && current.left().is_none() {
                 current.right = Some(Box::from(HuffmanNode::default()));
-                current = current.right.as_mut().unwrap();
-            } else if current.right().is_some() && current.right().as_ref().unwrap().has_space_at_depth((destination - current_height - 1) as u16) {
-                current = current.right.as_mut().unwrap();
-            } else if current.left().is_some() && current.left().as_ref().unwrap().has_space_at_depth((destination - current_height - 1) as u16) {
-                current = current.left.as_mut().unwrap();
+                current = current.right_unchecked_mut();
+            } else if current.right().is_some()
+                && current
+                .right_unchecked()
+                .has_space_at_depth((destination - current_height - 1) as u16, false)
+            {
+                current = current.right_unchecked_mut();
+            } else if current.left().is_some()
+                && current
+                .left_unchecked()
+                .has_space_at_depth((destination - current_height - 1) as u16, false)
+            {
+                current = current.left_unchecked_mut();
             } else if current.left().is_none() {
                 current.left = Some(Box::from(HuffmanNode::default()));
-                current = current.left.as_mut().unwrap();
+                current = current.left_unchecked_mut();
             } else {
                 panic!("Tree path error smth");
             }
@@ -448,7 +460,6 @@ pub fn code_len_to_tree(nodes: &mut Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, 
         } else if current.left().is_none() {
             current.left = Some(Box::from(leaf));
         } else {
-            // println!("{:?}", root);
             panic!("Leaf error");
         }
         current = &mut root;
@@ -458,14 +469,45 @@ pub fn code_len_to_tree(nodes: &mut Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, 
 }
 
 impl HuffmanNode<u8> {
+    /// get an immutable reference to this node's left child.
+    ///
+    /// # Panics
+    /// * if the left child is None.
+    pub fn left_unchecked(&self) -> &Box<HuffmanNode<u8>> {
+        self.left.as_ref().unwrap()
+    }
+
+    /// get an immutable reference to this node's right child.
+    ///
+    /// # Panics
+    /// * if the right child is None.
+    pub fn right_unchecked(&self) -> &Box<HuffmanNode<u8>> {
+        self.right.as_ref().unwrap()
+    }
+
+    /// get a mutable reference to this node's left child.
+    ///
+    /// # Panics
+    /// * if the left child is None.
+    pub fn left_unchecked_mut(&mut self) -> &mut Box<HuffmanNode<u8>> {
+        self.left.as_mut().unwrap()
+    }
+
+    /// get a mutable reference to this node's right child.
+    ///
+    /// # Panics
+    /// * if the right child is None.
+    pub fn right_unchecked_mut(&mut self) -> &mut Box<HuffmanNode<u8>> {
+        self.right.as_mut().unwrap()
+    }
     /// Calculate the chance/frequency for all symbols in this node and its child nodes.
     pub(crate) fn chance(&self) -> u64 {
         let mut result = self.chance;
         if self.left.is_some() {
-            result += self.left.as_ref().unwrap().chance();
+            result += self.left_unchecked().chance();
         }
         if self.right.is_some() {
-            result += self.right.as_ref().unwrap().chance();
+            result += self.right_unchecked().chance();
         }
         result
     }
@@ -551,50 +593,12 @@ impl HuffmanNode<u8> {
             map.insert(self.content.unwrap(), (code_len, code));
         }
         if self.left.is_some() {
-            self.left
-                .as_ref()
-                .unwrap()
+            self.left_unchecked()
                 .append_to_map(map, code << 1, code_len + 1);
         }
         if self.right.is_some() {
-            self.right
-                .as_ref()
-                .unwrap()
+            self.right_unchecked()
                 .append_to_map(map, (code << 1) + 1, code_len + 1);
-        }
-    }
-
-    /// Create a code from this tree. The result is a BitStream
-    /// containing the values.
-    pub fn create_code(&self) -> BitStream {
-        let mut stream = BitStream::open();
-        self.append_to_code(&mut stream, 0, 0);
-        stream
-    }
-
-    /// Append this node's data to the stream. Then recursively call
-    /// child nodes to append their data.
-    ///
-    /// # Arguments
-    ///
-    /// * `stream`: The stream to append codes to.
-    /// * `code`: The code bits for this node.
-    /// * `code_len`: The length of the code for this node.
-    fn append_to_code(&self, stream: &mut BitStream, code: u16, code_len: u8) {
-        if self.content.is_some() {
-            stream.append_n_bits(code, code_len);
-        }
-        if self.left.is_some() {
-            self.left
-                .as_ref()
-                .unwrap()
-                .append_to_code(stream, code << 1, code_len + 1);
-        }
-        if self.right.is_some() {
-            self.right
-                .as_ref()
-                .unwrap()
-                .append_to_code(stream, (code << 1) + 1, code_len + 1);
         }
     }
 
@@ -606,10 +610,8 @@ impl HuffmanNode<u8> {
             let left = mem::replace(&mut self.left, None);
             self.right = left;
         } else if self.left.is_some() {
-            if self.left.as_ref().unwrap().max_depth() > self.right.as_ref().unwrap().min_depth() {
-                if self.left.as_ref().unwrap().min_depth()
-                    >= self.right.as_ref().unwrap().max_depth()
-                {
+            if self.left_unchecked().max_depth() > self.right_unchecked().min_depth() {
+                if self.left_unchecked().min_depth() >= self.right_unchecked().max_depth() {
                     mem::swap(&mut self.right, &mut self.left);
                 } else {
                     self.swap_inner_nodes();
@@ -618,17 +620,17 @@ impl HuffmanNode<u8> {
         }
 
         if self.left.is_some() {
-            self.left.as_mut().unwrap().ensure_tree_grows_right();
+            self.left_unchecked_mut().ensure_tree_grows_right();
         }
         if self.right.is_some() {
-            self.right.as_mut().unwrap().ensure_tree_grows_right();
+            self.right_unchecked_mut().ensure_tree_grows_right();
         }
     }
 
     /// swap this node's right child's left child with the left child's right child node.
-    /// If this node's left child's max depth is greated than this node's right child's, swap them too.
+    /// If this node's left child's max depth is greater than this node's right child's, swap them too.
     fn swap_inner_nodes(&mut self) {
-        if self.left.as_ref().unwrap().max_depth() > self.right.as_ref().unwrap().max_depth() {
+        if self.left_unchecked().max_depth() > self.right_unchecked().max_depth() {
             mem::swap(&mut self.right, &mut self.left);
         }
         mem::swap(
@@ -637,16 +639,130 @@ impl HuffmanNode<u8> {
         );
     }
 
+    /// Remove the lower right leaf (1*) and replace it with a node which has only a leaf on the left
+    /// This *CAN* lead to a suboptimal code.
+    fn remove_only_ones_code(&mut self) {
+        if self.get_or_append_only_ones_code().is_some() {
+            panic!("No place found to put the 1* code!")
+        }
+    }
 
-    fn has_space_at_depth(&self, depth: u16) -> bool {
+    /// Recursively iterate through nodes to retrieve the node with the code 1* and put it elsewhere.
+    fn get_or_append_only_ones_code(&mut self) -> Option<(HuffmanNode<u8>, u16)> {
+        if self.right.is_none() {
+            return None;
+        }
+
+        if self.right_unchecked().content.is_some() {
+            let ones_node = mem::replace(&mut self.right, None).unwrap();
+            if self.left.is_none() {
+                self.left = Some(Box::from(ones_node.clone_leaf()));
+                return None;
+            }
+            return Some((ones_node.clone_leaf(), 1));
+        }
+
+        let ones_node_option = self.right_unchecked_mut().get_or_append_only_ones_code();
+
+        if ones_node_option.is_none() {
+            return None;
+        }
+
+        let ones_node = ones_node_option.as_ref().unwrap().0.clone_leaf();
+        let mut depth = ones_node_option.unwrap().1;
+        if self.left.is_none() {
+            let _ = mem::replace(&mut self.left.as_mut(), Some(&mut Box::from(ones_node)));
+            return None;
+        }
+        if self.replace_left_leaf_with_root(&ones_node) {
+            return None;
+        }
+
+        if self.left_unchecked().has_space_at_depth(depth, true) {
+            let mut current = self.left_unchecked_mut();
+            while depth > 0 {
+                if current.right.is_none() {
+                    current.right = Some(Box::from(ones_node));
+                    return None;
+                } else if current.left.is_none() {
+                    current.left = Some(Box::from(ones_node));
+                    return None;
+                } else if depth > 1 {
+                    if current.replace_right_leaf_with_root(&ones_node) {
+                        return None;
+                    } else if current.replace_left_leaf_with_root(&ones_node) {
+                        return None;
+                    }
+                } else if current.right_unchecked().has_space_at_depth(depth, true) {
+                    current = current.right_unchecked_mut();
+                    // this check is unnecessary as this will always be true, so it's commented out for understandability
+                    // } else if current.left_unchecked().has_space_at_depth(depth, true) {
+                } else {
+                    current = current.left_unchecked_mut();
+                }
+                depth -= 1;
+            }
+        }
+        return Some((ones_node, depth + 1));
+    }
+
+    /// if this node has a right leaf, replace it with a root that in turn has both
+    /// the old right leaf and `ones_node` as its left leaf.
+    ///
+    /// # Arguments
+    ///
+    /// * `ones_node`: The node to attach.
+    fn replace_right_leaf_with_root(&mut self, ones_node: &HuffmanNode<u8>) -> bool {
+        if self.right_unchecked().content.is_some() {
+            let right = mem::replace(&mut self.right, None);
+            self.right = Some(Box::from(HuffmanNode {
+                left: Some(Box::from(ones_node.clone_leaf())),
+                right: right,
+                ..Default::default()
+            }));
+            return true;
+        }
+        return false;
+    }
+
+    /// if this node has a left leaf, replace it with a root that in turn has both
+    /// the old left leaf and `ones_node` as its right leaf.
+    ///
+    /// # Arguments
+    ///
+    /// * `ones_node`: The node to attach.
+    fn replace_left_leaf_with_root(&mut self, ones_node: &HuffmanNode<u8>) -> bool {
+        if self.left_unchecked().content.is_some() {
+            let left = mem::replace(&mut self.left, None);
+            self.left = Some(Box::from(HuffmanNode {
+                right: Some(Box::from(ones_node.clone_leaf())),
+                left: left,
+                ..Default::default()
+            }));
+            return true;
+        }
+        return false;
+    }
+
+    /// TODO: doc comment
+    fn has_space_at_depth(&self, depth: u16, leaves_count_as_space: bool) -> bool {
         if self.content.is_some() {
-            return false;
+            return if leaves_count_as_space {
+                depth != 0
+            } else {
+                false
+            };
         } else if self.right.is_none() || self.left.is_none() {
             return true;
         } else if depth == 0 {
             return false;
         } else {
-            return self.left.as_ref().unwrap().has_space_at_depth(depth - 1) || self.right.as_ref().unwrap().has_space_at_depth(depth - 1);
+            return self
+                .left_unchecked()
+                .has_space_at_depth(depth - 1, leaves_count_as_space)
+                || self
+                .right_unchecked()
+                .has_space_at_depth(depth - 1, leaves_count_as_space);
         }
     }
 }
@@ -670,47 +786,86 @@ pub fn package_merge(stream: &mut BitStream, height: u16) -> HuffmanNode<u8> {
     if (nodes.len() as f64).log2().ceil() > height as f64 {
         panic!("Package merge not possible");
     }
+
     nodes.sort_by_key(|node| node.chance());
-    let p: Vec<(u8, u64)> = nodes
-        .iter()
-        .map(|node| (node.content().unwrap(), node.chance()))
-        .collect();
+    let p = create_p(&mut nodes);
+
     let mut lookup: HashMap<u8, (u8, u64)> = HashMap::with_capacity(p.len());
-    let mut l = vec![0u64; nodes.len()];
     let mut q: Vec<Vec<Vec<(u8, u64)>>> = Vec::with_capacity((height - 1) as usize);
     q.push(vec![]);
+
+    populate_first_q_row(&p, &mut lookup, &mut q);
+
+    calculate_further_q_rows(&mut q, height);
+
+    let l = calculate_code_lengths(q.last().unwrap(), &mut lookup, nodes.len());
+
+    let mut map = map_codes_to_code_length(&p, &l, &lookup, &mut nodes, height);
+
+    nodes.sort_by_key(|node| node.chance());
+
+    code_len_to_tree(&mut nodes, &mut map)
+}
+
+//TODO: clean up
+pub fn package_merge_experimental(stream: &mut BitStream, height: u16) -> HashMap<u8, (u8, u16)> {
+    let mut nodes = get_single_leaves(stream);
+    if nodes.len() == 0 {
+        panic!("Alarm");
+    }
+    if (nodes.len() as f64).log2().ceil() > height as f64 {
+        panic!("Package merge not possible");
+    }
+
+    nodes.sort_by_key(|node| node.chance());
+    let p = create_p(&mut nodes);
+
+    let mut lookup: HashMap<u8, (u8, u64)> = HashMap::with_capacity(p.len());
+    let mut q: Vec<Vec<Vec<(u8, u64)>>> = Vec::with_capacity((height - 1) as usize);
+    q.push(vec![]);
+
+    populate_first_q_row(&p, &mut lookup, &mut q);
+
+    calculate_further_q_rows(&mut q, height);
+
+    let l = calculate_code_lengths(q.last().unwrap(), &mut lookup, nodes.len());
+
+    let mut map = map_codes_to_code_length(&p, &l, &lookup, &mut nodes, height);
+
+    nodes.sort_by_key(|node| node.chance());
+
+    nodes_to_code(&nodes, &mut map, height);
+    map
+}
+
+fn create_p(nodes: &mut Vec<HuffmanNode<u8>>) -> Vec<(u8, u64)> {
+    nodes
+        .iter()
+        .map(|node| (node.content().unwrap(), node.chance()))
+        .collect()
+}
+
+fn populate_first_q_row(
+    p: &Vec<(u8, u64)>,
+    lookup: &mut HashMap<u8, (u8, u64)>,
+    q: &mut Vec<Vec<Vec<(u8, u64)>>>,
+) {
     let mut index = 0;
 
-    for i in &p {
+    for i in p {
         lookup.insert(i.0, (index, i.1));
         q[0].push(vec![*i]);
         index += 1;
     }
-    index = 0;
-    let mut q_0 = q[0].clone();
-    while q[index as usize].len() < (2 * p.len() - 2) {
-        let next = package(&mut q[index as usize], &mut q_0);
-        q.push(next);
-        index += 1;
-    }
-    for node in &q[q.len() - 1] {
-        for entry in node {
-            let index = lookup.get(&entry.0).unwrap().0;
-            l[index as usize] += 1;
-        }
-    }
-    let mut map: HashMap<u8, (u8, u16)> = HashMap::with_capacity(p.len());
-    for (i, el) in p.iter().enumerate() {
-        let code_length = l[lookup.get(&el.0).unwrap().0 as usize];
-        if code_length > height as u64 {
-            panic!("Something went wrong, code length bigger than height");
-        }
-        map.insert(el.0, (code_length as u8, 0));
-        nodes[i].set_chance(u64::MAX - code_length);
-    }
-    nodes.sort_by_key(|node| node.chance());
+}
 
-    code_len_to_tree(&mut nodes, &mut map)
+fn calculate_further_q_rows(q: &mut Vec<Vec<Vec<(u8, u64)>>>, height: u16) {
+    let mut q_0 = q[0].clone();
+
+    for i in 0..(height - 1) as usize {
+        let next = package(&mut q[i], &mut q_0);
+        q.push(next);
+    }
 }
 
 fn package(q: &mut Vec<Vec<(u8, u64)>>, q_0: &mut Vec<Vec<(u8, u64)>>) -> Vec<Vec<(u8, u64)>> {
@@ -729,6 +884,79 @@ fn package(q: &mut Vec<Vec<(u8, u64)>>, q_0: &mut Vec<Vec<(u8, u64)>>) -> Vec<Ve
         x
     });
     next_row
+}
+
+fn calculate_code_lengths(
+    q: &Vec<Vec<(u8, u64)>>,
+    lookup: &mut HashMap<u8, (u8, u64)>,
+    number_of_nodes: usize,
+) -> Vec<u64> {
+    if number_of_nodes == 1 {
+        return vec![1u64];
+    }
+    let mut l = vec![0u64; number_of_nodes];
+    for node in &q[0..(2 * number_of_nodes - 2)] {
+        for entry in node {
+            let index = lookup.get(&entry.0).unwrap().0 as usize;
+            l[index] += 1;
+        }
+    }
+    l
+}
+
+fn map_codes_to_code_length(
+    p: &Vec<(u8, u64)>,
+    l: &Vec<u64>,
+    lookup: &HashMap<u8, (u8, u64)>,
+    nodes: &mut Vec<HuffmanNode<u8>>,
+    height: u16,
+) -> HashMap<u8, (u8, u16)> {
+    let mut map: HashMap<u8, (u8, u16)> = HashMap::with_capacity(p.len());
+    for (i, el) in p.iter().enumerate() {
+        let code_length = l[lookup.get(&el.0).unwrap().0 as usize];
+        if code_length > height as u64 {
+            panic!("Something went wrong, code length bigger than height");
+        }
+        map.insert(el.0, (code_length as u8, 0));
+        nodes[i].set_chance(u64::MAX - code_length);
+    }
+    map
+}
+
+fn nodes_to_code(nodes: &Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, (u8, u16)>, height: u16) {
+    if 2_i32.pow(height as u32) == nodes.len() as i32 { panic!("Avoiding 1* not possible") }
+    let mut current_code = 0;
+    let mut start = true;
+    // We iterate from shortest to longest code
+    for (i, node) in nodes.iter().rev().enumerate() {
+        let val = &node.content.unwrap();
+        let mut next_node_code_length: u8 = 0;
+        let (mut code_length, _) = *map.get(val).unwrap();
+        if { i < nodes.len() - 1 } {
+            let key = &nodes[nodes.len() - i - 2].content.unwrap();
+            next_node_code_length = map.get(key).unwrap().0;
+        } else {
+            next_node_code_length = 0;
+        }
+        // If we're on the edge to the next code length, smooth out the transition by incrementing the
+        // current code_length and incrementing and shifting the current_code, if not 0
+        if code_length != next_node_code_length && next_node_code_length != 0 {
+            code_length += 1;
+            if !start {
+                current_code += 1;
+                current_code <<= 1;
+            }
+            start = false;
+            // If the code_length doesn't change, just increment the code
+        } else if !start {
+            current_code += 1;
+        } else {
+            start = false;
+        }
+        // update the map
+        map.insert(*val, (code_length, current_code));
+        // println!("value: {}, current code:{:08b}, code length: {}", *val, current_code, code_length);
+    }
 }
 
 pub fn criterion_bit_benchmark(c: &mut Criterion) {
@@ -806,11 +1034,12 @@ pub fn criterion_read_and_write_benchmark(c: &mut Criterion) {
 
 pub fn criterion_huffman_encoding_benchmark(c: &mut Criterion) {
     let mut stream = BitStream::open();
-    let mut rng = rand::thread_rng();
-    for i in 0..255 {
-        for _ in 0..rng.gen_range(2048..1048576) {
+    let mut j = 0;
+    for i in 0..240 {
+        for _ in 0..(100000 + j) {
             stream.append_byte(i);
         }
+        j += 1;
     }
     c.bench_function("Benchmark huffman encoding", |b| {
         b.iter(|| {
@@ -819,5 +1048,22 @@ pub fn criterion_huffman_encoding_benchmark(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, criterion_bit_benchmark, criterion_byte_benchmark, criterion_byte_and_write_benchmark, criterion_read_benchmark, criterion_read_and_write_benchmark, criterion_huffman_encoding_benchmark);
+pub fn criterion_huffman_encoding_benchmark_experimental(c: &mut Criterion) {
+    let mut stream = BitStream::open();
+    let mut j = 0;
+    for i in 0..240 {
+        for _ in 0..(100000 + j) {
+            stream.append_byte(i);
+        }
+        j += 1;
+    }
+    c.bench_function("Benchmark huffman encoding experimental", |b| {
+        b.iter(|| {
+            package_merge_experimental(&mut stream, 8);
+        })
+    });
+}
+
+// criterion_group!(benches, criterion_bit_benchmark, criterion_byte_benchmark, criterion_byte_and_write_benchmark, criterion_read_benchmark, criterion_read_and_write_benchmark, criterion_huffman_encoding_benchmark);
+criterion_group!(benches,criterion_huffman_encoding_benchmark, criterion_huffman_encoding_benchmark_experimental);
 criterion_main!(benches);

@@ -150,12 +150,9 @@ fn map_codes_to_code_length(
 
 fn nodes_to_code(nodes: &Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, (u8, u16)>, height: u16) {
     if 2_i32.pow(height as u32) == nodes.len() as i32 { panic!("Avoiding 1* not possible") }
-    let mut current_code_length = 0;
-    let min_code_length = map.get(&nodes.last().unwrap().content.unwrap()).unwrap().0;
-    let max_code_length = map.get(&nodes.first().unwrap().content.unwrap()).unwrap().0;
     let mut current_code = 0;
-    current_code_length = min_code_length;
     let mut start = true;
+    // We iterate from shortest to longest code
     for (i, node) in nodes.iter().rev().enumerate() {
         let val = &node.content.unwrap();
         let mut next_node_code_length: u8 = 0;
@@ -166,26 +163,24 @@ fn nodes_to_code(nodes: &Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, (u8, u16)>,
         } else {
             next_node_code_length = 0;
         }
-        if code_length != next_node_code_length && next_node_code_length == max_code_length {
-            current_code_length = code_length;
-            current_code_length += 1;
+        // If we're on the edge to the next code length, smooth out the transition by incrementing the
+        // current code_length and incrementing and shifting the current_code, if not 0
+        if code_length != next_node_code_length && next_node_code_length != 0 {
             code_length += 1;
             if !start {
                 current_code += 1;
                 current_code <<= 1;
             }
             start = false;
-        } else if current_code_length != code_length && !start {
-            current_code_length = code_length;
-            current_code <<= 1;
-            current_code += 2;
+            // If the code_length doesn't change, just increment the code
         } else if !start {
             current_code += 1;
         } else {
             start = false;
         }
+        // update the map
         map.insert(*val, (code_length, current_code));
-        println!("value: {}, current code:{:016b}, code length: {}", *val, current_code, code_length);
+        println!("value: {}, current code:{:08b}, code length: {}", *val, current_code, code_length);
     }
 }
 
