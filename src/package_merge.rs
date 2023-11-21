@@ -155,9 +155,9 @@ fn nodes_to_code(nodes: &Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, (u8, u16)>,
     // We iterate from shortest to longest code
     for (i, node) in nodes.iter().rev().enumerate() {
         let val = &node.content.unwrap();
-        let mut next_node_code_length: u8 = 0;
+        let next_node_code_length: u8;
         let (mut code_length, _) = *map.get(val).unwrap();
-        if { i < nodes.len() - 1 } {
+        if i < nodes.len() - 1 {
             let key = &nodes[nodes.len() - i - 2].content.unwrap();
             next_node_code_length = map.get(key).unwrap().0;
         } else {

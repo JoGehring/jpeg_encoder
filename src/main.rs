@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 // remove this once integrating - this is to avoid exessive and useless warnings for the time being
 
-use rand::Rng;
+use ppm_parser::read_ppm_from_file;
 
 use crate::bit_stream::BitStream;
 use crate::huffman::encode;
@@ -19,173 +19,15 @@ mod utils;
 mod package_merge;
 
 fn main() {
-    // keep this in to avoid loads of "unused" warnings
-    // let mut image = read_ppm_from_file("test/dwsample-ppm-640.ppm");
-    // // println!("{:?}", image);
-    // image.rgb_to_ycbcr();
-    // // println!("{:?}", image);
-    // image.downsample(4, 2, 0);
-    // println!("{:?}", image);
+    let mut image = read_ppm_from_file("test/dwsample-ppm-640.ppm");
+    image.rgb_to_ycbcr();
+    image.downsample(4, 2, 0);
 
-    // let mut stream = BitStream::open();
-    // stream.append_bit(true);
-    // stream.append_bit(true);
-    // stream.append_bit(true);
-    // stream.append_bit(true);
-    // stream.append_bit(true);
-    // stream.append_bit(true);
-    // stream.append_bit(true);
-    //
-    // stream.append_byte(3);
-    // stream.append_bit(true);
-    // stream.append_byte(4);
-    // stream.append_byte(5);
-    // stream.append_byte(6);
-    // stream.append_byte(7);
-    // stream.append_byte(8);
-    // stream.flush_to_file("test/binary_stream_test_file.bin").expect("TODO: panic message");
-    // // let test = fs::read("binary_stream_test_file.bin").expect("TODO: panic message");
-    // println!("{:?}", stream);
+    let mut target_stream = BitStream::open();
+    jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOI);
+    jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::APP0);
+    jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOF0);
 
-    // let mut target_stream = BitStream::open();
-    // jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOI);
-    // jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::APP0);
-    // jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOF0);
-    // jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::EOI);
-    // target_stream.flush_to_file("test/test_result.jpg").expect("TODO: Panic message");
-
-    let mut stream = BitStream::open();
-    // stream.append_byte(1);
-    // stream.append_byte(1);
-    // stream.append_byte(2);
-    // stream.append_byte(2);
-    // stream.append_byte(3);
-    // stream.append_byte(3);
-    // stream.append_byte(4);
-    // stream.append_byte(4);
-    // stream.append_byte(5);
-    // stream.append_byte(5);
-    // stream.append_byte(6);
-    // stream.append_byte(6);
-    //
-    // for _ in 0..1 {
-    //     stream.append_byte(1);
-    //     stream.append_byte(2);
-    // }
-    // for _ in 0..4 {
-    //     stream.append_byte(3);
-    // }
-    // for _ in 0..5 {
-    //     stream.append_byte(4);
-    // }
-    // for _ in 0..8 {
-    //     stream.append_byte(5);
-    // }
-    // for _ in 0..10 {
-    //     stream.append_byte(6);
-    // }
-    //
-    // for _ in 0..19 {
-    //     stream.append_byte(7);
-    // }
-    //
-    // for _ in 0..27 {
-    //     stream.append_byte(8);
-    // }
-    // for _ in 0..28 {
-    //     stream.append_byte(9);
-    // }
-    // for _ in 0..37 {
-    //     stream.append_byte(10);
-    // }
-    // for _ in 0..47 {
-    //     stream.append_byte(11);
-    // }
-    // for _ in 0..57 {
-    //     stream.append_byte(12);
-    // }
-    // for _ in 0..67 {
-    //     stream.append_byte(13);
-    // }
-    //
-    // for _ in 0..77 {
-    //     stream.append_byte(14);
-    // }
-    // for _ in 0..87 {
-    //     stream.append_byte(15);
-    // }
-    // for _ in 0..71 {
-    //     stream.append_byte(16);
-    // }
-    // for _ in 0..74 {
-    //     stream.append_byte(17);
-    // }
-    // for _ in 0..17 {
-    //     stream.append_byte(18);
-    // }
-    // for _ in 0..71 {
-    //     stream.append_byte(19);
-    // }
-    // for _ in 0..74 {
-    //     stream.append_byte(20);
-    // }
-    // for _ in 0..7 {
-    //     stream.append_byte(21);
-    // }
-    // for _ in 0..7 {
-    //     stream.append_byte(22);
-    // }
-    // for _ in 0..7 {
-    //     stream.append_byte(23);
-    // }
-    //
-    // for _ in 0..7 {
-    //     stream.append_byte(24);
-    // }
-    // for _ in 0..17 {
-    //     stream.append_byte(25);
-    // }
-    // for _ in 0..71 {
-    //     stream.append_byte(26);
-    // }
-    // for _ in 0..74 {
-    //     stream.append_byte(27);
-    // }
-    // // for _ in 0..17 {
-    // //     stream.append_byte(28);
-    // // }
-    // // for _ in 0..71 {
-    // //     stream.append_byte(29);
-    // // }
-    // // for _ in 0..74 {
-    // //     stream.append_byte(30);
-    // // }
-    // // for _ in 0..71 {
-    // //     stream.append_byte(31);
-    // // }
-    // // for _ in 0..74 {
-    // //     stream.append_byte(32);
-    // // // }
-    // // for i in 0..13 {
-    // //     for _ in 0..rng.gen {
-    // //         stream.append_byte(i);
-    // //     }
-    // // }
-    // // for _ in 0..9 {
-    // //     stream.append_byte(31);
-    // // }
-    // let mut rng = rand::thread_rng();
-    // for j in 0..24 {
-    //     for k in 0..rng.gen_range(1..10000) {
-    //         stream.append_byte(j);
-    //     }
-    // }
-    // // let mut tree = parse_u8_stream(&mut stream);
-    // // println!("before: {:?}", tree);
-    // // tree.restrict_height(5);
-    // // println!("after: {:?}", tree);
-    // let tree = package_merge_experimental(&mut stream, 5);
-    // // println!("{:?}", tree);
     let mut stream = BitStream::open();
     stream.append_byte(1);
     stream.append_byte(1);
@@ -217,7 +59,9 @@ fn main() {
     // let tree = parse_u8_stream(&mut stream);
     // println!("{:?}", tree);
     // package_merge_experimental(&mut stream, 3);
-    let (mut encoded_stream, code_map) = encode(&mut stream);
-    write_dht_segment(&mut encoded_stream, 0, &code_map, false);
-    encoded_stream.flush_to_file("test/dht_test.jpeg").expect("TODO: panic message");
+    let (_, code_map) = encode(&mut stream);
+    write_dht_segment(&mut target_stream, 0, &code_map, false);
+
+    jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::EOI);
+    target_stream.flush_to_file("test/test_result.jpg").expect("TODO: Panic message");
 }

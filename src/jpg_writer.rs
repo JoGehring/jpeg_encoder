@@ -157,12 +157,13 @@ pub fn write_dht_segment(
     let len: u16 = 19 + code_map.len() as u16;
     stream.append(len);
     let dht_info_byte = current_dht_id + (u8::from(is_ac) << 4);
+    stream.append(dht_info_byte);
     for i in 1..17 {
         let amount: u8 = code_map.iter().filter(|val| val.1.0 == i).count() as u8;
         stream.append(amount);
     }
     let mut code_vec: Vec<(&u8, &(u8, u16))> = code_map.iter().collect();
-    code_vec.sort_by(|(symbol, code), (symbol2, code2)|
+    code_vec.sort_by(|(_, code), (_2, code2)|
         { return if code.0 == code2.0 { code.1.cmp(&code2.1) } else { code.0.cmp(&code2.0) }; });
     for code in code_vec {
         stream.append(*code.0);

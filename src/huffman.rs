@@ -370,7 +370,6 @@ impl HuffmanNode<u8> {
         if self.right.is_none() {
             return;
         }
-        println!("I have right: {:?}", self.right_unchecked().content);
         let mut current = self;
         while current.right.is_some() {
             current = current.right_unchecked_mut();
