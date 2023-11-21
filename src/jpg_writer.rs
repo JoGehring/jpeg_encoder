@@ -61,7 +61,7 @@ fn write_app0_segment(stream: &mut BitStream, image: &Image) {
     stream.append::<u16>(16);
     // string "JFIF": 0x4a 0x46 0x49 0x46 0x00
     stream.append::<Vec<u8>>(vec![0x4a, 0x46, 0x49, 0x46, 0x00]); // TODO: use array rather than vec
-    // revision number 1.1: 0x01 0x01
+                                                                  // revision number 1.1: 0x01 0x01
     stream.append::<u16>(0x0101);
     // of pixel size (0 => no unit, aspect ratio instead)
     stream.append::<u8>(0);
@@ -93,7 +93,10 @@ fn write_sof0_segment(stream: &mut BitStream, image: &Image) {
     // number of components - we always do coloured so 3
     stream.append::<u8>(3);
 
-    let max_downsample_factor = std::cmp::max(std::cmp::max(image.y_downsample_factor(), image.cb_downsample_factor()), image.cr_downsample_factor()) as u8;
+    let max_downsample_factor = std::cmp::max(
+        std::cmp::max(image.y_downsample_factor(), image.cb_downsample_factor()),
+        image.cr_downsample_factor(),
+    ) as u8;
     // TODO: quantising tables, once they're implemented
     write_sof0_segment_component(
         stream,
@@ -140,7 +143,11 @@ fn write_sof0_segment_component(
 ) {
     stream.append(id);
     // the four bits for vertical
-    let mut downsample_value: u8 = if downsampled_vertically { max_downsample_factor / 2 } else { max_downsample_factor };
+    let mut downsample_value: u8 = if downsampled_vertically {
+        max_downsample_factor / 2
+    } else {
+        max_downsample_factor
+    };
     // the four bits for horizontal
     downsample_value += max_downsample_factor / downsample_factor << 4;
     stream.append(downsample_value);
@@ -159,23 +166,30 @@ pub fn write_dht_segment(
     let dht_info_byte = current_dht_id + (u8::from(is_ac) << 4);
     stream.append(dht_info_byte);
     for i in 1..17 {
-        let amount: u8 = code_map.iter().filter(|val| val.1.0 == i).count() as u8;
+        let amount: u8 = code_map.iter().filter(|val| val.1 .0 == i).count() as u8;
         stream.append(amount);
     }
     let mut code_vec: Vec<(&u8, &(u8, u16))> = code_map.iter().collect();
-    code_vec.sort_by(|(_, code), (_2, code2)|
-        { return if code.0 == code2.0 { code.1.cmp(&code2.1) } else { code.0.cmp(&code2.0) }; });
+    code_vec.sort_by(|(_, code), (_2, code2)| {
+        return if code.0 == code2.0 {
+            code.1.cmp(&code2.1)
+        } else {
+            code.0.cmp(&code2.0)
+        };
+    });
     for code in code_vec {
         stream.append(*code.0);
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::bit_stream::BitStream;
     use crate::huffman::encode;
-    use crate::jpg_writer::{SegmentType, write_app0_segment, write_dht_segment, write_marker_for_segment, write_segment_to_stream, write_sof0_segment, write_sof0_segment_component};
+    use crate::jpg_writer::{
+        write_app0_segment, write_dht_segment, write_marker_for_segment, write_segment_to_stream,
+        write_sof0_segment, write_sof0_segment_component, SegmentType,
+    };
     use crate::ppm_parser::read_ppm_from_file;
 
     #[test]
@@ -201,7 +215,9 @@ mod tests {
         let mut stream = BitStream::open();
         let image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         write_app0_segment(&mut stream, &image);
-        let data: Vec<u8> = vec![0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 1, 0, 1, 0, 0];
+        let data: Vec<u8> = vec![
+            0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 1, 0, 1, 0, 0,
+        ];
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
     }
@@ -272,7 +288,11 @@ mod tests {
         write_segment_to_stream(&mut stream, &image, SegmentType::APP0);
         write_segment_to_stream(&mut stream, &image, SegmentType::SOF0);
         write_segment_to_stream(&mut stream, &image, SegmentType::EOI);
-        let data: Vec<u8> = vec![0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 1, 0, 1, 0, 0, 0xff, 0xc0, 0, 17, 8, 0, 4, 0, 4, 3, 1, 0x22, 0, 2, 0x11, 0, 3, 0x11, 0, 0xff, 0xd9];
+        let data: Vec<u8> = vec![
+            0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 1, 0, 1,
+            0, 0, 0xff, 0xc0, 0, 17, 8, 0, 4, 0, 4, 3, 1, 0x22, 0, 2, 0x11, 0, 3, 0x11, 0, 0xff,
+            0xd9,
+        ];
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
     }
@@ -285,21 +305,125 @@ mod tests {
         write_segment_to_stream(&mut stream, &image, SegmentType::APP0);
         write_segment_to_stream(&mut stream, &image, SegmentType::SOF0);
         write_segment_to_stream(&mut stream, &image, SegmentType::EOI);
-        let data: Vec<u8> = vec![0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 1, 0, 1, 0, 0, 0xff, 0xc0, 0, 17, 8, 0, 4, 0, 4, 3, 1, 0x11, 0, 2, 0x11, 0, 3, 0x11, 0, 0xff, 0xd9];
+        let data: Vec<u8> = vec![
+            0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 1, 0, 1,
+            0, 0, 0xff, 0xc0, 0, 17, 8, 0, 4, 0, 4, 3, 1, 0x11, 0, 2, 0x11, 0, 3, 0x11, 0, 0xff,
+            0xd9,
+        ];
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
     }
 
-    // #[test]
-    // fn test_write_dht_segment() {
-    //     let mut stream = BitStream::open();
-    //
-    //     let (mut stream, code_map) = encode(&mut stream);
-    //     write_dht_segment(&mut stream, 0, &code_map, false);
-    //     let data: Vec<u8> = vec![0xff, 0xc4, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 1, 0, 1, 0, 0, 0xff, 0xc0, 0, 17, 8, 0, 4, 0, 4, 3, 1, 0x11, 0, 2, 0x11, 0, 3, 0x11, 0, 0xff, 0xd9];
-    //     assert_eq!(data, *stream.data());
-    //     assert_eq!(8, stream.bits_in_last_byte());
-    // }
+    #[test]
+    fn test_write_dht_segment() {
+        let mut symbol_stream = BitStream::open();
+        for _ in 0..2 {
+            symbol_stream.append_byte(1);
+            symbol_stream.append_byte(2);
+        }
+        for _ in 0..3 {
+            symbol_stream.append_byte(3);
+            symbol_stream.append_byte(4);
+        }
+        for _ in 0..4 {
+            symbol_stream.append_byte(5);
+        }
+        for _ in 0..5 {
+            symbol_stream.append_byte(6);
+        }
+
+        for _ in 0..6 {
+            symbol_stream.append_byte(7);
+        }
+
+        for _ in 0..7 {
+            symbol_stream.append_byte(8);
+        }
+        for _ in 0..7 {
+            symbol_stream.append_byte(9);
+        }
+        for _ in 0..7 {
+            symbol_stream.append_byte(10);
+        }
+        for _ in 0..7 {
+            symbol_stream.append_byte(11);
+        }
+        for _ in 0..7 {
+            symbol_stream.append_byte(12);
+        }
+        for _ in 0..7 {
+            symbol_stream.append_byte(13);
+        }
+
+        for _ in 0..7 {
+            symbol_stream.append_byte(14);
+        }
+        for _ in 0..17 {
+            symbol_stream.append_byte(15);
+        }
+        for _ in 0..71 {
+            symbol_stream.append_byte(16);
+        }
+        for _ in 0..74 {
+            symbol_stream.append_byte(17);
+        }
+        for _ in 0..17 {
+            symbol_stream.append_byte(18);
+        }
+        for _ in 0..71 {
+            symbol_stream.append_byte(19);
+        }
+        for _ in 0..74 {
+            symbol_stream.append_byte(20);
+        }
+        for _ in 0..7 {
+            symbol_stream.append_byte(21);
+        }
+        for _ in 0..7 {
+            symbol_stream.append_byte(22);
+        }
+        for _ in 0..7 {
+            symbol_stream.append_byte(23);
+        }
+
+        for _ in 0..7 {
+            symbol_stream.append_byte(24);
+        }
+        for _ in 0..17 {
+            symbol_stream.append_byte(25);
+        }
+        for _ in 0..71 {
+            symbol_stream.append_byte(26);
+        }
+        for _ in 0..74 {
+            symbol_stream.append_byte(27);
+        }
+
+        let (_, code_map) = encode(&mut symbol_stream);
+        let mut stream = BitStream::open();
+        write_dht_segment(&mut stream, 0, &code_map, false);
+        let data: Vec<u8> = vec![
+            0xff, 0xc4, // marker
+            0, 46, // length
+            0,  // HT information
+            0,  // 1 bit codes
+            0,  // 2 bit codes
+            6,  // 3 bit codes
+            0,  // 4 bit codes
+            3,  // 5 bit codes
+            4,  // 6 bit codes
+            10, // 7 bit codes
+            3,  // 8 bit codes
+            1,  // 9 bit codes
+            0, 0, 0, 0, 0, 0, 0, // remaining empty codes
+            // symbols in order
+            27, 20, 17, 26, 19, 16, 25, 18, 15, 24, 23, 22, 21, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5,
+            4, 3, 2, 1,
+        ];
+        println!("{:?}", code_map);
+        assert_eq!(data, *stream.data());
+        assert_eq!(8, stream.bits_in_last_byte());
+    }
 
     #[test]
     #[ignore]
@@ -312,13 +436,15 @@ mod tests {
         write_segment_to_stream(&mut stream, &image, SegmentType::SOF0);
         write_segment_to_stream(&mut stream, &image, SegmentType::EOI);
         //SOI
-        let data: Vec<u8> = vec![0xff, 0xd8,
-                                 //APP0: length 2 byte, JFIF0, major revision 1 byte, minor revision 1 byte, pixel ratio mode 1byte, x density 2 byte, y density 2 byte, thumbnail
-                                 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 16, 0, 9, 0, 0,
-                                 //SOF0
-                                 0xff, 0xc0, 0, 17, 8, 8, 112, 15, 0, 3, 1, 0x22, 0, 2, 0x11, 0, 3, 0x11, 0,
-                                 //EOI
-                                 0xff, 0xd9];
+        let data: Vec<u8> = vec![
+            0xff, 0xd8,
+            //APP0: length 2 byte, JFIF0, major revision 1 byte, minor revision 1 byte, pixel ratio mode 1byte, x density 2 byte, y density 2 byte, thumbnail
+            0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 16, 0, 9, 0, 0,
+            //SOF0
+            0xff, 0xc0, 0, 17, 8, 8, 112, 15, 0, 3, 1, 0x22, 0, 2, 0x11, 0, 3, 0x11, 0,
+            //EOI
+            0xff, 0xd9,
+        ];
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
     }
