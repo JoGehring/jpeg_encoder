@@ -55,7 +55,7 @@ pub fn encode(stream: &mut BitStream) -> (BitStream, HashMap<u8, (u8, u16)>) {
 /// # Panics
 /// * If there are more symbols than can be encoded in 16 bit codes.
 pub fn parse_u8_stream(stream: &mut BitStream) -> HuffmanNode<u8> {
-    let mut tree = package_merge(stream, 16);
+    let mut tree = package_merge(stream, 15);
 
     tree.remove_only_ones_code();
 
@@ -364,109 +364,26 @@ impl HuffmanNode<u8> {
         );
     }
 
-    /// Remove the lower right leaf (1*) and replace it with a node which has only a leaf on the left
-    /// This *CAN* lead to a suboptimal code.
+    /// Remove the lower right leaf (1*) and replace it with a node which has only a leaf on the left.
+    /// This will lead to a less optimised code
     fn remove_only_ones_code(&mut self) {
-        if self.get_or_append_only_ones_code().is_some() {
-            panic!("No place found to put the 1* code!")
-        }
-    }
-
-    /// Recursively iterate through nodes to retrieve the node with the code 1* and put it elsewhere.
-    fn get_or_append_only_ones_code(&mut self) -> Option<(HuffmanNode<u8>, u16)> {
         if self.right.is_none() {
-            return None;
+            return;
         }
-
-        if self.right_unchecked().content.is_some() {
-            let ones_node = mem::replace(&mut self.right, None).unwrap();
-            if self.left.is_none() {
-                self.left = Some(Box::from(ones_node.clone_leaf()));
-                return None;
-            }
-            return Some((ones_node.clone_leaf(), 1));
+        println!("I have right: {:?}", self.right_unchecked().content);
+        let mut current = self;
+        while current.right.is_some() {
+            current = current.right_unchecked_mut();
         }
-
-        let ones_node_option = self.right_unchecked_mut().get_or_append_only_ones_code();
-
-        if ones_node_option.is_none() {
-            return None;
-        }
-
-        let ones_node = ones_node_option.as_ref().unwrap().0.clone_leaf();
-        let mut depth = ones_node_option.unwrap().1;
-        if self.left.is_none() {
-            let _ = mem::replace(&mut self.left.as_mut(), Some(&mut Box::from(ones_node)));
-            return None;
-        }
-        if self.replace_left_leaf_with_root(&ones_node) {
-            return None;
-        }
-
-        if self.left_unchecked().has_space_at_depth(depth, true) {
-            let mut current = self.left_unchecked_mut();
-            while depth > 0 {
-                if current.right.is_none() {
-                    current.right = Some(Box::from(ones_node));
-                    return None;
-                } else if current.left.is_none() {
-                    current.left = Some(Box::from(ones_node));
-                    return None;
-                } else if depth > 1 {
-                    if current.replace_right_leaf_with_root(&ones_node) {
-                        return None;
-                    } else if current.replace_left_leaf_with_root(&ones_node) {
-                        return None;
-                    }
-                } else if current.right_unchecked().has_space_at_depth(depth, true) {
-                    current = current.right_unchecked_mut();
-                // this check is unnecessary as this will always be true, so it's commented out for understandability
-                // } else if current.left_unchecked().has_space_at_depth(depth, true) {
-                } else {
-                    current = current.left_unchecked_mut();
-                }
-                depth -= 1;
-            }
-        }
-        return Some((ones_node, depth + 1));
-    }
-
-    /// if this node has a right leaf, replace it with a root that in turn has both
-    /// the old right leaf and `ones_node` as its left leaf.
-    ///
-    /// # Arguments
-    ///
-    /// * `ones_node`: The node to attach.
-    fn replace_right_leaf_with_root(&mut self, ones_node: &HuffmanNode<u8>) -> bool {
-        if self.right_unchecked().content.is_some() {
-            let right = mem::replace(&mut self.right, None);
-            self.right = Some(Box::from(HuffmanNode {
-                left: Some(Box::from(ones_node.clone_leaf())),
-                right: right,
-                ..Default::default()
-            }));
-            return true;
-        }
-        return false;
-    }
-
-    /// if this node has a left leaf, replace it with a root that in turn has both
-    /// the old left leaf and `ones_node` as its right leaf.
-    ///
-    /// # Arguments
-    ///
-    /// * `ones_node`: The node to attach.
-    fn replace_left_leaf_with_root(&mut self, ones_node: &HuffmanNode<u8>) -> bool {
-        if self.left_unchecked().content.is_some() {
-            let left = mem::replace(&mut self.left, None);
-            self.left = Some(Box::from(HuffmanNode {
-                right: Some(Box::from(ones_node.clone_leaf())),
-                left: left,
-                ..Default::default()
-            }));
-            return true;
-        }
-        return false;
+        let new_left_node = HuffmanNode {
+            chance: current.chance,
+            content: current.content,
+            left: None,
+            right: None,
+        };
+        current.content = None;
+        current.chance = 0;
+        current.left = Some(Box::from(new_left_node))
     }
 
     /// TODO: doc comment
@@ -568,9 +485,14 @@ mod tests {
             HuffmanNode {
                 chance: 0,
                 content: None,
-                left: Some(Box::from(HuffmanNode {
-                    chance: u64::MAX - 1,
-                    content: Some(1),
+                right: Some(Box::from(HuffmanNode {
+                    chance: 0,
+                    content: None,
+                    left: Some(Box::from(HuffmanNode {
+                        chance: u64::MAX - 1,
+                        content: Some(1),
+                        ..Default::default()
+                    })),
                     ..Default::default()
                 })),
                 ..Default::default()
@@ -623,10 +545,10 @@ mod tests {
 
         // code lengths should be 3 for 1, 3 for 2, 3 for 3, 3 for 4, 3 for 5, 2 for 6
         let mut correct_code_len = 3 * 4 + // 4 1s with code length 3
-            3 * 4 + // 4 2s with code length 3
+            4 * 4 + // 4 2s with code length 3, longer than optimal because of remove_only_ones_code()
             3 * 6 + // 6 3s with code length 3
-            3 * 6 + // 6 4s with code length 3
-            3 * 7 + // 7 5s with code length 3, longer than optimal because of remove_only_ones_code()
+            3 * 6 + // 6 4s with code length 4
+            2 * 7 + // 7 5s with code length 2
             2 * 9; // 9 6s with code length 2
         correct_code_len = (correct_code_len as f32 / 8 as f32).ceil() as usize;
         assert_eq!(correct_code_len, code.data().len());
