@@ -367,8 +367,12 @@ impl HuffmanNode<u8> {
     /// Remove the lower right leaf (1*) and replace it with a node which has only a leaf on the left.
     /// This will lead to a less optimised code
     fn remove_only_ones_code(&mut self) {
+        if self.right.is_none() {
+            return;
+        }
+        println!("I have right: {:?}", self.right_unchecked().content);
         let mut current = self;
-        while current.left.is_some() && current.right.is_some() {
+        while current.right.is_some() {
             current = current.right_unchecked_mut();
         }
         let new_left_node = HuffmanNode {
@@ -481,9 +485,14 @@ mod tests {
             HuffmanNode {
                 chance: 0,
                 content: None,
-                left: Some(Box::from(HuffmanNode {
-                    chance: u64::MAX - 1,
-                    content: Some(1),
+                right: Some(Box::from(HuffmanNode {
+                    chance: 0,
+                    content: None,
+                    left: Some(Box::from(HuffmanNode {
+                        chance: u64::MAX - 1,
+                        content: Some(1),
+                        ..Default::default()
+                    })),
                     ..Default::default()
                 })),
                 ..Default::default()
@@ -536,10 +545,10 @@ mod tests {
 
         // code lengths should be 3 for 1, 3 for 2, 3 for 3, 3 for 4, 3 for 5, 2 for 6
         let mut correct_code_len = 3 * 4 + // 4 1s with code length 3
-            3 * 4 + // 4 2s with code length 3
+            4 * 4 + // 4 2s with code length 3, longer than optimal because of remove_only_ones_code()
             3 * 6 + // 6 3s with code length 3
-            3 * 6 + // 6 4s with code length 3
-            3 * 7 + // 7 5s with code length 3, longer than optimal because of remove_only_ones_code()
+            3 * 6 + // 6 4s with code length 4
+            2 * 7 + // 7 5s with code length 2
             2 * 9; // 9 6s with code length 2
         correct_code_len = (correct_code_len as f32 / 8 as f32).ceil() as usize;
         assert_eq!(correct_code_len, code.data().len());
