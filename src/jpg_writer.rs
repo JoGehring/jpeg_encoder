@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use modinverse::egcd;
 
 use crate::bit_stream::BitStream;
@@ -41,6 +43,7 @@ fn write_marker_for_segment(stream: &mut BitStream, segment_type: &SegmentType) 
         SegmentType::APP0 => 0xffe0,
         SegmentType::SOF0 => 0xffc0,
         SegmentType::EOI => 0xffd9,
+        SegmentType::DHT => 0xffc4,
         _ => panic!("Not implemented yet!"),
     });
 }
@@ -144,11 +147,34 @@ fn write_sof0_segment_component(
     stream.append(quantise_table);
 }
 
+pub fn write_dht_segment(
+    stream: &mut BitStream,
+    current_dht_id: u8,
+    code_map: &HashMap<u8, (u8, u16)>,
+    is_ac: bool,
+) {
+    write_marker_for_segment(stream, &SegmentType::DHT);
+    let len: u16 = 19 + code_map.len() as u16;
+    stream.append(len);
+    let dht_info_byte = current_dht_id + (u8::from(is_ac) << 4);
+    for i in 1..17 {
+        let amount: u8 = code_map.iter().filter(|val| val.1.0 == i).count() as u8;
+        stream.append(amount);
+    }
+    let mut code_vec: Vec<(&u8, &(u8, u16))> = code_map.iter().collect();
+    code_vec.sort_by(|(symbol, code), (symbol2, code2)|
+        { return if code.0 == code2.0 { code.1.cmp(&code2.1) } else { code.0.cmp(&code2.0) }; });
+    for code in code_vec {
+        stream.append(*code.0);
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
     use crate::bit_stream::BitStream;
-    use crate::jpg_writer::{SegmentType, write_app0_segment, write_marker_for_segment, write_segment_to_stream, write_sof0_segment, write_sof0_segment_component};
+    use crate::huffman::encode;
+    use crate::jpg_writer::{SegmentType, write_app0_segment, write_dht_segment, write_marker_for_segment, write_segment_to_stream, write_sof0_segment, write_sof0_segment_component};
     use crate::ppm_parser::read_ppm_from_file;
 
     #[test]
@@ -262,6 +288,17 @@ mod tests {
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
     }
+
+    // #[test]
+    // fn test_write_dht_segment() {
+    //     let mut stream = BitStream::open();
+    //
+    //     let (mut stream, code_map) = encode(&mut stream);
+    //     write_dht_segment(&mut stream, 0, &code_map, false);
+    //     let data: Vec<u8> = vec![0xff, 0xc4, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 1, 0, 1, 0, 0, 0xff, 0xc0, 0, 17, 8, 0, 4, 0, 4, 3, 1, 0x11, 0, 2, 0x11, 0, 3, 0x11, 0, 0xff, 0xd9];
+    //     assert_eq!(data, *stream.data());
+    //     assert_eq!(8, stream.bits_in_last_byte());
+    // }
 
     #[test]
     #[ignore]
