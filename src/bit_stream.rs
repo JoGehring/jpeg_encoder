@@ -439,7 +439,89 @@ mod tests {
 
     use super::BitStream;
 
-// TODO: test für flush_n_bits, read_n_bits_padded
+    #[test]
+    fn test_is_empty_empty_stream() {
+        let stream = BitStream::open();
+        assert!(stream.is_empty());
+    }
+
+    #[test]
+    fn test_is_empty_non_empty_stream() {
+        let mut stream = BitStream::open();
+        stream.append(244u8);
+        assert!(!stream.is_empty());
+    }
+
+    #[test]
+    fn test_append_u8() {
+        let mut stream = BitStream::open();
+        stream.append(244u8);
+        assert_eq!(stream.data, vec![244]);
+    }
+
+    #[test]
+    fn test_append_u16() {
+        let mut stream = BitStream::open();
+        stream.append(244u16);
+        assert_eq!(stream.data, vec![0, 244]);
+    }
+
+    #[test]
+    fn test_flush_n_bits_less_than_byte() {
+        let mut stream = BitStream::open();
+        stream.append(244u8);
+        stream.flush_n_bits(3);
+        assert_eq!(stream.data, vec![244]);
+        assert_eq!(stream.bits_read_from_first_byte, 3);
+    }
+
+    #[test]
+    fn test_flush_n_bits_multiple_bytes() {
+        let mut stream = BitStream::open();
+        stream.append(244u8);
+        stream.append(255u8);
+        stream.flush_n_bits(13);
+        assert_eq!(stream.data, vec![255]);
+        assert_eq!(stream.bits_read_from_first_byte, 5);
+    }
+
+    #[test]
+    fn test_flush_n_bits_empty_stream() {
+        let mut stream = BitStream::open();
+        stream.flush_n_bits(5);
+        assert_eq!(stream.data, vec![]);
+        assert_eq!(stream.bits_read_from_first_byte, 5);
+    }
+
+    #[test]
+    fn test_read_n_bits_padded_empty_stream_pad_true() {
+        let stream = BitStream::open();
+        let result = stream.read_n_bits_padded(8, true);
+        assert_eq!(result, 0b1111_1111);
+    }
+
+    #[test]
+    fn test_read_n_bits_padded_empty_stream_pad_false() {
+        let stream = BitStream::open();
+        let result = stream.read_n_bits_padded(8, false);
+        assert_eq!(result, u16::MIN);
+    }
+
+    #[test]
+    fn test_read_n_bits_padded_sufficient_data_no_padding() {
+        let mut stream = BitStream::open();
+        stream.append_byte(0b1100_0011);
+        let result = stream.read_n_bits_padded(8, false);
+        assert_eq!(result, 0b1100_0011);
+    }
+
+    #[test]
+    fn test_read_n_bits_padded_sufficient_data_with_padding() {
+        let mut stream = BitStream::open();
+        stream.append_byte(0b1100_0011);
+        let result = stream.read_n_bits_padded(10, true);
+        assert_eq!(result, 0b0011_0000_1111);
+    }
 
     #[test]
     fn test_flush_to_file() -> std::io::Result<()> {
