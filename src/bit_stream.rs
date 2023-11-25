@@ -221,9 +221,19 @@ impl BitStream {
     /// stream.append_bit(false);
     /// stream.flush_to_file("test.bin");
     /// ```
-    pub fn flush_to_file(&self, filename: &str) {
-        // todo clear first bits of self.data if self.read_bits_in_first_byte is set
+    pub fn flush_to_file(&mut self, filename: &str) {
+        if self.bits_in_last_byte > 0 {
+            self.clear_first_bits();
+        }
         fs::write(filename, &self.data).expect("Error when writing to file.")
+    }
+
+    fn clear_first_bits(&mut self) {
+        let last_byte_index = self.data.len() - 1;
+        let last_byte = self.data[last_byte_index];
+        let bits_to_clear = 8 - self.bits_in_last_byte;
+        let mask = (1 << bits_to_clear) - 1;
+        self.data[last_byte_index] = last_byte & mask;
     }
 
     /// Read up to 16 bits from the stream. If the stream has less than the requested
@@ -525,7 +535,7 @@ mod tests {
 
     #[test]
     fn test_flush_to_file() -> std::io::Result<()> {
-        let stream = BitStream {
+        let mut stream = BitStream {
             data: vec![0b10101010, 0b01010101],
             bits_in_last_byte: 0,
             bits_read_from_first_byte: 0,
