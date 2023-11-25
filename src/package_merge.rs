@@ -35,7 +35,7 @@ pub fn package_merge(stream: &mut BitStream, height: u16) -> HuffmanNode<u8> {
 //TODO: clean up
 pub fn package_merge_experimental(stream: &mut BitStream, height: u16) -> HashMap<u8, (u8, u16)> {
     let mut nodes = get_single_leaves(stream);
-    if nodes.len() == 0 {
+    if nodes.is_empty() {
         panic!("Alarm");
     }
     if (nodes.len() as f64).log2().ceil() > height as f64 {

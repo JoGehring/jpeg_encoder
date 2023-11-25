@@ -420,7 +420,36 @@ fn combine_nodes(node_1: HuffmanNode<u8>, node_2: HuffmanNode<u8>) -> HuffmanNod
     }
 }
 
-/// TODO: doc comment
+/// Constructs a Huffman tree from a list of Huffman nodes and a mapping of symbols to code lengths.
+/// The resulting tree is represented by the root node.
+///
+/// # Arguments
+///
+/// * `nodes` - A mutable reference to a vector of Huffman nodes.
+/// * `map` - A mutable reference to a hashmap that maps symbols to code lengths and code values.
+///
+/// # Returns
+///
+/// The root node of the constructed Huffman tree.
+///
+/// # Examples
+///
+/// ```
+/// let mut nodes = vec![
+///     HuffmanNode::new(Some(0), 2),
+///     HuffmanNode::new(Some(1), 3),
+///     HuffmanNode::new(Some(2), 3),
+///     HuffmanNode::new(Some(3), 4),
+/// ];
+///
+/// let mut map = HashMap::new();
+/// map.insert(0, (2, 0b00));
+/// map.insert(1, (3, 0b010));
+/// map.insert(2, (3, 0b011));
+/// map.insert(3, (4, 0b1000));
+///
+/// let root = code_len_to_tree(&mut nodes, &mut map);
+/// ```
 pub fn code_len_to_tree(
     nodes: &mut Vec<HuffmanNode<u8>>,
     map: &mut HashMap<u8, (u8, u16)>,
@@ -744,7 +773,28 @@ impl HuffmanNode<u8> {
         return false;
     }
 
-    /// TODO: doc comment
+    /// Checks if the bit stream has space at a given depth.
+    ///
+    /// This function checks if the bit stream has space at the specified depth. The `depth` parameter
+    /// indicates the depth at which the space is being checked. The `leaves_count_as_space` parameter
+    /// determines whether the leaves of the bit stream should be considered as space.
+    ///
+    /// # Arguments
+    ///
+    /// * `depth` - The depth at which the space is being checked.
+    /// * `leaves_count_as_space` - Determines whether the leaves should be considered as space.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` if the bit stream has space at the specified depth, otherwise `false`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let bit_stream = BitStream::new();
+    /// let has_space = bit_stream.has_space_at_depth(2, true);
+    /// assert_eq!(has_space, true);
+    /// ```
     fn has_space_at_depth(&self, depth: u16, leaves_count_as_space: bool) -> bool {
         if self.content.is_some() {
             return if leaves_count_as_space {
