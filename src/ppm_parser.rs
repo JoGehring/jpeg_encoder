@@ -142,7 +142,6 @@ mod tests {
 
     use super::{extract_pixel_values, parse_file_to_split_vec, read_ppm_from_file, unwrap_and_scale};
 
-
     #[test]
     fn test_ppm_from_file_successful() {
         let read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");

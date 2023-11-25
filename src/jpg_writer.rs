@@ -166,7 +166,7 @@ pub fn write_dht_segment(
     let dht_info_byte = current_dht_id + (u8::from(is_ac) << 4);
     stream.append(dht_info_byte);
     for i in 1..17 {
-        let amount: u8 = code_map.iter().filter(|val| val.1 .0 == i).count() as u8;
+        let amount: u8 = code_map.iter().filter(|val| val.1.0 == i).count() as u8;
         stream.append(amount);
     }
     let mut code_vec: Vec<(&u8, &(u8, u16))> = code_map.iter().collect();
@@ -187,8 +187,8 @@ mod tests {
     use crate::bit_stream::BitStream;
     use crate::huffman::encode;
     use crate::jpg_writer::{
-        write_app0_segment, write_dht_segment, write_marker_for_segment, write_segment_to_stream,
-        write_sof0_segment, write_sof0_segment_component, SegmentType,
+        SegmentType, write_app0_segment, write_dht_segment, write_marker_for_segment,
+        write_segment_to_stream, write_sof0_segment, write_sof0_segment_component,
     };
     use crate::ppm_parser::read_ppm_from_file;
 

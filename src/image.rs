@@ -3,6 +3,7 @@ extern crate nalgebra as na;
 use na::{Matrix3, Vector3};
 
 use crate::downsample::downsample_channel;
+
 /// Image data structure for parsed image files
 ///
 /// # Attributes
@@ -469,65 +470,65 @@ mod tests {
     #[test]
     fn test_correct_scaling_not_maximal_value() {
         let image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
-        let expected_image =             Image {
-                width: 4,
-                height: 4,
-                channel1: vec![
-                    vec![0, 0, 0, 65535],
-                    vec![0, 0, 0, 0],
-                    vec![0, 0, 0, 0],
-                    vec![65535, 0, 0, 0]
-                ],
-                channel2: vec![
-                    vec![0, 0, 0, 0],
-                    vec![0, 65535, 0, 0],
-                    vec![0, 0, 65535, 0],
-                    vec![0, 0, 0, 0]
-                ],
-                channel3: vec![
-                    vec![0, 0, 0, 65535],
-                    vec![0, 30583, 0, 0],
-                    vec![0, 0, 30583, 0],
-                    vec![65535, 0, 0, 0]
-                ],
-                y_downsample_factor: 1,
-                cb_downsample_factor: 1,
-                cr_downsample_factor: 1,
-                downsampled_vertically: false,
-            };
+        let expected_image = Image {
+            width: 4,
+            height: 4,
+            channel1: vec![
+                vec![0, 0, 0, 65535],
+                vec![0, 0, 0, 0],
+                vec![0, 0, 0, 0],
+                vec![65535, 0, 0, 0],
+            ],
+            channel2: vec![
+                vec![0, 0, 0, 0],
+                vec![0, 65535, 0, 0],
+                vec![0, 0, 65535, 0],
+                vec![0, 0, 0, 0],
+            ],
+            channel3: vec![
+                vec![0, 0, 0, 65535],
+                vec![0, 30583, 0, 0],
+                vec![0, 0, 30583, 0],
+                vec![65535, 0, 0, 0],
+            ],
+            y_downsample_factor: 1,
+            cb_downsample_factor: 1,
+            cr_downsample_factor: 1,
+            downsampled_vertically: false,
+        };
         assert_eq!(expected_image, image);
     }
 
-        #[test]
+    #[test]
     fn test_correct_scaling_maximal_value() {
         let image = read_ppm_from_file("test/valid_test_maxVal_65535.ppm");
-        let expected_image =             Image {
-                width: 4,
-                height: 4,
-                channel1: vec![
-                    vec![0, 0, 0, 65535],
-                    vec![0, 0, 0, 0],
-                    vec![0, 0, 0, 0],
-                    vec![65535, 0, 0, 0]
-                ],
-                channel2: vec![
-                    vec![0, 0, 0, 0],
-                    vec![0, 65535, 0, 0],
-                    vec![0, 0, 65535, 0],
-                    vec![0, 0, 0, 0]
-                ],
-                channel3: vec![
-                    vec![0, 0, 0, 65535],
-                    vec![0, 7, 0, 0],
-                    vec![0, 0, 7, 0],
-                    vec![65535, 0, 0, 0]
-                ],
-                y_downsample_factor: 1,
-                cb_downsample_factor: 1,
-                cr_downsample_factor: 1,
-                downsampled_vertically: false,
-            };
-            assert_eq!(expected_image, image);
+        let expected_image = Image {
+            width: 4,
+            height: 4,
+            channel1: vec![
+                vec![0, 0, 0, 65535],
+                vec![0, 0, 0, 0],
+                vec![0, 0, 0, 0],
+                vec![65535, 0, 0, 0],
+            ],
+            channel2: vec![
+                vec![0, 0, 0, 0],
+                vec![0, 65535, 0, 0],
+                vec![0, 0, 65535, 0],
+                vec![0, 0, 0, 0],
+            ],
+            channel3: vec![
+                vec![0, 0, 0, 65535],
+                vec![0, 7, 0, 0],
+                vec![0, 0, 7, 0],
+                vec![65535, 0, 0, 0],
+            ],
+            y_downsample_factor: 1,
+            cb_downsample_factor: 1,
+            cr_downsample_factor: 1,
+            downsampled_vertically: false,
+        };
+        assert_eq!(expected_image, image);
     }
 
     #[test]

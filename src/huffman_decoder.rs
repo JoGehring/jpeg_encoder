@@ -26,7 +26,7 @@ pub fn decode(stream: &mut BitStream, code: HashMap<u8, (u8, u16)>) -> BitStream
             stream.flush_n_bits(*len);
             break;
         }
-        iter+=1;
+        iter += 1;
         if iter >= 100 {
             assert!(false)
         }
