@@ -251,8 +251,8 @@ impl BitStream {
     /// stream.append_bit(false);
     /// stream.flush_to_file("test.bin");
     /// ```
-    pub fn flush_to_file(&self, filename: &str) -> std::io::Result<()> {
-        fs::write(filename, &self.data)
+    pub fn flush_to_file(&self, filename: &str) {
+        fs::write(filename, &self.data).expect("Error when writing to file.")
     }
 
     pub fn append<T: AppendableToBitStream>(&mut self, value: T) {
@@ -1042,7 +1042,7 @@ pub fn criterion_byte_and_write_benchmark(c: &mut Criterion) {
             for _ in 0..10_000_000 {
                 stream.append_byte(black_box(170));
             }
-            stream.flush_to_file(black_box("test/test.bin")).expect("bit stream could not be flushed to file");
+            stream.flush_to_file(black_box("test/test.bin"));
         })
     });
     fs::remove_file("test/test.bin").expect("file could not be removed");
@@ -1053,7 +1053,7 @@ pub fn criterion_read_benchmark(c: &mut Criterion) {
     for _ in 0..10_000_000 {
         stream.append_byte(170);
     }
-    stream.flush_to_file(black_box("test/test.bin")).expect("bit stream could not be flushed to file");
+    stream.flush_to_file(black_box("test/test.bin"));
     c.bench_function("Test reading bitstream from file", |b| {
         b.iter(|| {
             let mut read_stream = BitStream::read_bit_stream_from_file(black_box("test/test.bin"));
@@ -1068,7 +1068,7 @@ pub fn criterion_read_and_write_benchmark(c: &mut Criterion) {
     for _ in 0..10_000_000 {
         stream.append_byte(170);
     }
-    stream.flush_to_file(black_box("test/test.bin")).expect("bit stream could not be flushed to file");
+    stream.flush_to_file(black_box("test/test.bin"));
     c.bench_function("Test reading and writing bitstream from/to file", |b| {
         b.iter(|| {
             let mut read_stream = BitStream::read_bit_stream_from_file(black_box("test/test.bin"));
@@ -1076,7 +1076,7 @@ pub fn criterion_read_and_write_benchmark(c: &mut Criterion) {
                 read_stream.append_bit(false);
                 read_stream.append_byte(black_box(170));
             }
-            stream.flush_to_file(black_box("test/test.bin")).expect("bit stream could not be flushed to file");
+            stream.flush_to_file(black_box("test/test.bin"));
         })
     });
     fs::remove_file("test/test.bin").expect("file could not be removed");

@@ -221,9 +221,9 @@ impl BitStream {
     /// stream.append_bit(false);
     /// stream.flush_to_file("test.bin");
     /// ```
-    pub fn flush_to_file(&self, filename: &str) -> std::io::Result<()> {
-        // TODO: clear first bits of self.data if self.read_bits_in_first_byte is set
-        fs::write(filename, &self.data)
+    pub fn flush_to_file(&self, filename: &str) {
+        // todo clear first bits of self.data if self.read_bits_in_first_byte is set
+        fs::write(filename, &self.data).expect("Error when writing to file.")
     }
 
     /// Read up to 16 bits from the stream. If the stream has less than the requested
@@ -531,15 +531,13 @@ mod tests {
             bits_read_from_first_byte: 0,
         };
         let filename = "test.bin";
-        stream.flush_to_file(filename)?;
+        stream.flush_to_file(filename);
 
         let contents = fs::read(filename)?;
         assert_eq!(vec![0b10101010, 0b01010101], contents);
 
         // Clean up the file
-        fs::remove_file(filename)?;
-
-        Ok(())
+        fs::remove_file(filename)
     }
 
     #[test]
