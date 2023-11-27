@@ -222,9 +222,9 @@ impl BitStream {
     /// stream.flush_to_file("test.bin");
     /// ```
     pub fn flush_to_file(&mut self, filename: &str) {
-        if self.bits_in_last_byte > 0 {
-            self.clear_first_bits();
-        }
+        // if self.bits_in_last_byte > 0 {
+        //     self.clear_first_bits();
+        // }
         fs::write(filename, &self.data).expect("Error when writing to file.")
     }
 
