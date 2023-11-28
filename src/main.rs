@@ -3,10 +3,11 @@
 
 use ppm_parser::read_ppm_from_file;
 
+/*
 use crate::bit_stream::BitStream;
 use crate::huffman::encode;
 use crate::jpg_writer::write_dht_segment;
-
+ */
 mod image;
 mod downsample;
 mod ppm_parser;
@@ -17,8 +18,10 @@ mod huffman;
 mod huffman_decoder;
 mod utils;
 mod package_merge;
+mod dct;
 
 fn main() {
+    /*
     let mut image = read_ppm_from_file("test/dwsample-ppm-640.ppm");
     image.rgb_to_ycbcr();
     image.downsample(4, 2, 0);
@@ -64,4 +67,14 @@ fn main() {
 
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::EOI);
     target_stream.flush_to_file("test/test_result.jpg");
+    */
+
+    let mut image = read_ppm_from_file("test/valid_test_8x8.ppm");
+    image.rgb_to_ycbcr();
+    image.downsample(4, 2, 0);
+
+    let (y, cb, cr) = image.to_matrices();
+    println!("{:?}", y);
+    println!("{:?}", cb);
+    println!("{:?}", cr);
 }
