@@ -19,6 +19,7 @@ mod huffman_decoder;
 mod utils;
 mod package_merge;
 mod dct;
+mod arai;
 
 fn main() {
     /*
