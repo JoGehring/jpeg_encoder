@@ -2,7 +2,7 @@ use nalgebra::SMatrix;
 use std::sync::mpsc::{self, Receiver};
 use std::thread::{self, JoinHandle};
 
-use crate::dct::dct::arai_dct;
+use crate::dct::arai_dct;
 use crate::image::Image;
 
 pub fn dct(

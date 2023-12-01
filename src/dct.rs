@@ -1,4 +1,3 @@
-pub mod dct {
     use core::f32::consts::PI;
     use std::ops::Mul;
 
@@ -105,13 +104,12 @@ pub mod dct {
         }
         output
     }
-}
 
 #[cfg(test)]
 mod tests {
     use nalgebra::SMatrix;
 
-    use super::dct::{arai_dct, direct_dct, inverse_dct, matrix_dct};
+    use super::{arai_dct, direct_dct, inverse_dct, matrix_dct};
 
     #[test]
     fn test_direct_dct_from_slides() {
