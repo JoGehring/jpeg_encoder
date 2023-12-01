@@ -1,5 +1,7 @@
 extern crate nalgebra as na;
 
+use std::sync::mpsc::{self, Receiver};
+use std::thread::{self, JoinHandle};
 use na::{Matrix3, SMatrix, Vector3};
 
 use crate::downsample::downsample_channel;
@@ -101,14 +103,39 @@ pub fn create_image(
 /// # Panics
 /// * If `channel`'s dimensions aren't divisible by 8.
 fn channel_to_matrices(channel: &Vec<Vec<u16>>) -> Vec<SMatrix<u16, 8, 8>> {
-    let mut result_vec: Vec<SMatrix<u16, 8, 8>> =
-        Vec::with_capacity((channel.len() / 8) * (channel[0].len() / 8));
 
-    for y in (0..channel.len()).step_by(8) {
-        append_row_matrices_to_channel_matrix(channel, y, &mut result_vec);
+    let mut chunk_size = channel.len() / thread::available_parallelism().unwrap().get();
+    // always ensure that chunk size is divisible by 8 - otherwise threads don't get proper number of rows
+    chunk_size += 8 - chunk_size % 8;
+    let chunks: Vec<&[Vec<u16>]> = channel.chunks(chunk_size).collect();
+    let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(chunks.len());
+    let mut receivers: Vec<Receiver<Vec<SMatrix<u16, 8, 8>>>> = Vec::with_capacity(chunks.len());
+
+    for chunk in chunks {
+        let (tx, rx) = mpsc::channel();
+        // slow copy because directly using `chunk` leads to borrow issues. maybe fixable with lifetimes?
+        let chunk_owned = chunk.to_owned();
+        let handle = thread::spawn(move || {
+            let mut result_vec: Vec<SMatrix<u16, 8, 8>> =
+                Vec::with_capacity((chunk_owned.len() / 8) * (chunk_owned[0].len() / 8));
+            for y in (0..chunk_owned.len()).step_by(8) {
+                append_row_matrices_to_channel_matrix(&chunk_owned, y, &mut result_vec);
+            }
+            tx.send(result_vec).unwrap()
+        });
+
+        handles.push(handle);
+        receivers.push(rx);
     }
 
-    result_vec
+    let mut result: Vec<SMatrix<u16, 8, 8>> = vec![];
+    for handle in handles {
+        handle.join().unwrap();
+    } 
+    for receiver in receivers {
+        result.extend(receiver.recv().unwrap());
+    }
+    result
 }
 
 /// Convert 8 rows' worth of a channel's data into a Vec of 8x8 matrices containing that data.
@@ -124,7 +151,7 @@ fn channel_to_matrices(channel: &Vec<Vec<u16>>) -> Vec<SMatrix<u16, 8, 8>> {
 /// # Panics
 /// * If `channel`'s width is't divisible by 8.
 fn append_row_matrices_to_channel_matrix(
-    channel: &Vec<Vec<u16>>,
+    channel: &[Vec<u16>],
     y: usize,
     result_vec: &mut Vec<SMatrix<u16, 8, 8>>,
 ) {
