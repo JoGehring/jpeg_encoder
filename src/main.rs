@@ -20,6 +20,7 @@ mod utils;
 mod package_merge;
 mod dct;
 mod arai;
+mod parallel_dct;
 
 fn main() {
     /*
@@ -70,12 +71,10 @@ fn main() {
     target_stream.flush_to_file("test/test_result.jpg");
     */
 
-    let mut image = read_ppm_from_file("test/valid_test_8x8.ppm");
-    image.rgb_to_ycbcr();
-    image.downsample(4, 2, 0);
-
-    let (y, cb, cr) = image.to_matrices();
+    let image = read_ppm_from_file("test/valid_test_8x8.ppm");
+    let (y, cb, cr) = crate::parallel_dct::dct(&image);
     println!("{:?}", y);
-    println!("{:?}", cb);
-    println!("{:?}", cr);
+
+    let (y_m, cb_m, cr_m) = image.to_matrices();
+    println!("{:?}", dct::arai_dct(&y_m[0]))
 }
