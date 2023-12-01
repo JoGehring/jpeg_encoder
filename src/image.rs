@@ -92,26 +92,20 @@ pub fn create_image(
 
 /// Convert one channel into a Vec of 8x8 matrices containing its data.
 /// This assumes the channel's dimensions can be divided by 8!
-/// 
+///
 /// # Arguments
 /// * `channel`: The channel for which data should be converted.
 /// * `downsample_factor`: The factor by which the channel was downsampled horizontally.
 /// * `downsampled_vertically`: Whether the channel was downsampled vertically.
-/// 
+///
 /// # Panics
 /// * If `channel`'s dimensions aren't divisible by 8.
-fn channel_to_matrices(
-    channel: &Vec<Vec<u16>>,
-) -> Vec<SMatrix<u16, 8, 8>> {
+fn channel_to_matrices(channel: &Vec<Vec<u16>>) -> Vec<SMatrix<u16, 8, 8>> {
     let mut result_vec: Vec<SMatrix<u16, 8, 8>> =
         Vec::with_capacity((channel.len() / 8) * (channel[0].len() / 8));
 
     for y in (0..channel.len()).step_by(8) {
-        append_row_matrices_to_channel_matrix(
-            channel,
-            y,
-            &mut result_vec,
-        );
+        append_row_matrices_to_channel_matrix(channel, y, &mut result_vec);
     }
 
     result_vec
@@ -119,14 +113,14 @@ fn channel_to_matrices(
 
 /// Convert 8 rows' worth of a channel's data into a Vec of 8x8 matrices containing that data.
 /// This assumes the channel's width can be divided by 8!
-/// 
+///
 /// # Arguments
 /// * `channel`: The channel for which data should be converted.
 /// * `y`: The y index of the first of the 8 rows.
 /// * `downsample_factor`: The factor by which the channel was downsampled horizontally.
 /// * `downsampled_vertically`: Whether the channel was downsampled vertically.
 /// * `result_vec`: The Vec to append the resulting matrices to.
-/// 
+///
 /// # Panics
 /// * If `channel`'s width is't divisible by 8.
 fn append_row_matrices_to_channel_matrix(
@@ -136,24 +130,20 @@ fn append_row_matrices_to_channel_matrix(
 ) {
     let row_vectors = &channel[y..y + 8];
     for x in (0..channel[0].len()).step_by(8) {
-        append_matrix_at_coordinates_to_channel_matrix(
-            x,
-            row_vectors,
-            result_vec,
-        );
+        append_matrix_at_coordinates_to_channel_matrix(x, row_vectors, result_vec);
     }
 }
 
 /// Convert a row of 8 values in row_vectors into a 8x8 matrix.
 /// This assumes the channel's width can be divided by 8!
-/// 
+///
 /// # Arguments
 /// * `x`: The x index of the first of the 8 values in each row.
 /// * `row_vectors`: The vectors to take data from. This should always have the size 8, although it isn't checked.
 /// * `downsample_factor`: The factor by which the channel was downsampled horizontally.
 /// * `downsampled_vertically`: Whether the channel was downsampled vertically.
 /// * `result_vec`: The Vec to append the resulting matrix to.
-/// 
+///
 /// # Panics
 /// * If `channel`'s width is't divisible by 8.
 fn append_matrix_at_coordinates_to_channel_matrix(
@@ -163,7 +153,7 @@ fn append_matrix_at_coordinates_to_channel_matrix(
 ) {
     let mut iter_vector: Vec<u16> = Vec::with_capacity(64);
     for vector in row_vectors {
-        let row_vec = &vector[x..x+8];
+        let row_vec = &vector[x..x + 8];
         iter_vector.extend_from_slice(&row_vec);
     }
     result_vec.push(SMatrix::from_row_iterator(iter_vector.into_iter()));
@@ -305,15 +295,10 @@ impl Image {
             panic!("attempted to convert image to matrices, but image dimensions are not divisible by 8 for at least one channel!");
         }
 
-
         (
             channel_to_matrices(&self.channel1),
-            channel_to_matrices(
-                &self.channel2,
-            ),
-            channel_to_matrices(
-                &self.channel3,
-            ),
+            channel_to_matrices(&self.channel2),
+            channel_to_matrices(&self.channel3),
         )
     }
 
@@ -720,7 +705,7 @@ mod tests {
 
     #[test]
     fn test_to_matrices_downsample_and_ycbcr() {
-        let mut image = read_ppm_from_file("test/valid_test_8x8.ppm");
+        let mut image = read_ppm_from_file("test/valid_test_16x16.ppm");
         image.rgb_to_ycbcr();
         image.downsample(4, 2, 0);
 
@@ -735,33 +720,48 @@ mod tests {
             0, 0, 41956, 0, 0, 0, 41956, 0, // row 7
             27066, 0, 0, 0, 27066, 0, 0, 0, // row 8
         ];
-        let y_expected: Vec<SMatrix<u16, 8, 8>> = vec![SMatrix::from_iterator(y_expected_vec)];
+        let y_expected: Vec<SMatrix<u16, 8, 8>> = vec![
+            SMatrix::from_iterator(y_expected_vec.clone()),
+            SMatrix::from_iterator(y_expected_vec.clone()),
+            SMatrix::from_iterator(y_expected_vec.clone()),
+            SMatrix::from_iterator(y_expected_vec),
+        ];
         assert_eq!(y_expected, y);
 
         let cb_expected_vec = vec![
-            31163, 31163, 38195, 38195, 31163, 31163, 38195, 38195, // row 1
-            31163, 31163, 38195, 38195, 31163, 31163, 38195, 38195, // row 2
-            38195, 38195, 31163, 31163, 38195, 38195, 31163, 31163, // row 3
-            38195, 38195, 31163, 31163, 38195, 38195, 31163, 31163, // row 4
-            31163, 31163, 38195, 38195, 31163, 31163, 38195, 38195, // row 5
-            31163, 31163, 38195, 38195, 31163, 31163, 38195, 38195, // row 6
-            38195, 38195, 31163, 31163, 38195, 38195, 31163, 31163, // row 7
-            38195, 38195, 31163, 31163, 38195, 38195, 31163, 31163, // row 8
+            31163, 38195, 31163, 38195, 31163, 38195, 31163, 38195, // row 1
+            38195, 31163, 38195, 31163, 38195, 31163, 38195, 31163, // row 3
+            31163, 38195, 31163, 38195, 31163, 38195, 31163, 38195, // row 2
+            38195, 31163, 38195, 31163, 38195, 31163, 38195, 31163, // row 4
+            31163, 38195, 31163, 38195, 31163, 38195, 31163, 38195, // row 5
+            38195, 31163, 38195, 31163, 38195, 31163, 38195, 31163, // row 6
+            31163, 38195, 31163, 38195, 31163, 38195, 31163, 38195, // row 7
+            38195, 31163, 38195, 31163, 38195, 31163, 38195, 31163, // row 8
         ];
         let cb_expected: Vec<SMatrix<u16, 8, 8>> = vec![SMatrix::from_iterator(cb_expected_vec)];
         assert_eq!(cb_expected, cb);
 
         let cr_expected_vec = vec![
-            25287, 25287, 39627, 39627, 25287, 25287, 39627, 39627, // row 1
-            25287, 25287, 39627, 39627, 25287, 25287, 39627, 39627, // row 2
-            39627, 39627, 25287, 25287, 39627, 39627, 25287, 25287, // row 3
-            39627, 39627, 25287, 25287, 39627, 39627, 25287, 25287, // row 4
-            25287, 25287, 39627, 39627, 25287, 25287, 39627, 39627, // row 5
-            25287, 25287, 39627, 39627, 25287, 25287, 39627, 39627, // row 6
-            39627, 39627, 25287, 25287, 39627, 39627, 25287, 25287, // row 7
-            39627, 39627, 25287, 25287, 39627, 39627, 25287, 25287, // row 8
+            25287, 39627, 25287, 39627, 25287, 39627, 25287, 39627, // row 1
+            39627, 25287, 39627, 25287, 39627, 25287, 39627, 25287, // row 2
+            25287, 39627, 25287, 39627, 25287, 39627, 25287, 39627, // row 3
+            39627, 25287, 39627, 25287, 39627, 25287, 39627, 25287, // row 4
+            25287, 39627, 25287, 39627, 25287, 39627, 25287, 39627, // row 5
+            39627, 25287, 39627, 25287, 39627, 25287, 39627, 25287, // row 6
+            25287, 39627, 25287, 39627, 25287, 39627, 25287, 39627, // row 7
+            39627, 25287, 39627, 25287, 39627, 25287, 39627, 25287, // row 8
         ];
         let cr_expected: Vec<SMatrix<u16, 8, 8>> = vec![SMatrix::from_iterator(cr_expected_vec)];
         assert_eq!(cr_expected, cr);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_to_matrices_too_small_after_downsample()
+    {
+        let mut image = read_ppm_from_file("test/valid_test_8x8.ppm");
+        image.rgb_to_ycbcr();
+        image.downsample(4, 2, 0);
+        let _ = image.to_matrices();
     }
 }
