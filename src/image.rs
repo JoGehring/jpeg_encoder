@@ -102,18 +102,14 @@ pub fn create_image(
 /// * If `channel`'s dimensions aren't divisible by 8.
 fn channel_to_matrices(
     channel: &Vec<Vec<u16>>,
-    downsample_factor: usize,
-    downsampled_vertically: bool,
 ) -> Vec<SMatrix<u16, 8, 8>> {
     let mut result_vec: Vec<SMatrix<u16, 8, 8>> =
         Vec::with_capacity((channel.len() / 8) * (channel[0].len() / 8));
 
-    for y in (0..channel.len()).step_by(if downsampled_vertically { 4 } else { 8 }) {
+    for y in (0..channel.len()).step_by(8) {
         append_row_matrices_to_channel_matrix(
             channel,
             y,
-            downsample_factor,
-            downsampled_vertically,
             &mut result_vec,
         );
     }
@@ -136,17 +132,13 @@ fn channel_to_matrices(
 fn append_row_matrices_to_channel_matrix(
     channel: &Vec<Vec<u16>>,
     y: usize,
-    downsample_factor: usize,
-    downsampled_vertically: bool,
     result_vec: &mut Vec<SMatrix<u16, 8, 8>>,
 ) {
-    let row_vectors = &channel[y..y + (if downsampled_vertically { 4 } else { 8 })];
-    for x in (0..channel[0].len()).step_by(8 / downsample_factor) {
+    let row_vectors = &channel[y..y + 8];
+    for x in (0..channel[0].len()).step_by(8) {
         append_matrix_at_coordinates_to_channel_matrix(
             x,
             row_vectors,
-            downsample_factor,
-            downsampled_vertically,
             result_vec,
         );
     }
@@ -167,37 +159,14 @@ fn append_row_matrices_to_channel_matrix(
 fn append_matrix_at_coordinates_to_channel_matrix(
     x: usize,
     row_vectors: &[Vec<u16>],
-    downsample_factor: usize,
-    downsampled_vertically: bool,
     result_vec: &mut Vec<SMatrix<u16, 8, 8>>,
 ) {
     let mut iter_vector: Vec<u16> = Vec::with_capacity(64);
     for vector in row_vectors {
-        let row_vec = create_vector_for_row(x, vector, downsample_factor);
-        iter_vector.extend(&row_vec);
-        if downsampled_vertically {
-            iter_vector.extend(&row_vec);
-        }
+        let row_vec = &vector[x..x+8];
+        iter_vector.extend_from_slice(&row_vec);
     }
     result_vec.push(SMatrix::from_row_iterator(iter_vector.into_iter()));
-}
-
-/// Extract 8 values from a Vec representing a part of a row into a Vec.
-/// If the Vec is downsampled, values are repeated accordingly.
-/// 
-/// # Arguments
-/// * `x`: The x index of the first of the 8 values.
-/// * `vector`: The Vec to extract values from.
-/// * `downsample_factor`: The factor by which the channel was downsampled horizontally.
-fn create_vector_for_row(x: usize, vector: &Vec<u16>, downsample_factor: usize) -> Vec<u16>{
-    let row_slice = &vector[x..x + (8 / downsample_factor)];
-    let mut row_vec: Vec<u16> = Vec::with_capacity(8);
-    for value in row_slice {
-        for _ in 0..downsample_factor {
-            row_vec.push(*value);
-        }
-    }
-    row_vec
 }
 
 impl Image {
@@ -327,22 +296,23 @@ impl Image {
         Vec<SMatrix<u16, 8, 8>>,
     ) {
         if self.channel1.len() % 8 != 0
-            || (self.channel1[0].len() * self.y_downsample_factor) % 8 != 0
+            || (self.channel1[0].len()) % 8 != 0
+            || self.channel2.len() % 8 != 0
+            || self.channel2[0].len() % 8 != 0
+            || self.channel3.len() % 8 != 0
+            || self.channel3[0].len() % 8 != 0
         {
-            panic!("to_matrices is only implemented for pictures in 8x8 size!");
+            panic!("attempted to convert image to matrices, but image dimensions are not divisible by 8 for at least one channel!");
         }
 
+
         (
-            channel_to_matrices(&self.channel1, self.y_downsample_factor, false),
+            channel_to_matrices(&self.channel1),
             channel_to_matrices(
                 &self.channel2,
-                self.cb_downsample_factor,
-                self.downsampled_vertically,
             ),
             channel_to_matrices(
                 &self.channel3,
-                self.cr_downsample_factor,
-                self.downsampled_vertically,
             ),
         )
     }
