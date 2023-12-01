@@ -76,5 +76,7 @@ fn main() {
     println!("{:?}", y);
 
     let (y_m, cb_m, cr_m) = image.to_matrices();
-    println!("{:?}", dct::arai_dct(&y_m[0]))
+    println!("{:?}", dct::dct::arai_dct(&y_m[0]));
+    println!("{:?}", dct::dct::arai_dct(&cb_m[0]));
+    println!("{:?}", dct::dct::arai_dct(&cr_m[0]));
 }
