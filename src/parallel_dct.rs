@@ -1,6 +1,7 @@
 use std::sync::mpsc::{self, Receiver};
 use std::thread::{self, JoinHandle};
 use nalgebra::SMatrix;
+use crate::dct::dct::arai_dct;
 
 use crate::image::Image;
 
@@ -37,7 +38,7 @@ fn spawn_threads_for_channel(
     let handle = thread::spawn(move || {
         let mut result: Vec<SMatrix<i32, 8, 8>> = Vec::with_capacity(channel.len());
         for matrix in channel {
-            result.push(crate::dct::arai_dct(&matrix))
+            result.push(arai_dct(&matrix))
         }
         tx.send(result).unwrap()
     });
