@@ -1,7 +1,7 @@
 use std::sync::mpsc::{self, Receiver};
 use std::thread::{self, JoinHandle};
 use nalgebra::SMatrix;
-use crate::dct::dct::arai_dct;
+use crate::dct::arai_dct;
 
 use crate::image::Image;
 
