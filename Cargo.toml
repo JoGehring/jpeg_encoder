@@ -3,6 +3,10 @@ name = "jpeg_encoder"
 version = "0.1.0"
 edition = "2021"
 
+# Optimisations: Only 1 codegen unit and as much link-time optimisation as possible
+[profile.release]
+codegen-units = 1
+lto = "fat"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

@@ -45,7 +45,7 @@ impl AppendableToBitStream for Vec<u8> {
         if amount > (self.len() * 8) as u8 { panic!("Not enough bits in value to append") }
         for i in 0..amount {
             let current_val = self[(i / 8) as usize];
-            let i = 0b1000_0000 >> i % 8;
+            let i = 0b1000_0000 >> (i % 8);
             let bit = current_val & i != 0;
             stream.append_bit(bit);
         }
@@ -80,7 +80,7 @@ impl AppendableToBitStream for Vec<u16> {
         if amount > (self.len() * 16) as u8 { panic!("Not enough bits in value to append") }
         for i in 0..amount {
             let current_val = self[(i / 16) as usize];
-            let i = 0b1000_0000_0000_0000 >> i % 16;
+            let i = 0b1000_0000_0000_0000 >> (i % 16);
             let bit = current_val & i != 0;
             stream.append_bit(bit);
         }

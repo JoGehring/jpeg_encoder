@@ -35,7 +35,8 @@ pub fn downsample_channel(
             final_channel.push(final_lower_row);
         }
     }
-    return final_channel;
+
+    final_channel
 }
 
 /// Down-sample the row and potentially the row below it, based on the factors `a` and `b`.
@@ -86,7 +87,7 @@ fn downsample_rows(
         final_lower_row.append(&mut lower_subresult);
     }
 
-    return (final_row, final_lower_row);
+    (final_row, final_lower_row)
 }
 
 /// Copy an segment of row at the given offset and length.
@@ -119,7 +120,7 @@ fn copy_and_pad(row: &Vec<u16>, offset: usize, length: usize) -> Vec<u16> {
     while row_vec.len() < length {
         row_vec.push(row_vec[row_vec.len() - 1]);
     }
-    return row_vec;
+    row_vec
 }
 
 /// Down-sample the vector, based on the factors `a` and `b`.
@@ -147,7 +148,7 @@ fn downsample_segment_of_row(row_segment: &[u16], a: usize, b: usize) -> Vec<u16
         subresult = downsample_vec_by_two(&subresult);
         factor *= 2;
     }
-    return subresult;
+    subresult
 }
 
 /// Down-sample the vector and return a vector with half the size.
@@ -175,7 +176,7 @@ fn downsample_vec_by_two(original_vec: &Vec<u16>) -> Vec<u16> {
             original_vec[key],
         ));
     }
-    return new_vec;
+    new_vec
 }
 
 /// Calculate an average between two values, while accounting for overflows.

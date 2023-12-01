@@ -149,7 +149,7 @@ fn write_sof0_segment_component(
         max_downsample_factor
     };
     // the four bits for horizontal
-    downsample_value += max_downsample_factor / downsample_factor << 4;
+    downsample_value += (max_downsample_factor / downsample_factor) << 4;
     stream.append(downsample_value);
     stream.append(quantise_table);
 }

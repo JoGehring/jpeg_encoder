@@ -72,9 +72,10 @@ fn main() {
     */
 
     let image = read_ppm_from_file("test/dwsample-ppm-4k.ppm");
+    let start = std::time::Instant::now();
     let (y, cb, cr) = crate::parallel_dct::dct(&image);
-    println!("done");
-    println!("{:?}", y);
-    println!("{:?}", cb);
-    println!("{:?}", cr);
+    println!("{}", start.elapsed().as_millis());
+    println!("{:?}", y.len());
+    println!("{:?}", cb.len());
+    println!("{:?}", cr.len());
 }

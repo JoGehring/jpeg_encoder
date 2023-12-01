@@ -150,6 +150,7 @@ fn channel_to_matrices(channel: &Vec<Vec<u16>>) -> Vec<SMatrix<u16, 8, 8>> {
 ///
 /// # Panics
 /// * If `channel`'s width is't divisible by 8.
+#[inline(always)]
 fn append_row_matrices_to_channel_matrix(
     channel: &[Vec<u16>],
     y: usize,
@@ -173,6 +174,7 @@ fn append_row_matrices_to_channel_matrix(
 ///
 /// # Panics
 /// * If `channel`'s width is't divisible by 8.
+#[inline(always)]
 fn append_matrix_at_coordinates_to_channel_matrix(
     x: usize,
     row_vectors: &[Vec<u16>],
@@ -181,9 +183,9 @@ fn append_matrix_at_coordinates_to_channel_matrix(
     let mut iter_vector: Vec<u16> = Vec::with_capacity(64);
     for vector in row_vectors {
         let row_vec = &vector[x..x + 8];
-        iter_vector.extend_from_slice(&row_vec);
+        iter_vector.extend_from_slice(row_vec);
     }
-    result_vec.push(SMatrix::from_row_iterator(iter_vector.into_iter()));
+    result_vec.push(SMatrix::from_row_iterator(iter_vector));
 }
 
 impl Image {
@@ -285,7 +287,7 @@ impl Image {
             return;
         }
         let product = (a * b * c) as isize;
-        if (product & product - 1) != 0 {
+        if (product & (product - 1)) != 0 {
             panic!("One of the values is not in power of two");
         }
         let result_cb = downsample_channel(&self.channel2, a, b, c == 0);

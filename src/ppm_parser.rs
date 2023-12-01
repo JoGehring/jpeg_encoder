@@ -63,7 +63,7 @@ pub fn read_ppm_from_file(filename: &str) -> Image {
 /// ```
 /// let (image_values1, image_values2, image_values3) = extract_pixel_values(&data, 1920, 1080, 3.14);
 /// ```
-fn extract_pixel_values(raw_data: &Vec<String>, height: usize, width: usize, scaling_factor: f32) -> (Vec<Vec<u16>>, Vec<Vec<u16>>, Vec<Vec<u16>>) {
+fn extract_pixel_values(raw_data: &[String], height: usize, width: usize, scaling_factor: f32) -> (Vec<Vec<u16>>, Vec<Vec<u16>>, Vec<Vec<u16>>) {
     let mut image_values1: Vec<Vec<u16>> = vec![vec![0; width]; height];
     let mut image_values2: Vec<Vec<u16>> = vec![vec![0; width]; height];
     let mut image_values3: Vec<Vec<u16>> = vec![vec![0; width]; height];
@@ -117,7 +117,7 @@ fn parse_file_to_string(filename: &str) -> String {
         .unwrap();
     let vec: Vec<_> = string
         .lines()
-        .filter(|line| !line.starts_with("#"))
+        .filter(|line| !line.starts_with('#'))
         .collect();
     vec.join(" ")
 }
@@ -132,8 +132,8 @@ fn parse_file_to_string(filename: &str) -> String {
 /// # Panics
 ///
 /// * If the value cannot be parsed into a float.
-fn unwrap_and_scale(value: &String, scaling_factor: f32) -> u16 {
-    (value.parse::<f32>().unwrap() as f32 * scaling_factor) as u16
+fn unwrap_and_scale(value: &str, scaling_factor: f32) -> u16 {
+    (value.parse::<f32>().unwrap() * scaling_factor) as u16
 }
 
 #[cfg(test)]
