@@ -1,8 +1,8 @@
 extern crate nalgebra as na;
 
+use na::{Matrix3, SMatrix, Vector3};
 use std::sync::mpsc::{self, Receiver};
 use std::thread::{self, JoinHandle};
-use na::{Matrix3, SMatrix, Vector3};
 
 use crate::downsample::downsample_channel;
 
@@ -103,13 +103,13 @@ pub fn create_image(
 /// # Panics
 /// * If `channel`'s dimensions aren't divisible by 8.
 fn channel_to_matrices(channel: &Vec<Vec<u16>>) -> Vec<SMatrix<u16, 8, 8>> {
-
-    let mut chunk_size = channel.len() / thread::available_parallelism().unwrap().get();
+    let available_threads = thread::available_parallelism().unwrap().get();
+    let mut chunk_size = channel.len() / available_threads;
     // always ensure that chunk size is divisible by 8 - otherwise threads don't get proper number of rows
     chunk_size += 8 - chunk_size % 8;
-    let chunks: Vec<&[Vec<u16>]> = channel.chunks(chunk_size).collect();
-    let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(chunks.len());
-    let mut receivers: Vec<Receiver<Vec<SMatrix<u16, 8, 8>>>> = Vec::with_capacity(chunks.len());
+    let chunks: std::slice::Chunks<'_, Vec<u16>> = channel.chunks(chunk_size);
+    let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(available_threads);
+    let mut receivers: Vec<Receiver<Vec<SMatrix<u16, 8, 8>>>> = Vec::with_capacity(available_threads);
 
     for chunk in chunks {
         let (tx, rx) = mpsc::channel();
@@ -128,10 +128,11 @@ fn channel_to_matrices(channel: &Vec<Vec<u16>>) -> Vec<SMatrix<u16, 8, 8>> {
         receivers.push(rx);
     }
 
-    let mut result: Vec<SMatrix<u16, 8, 8>> = vec![];
+    let mut result: Vec<SMatrix<u16, 8, 8>> =
+        Vec::with_capacity((channel.len() / 8) * (channel[0].len() / 8));
     for handle in handles {
         handle.join().unwrap();
-    } 
+    }
     for receiver in receivers {
         result.extend(receiver.recv().unwrap());
     }
@@ -786,8 +787,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_to_matrices_too_small_after_downsample()
-    {
+    fn test_to_matrices_too_small_after_downsample() {
         let mut image = read_ppm_from_file("test/valid_test_8x8.ppm");
         image.rgb_to_ycbcr();
         image.downsample(4, 2, 0);

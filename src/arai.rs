@@ -55,6 +55,7 @@ pub fn arai_1d(input: &SVector<i32, 8>) -> SVector<i32, 8> {
 ///
 /// # Arguments
 /// * `input`: A vector of integers.
+#[inline(always)]
 fn additions_before_first_multiplication(input: &SVector<i32, 8>) -> SVector<f32, 8> {
     let mut result_vector: SVector<f32, 8> = SVector::zeros();
 
@@ -78,6 +79,7 @@ fn additions_before_first_multiplication(input: &SVector<i32, 8>) -> SVector<f32
 ///
 /// # Arguments
 /// * `vector`: the vector to perform the multiplications on.
+#[inline(always)]
 fn first_multiplications(vector: &mut SVector<f32, 8>) {
     vector[2] *= ARAI_A[1];
     let after_a5 = (-(vector[4] + vector[6])) * ARAI_A[5];
@@ -90,6 +92,7 @@ fn first_multiplications(vector: &mut SVector<f32, 8>) {
 ///
 /// # Arguments
 /// * `vector`: the vector to perform the additions on.
+#[inline(always)]
 fn additions_before_second_multiplication(vector: &mut SVector<f32, 8>) {
     let second_before = vector[2];
     vector[2] += vector[3];
@@ -112,6 +115,7 @@ fn additions_before_second_multiplication(vector: &mut SVector<f32, 8>) {
 ///
 /// # Arguments
 /// * `vector`: the vector to perform the multiplications on.
+#[inline(always)]
 fn second_multiplications(vector: &SVector<f32, 8>) -> SVector<i32, 8> {
     let mut result: SVector<i32, 8> = SVector::zeros();
     result[0] = multiply_and_cast(vector[0], 0);

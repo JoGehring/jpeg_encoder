@@ -121,8 +121,9 @@ fn build_tree<K, F>(nodes: &mut Vec<HuffmanNode<u8>>, sort_lambda: &mut F) -> Hu
 {
     while nodes.len() > 1 {
         nodes.sort_by_key(&mut *sort_lambda);
-        let mut bigger_node = nodes.remove(1);
-        let smaller_node = nodes.remove(0);
+        // use swap_remove because we don't care how elements are reordered and it's O(1) rather than O(n)
+        let mut bigger_node = nodes.swap_remove(1);
+        let smaller_node = nodes.swap_remove(0);
         bigger_node = combine_nodes(bigger_node, smaller_node);
         nodes.push(bigger_node);
     }

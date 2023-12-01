@@ -49,9 +49,9 @@ fn spawn_threads_for_channel(
     let thread_count = std::thread::available_parallelism().unwrap().get();
     // + 1 to avoid creating a new chunk with just the last element
     let chunk_size = (channel.len() / thread_count) + 1;
-    let data_vecs: Vec<&[SMatrix<u16, 8, 8>]> = channel.chunks(chunk_size).collect();
-    let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(data_vecs.len());
-    let mut receivers: Vec<Receiver<Vec<SMatrix<i32, 8, 8>>>> = Vec::with_capacity(data_vecs.len());
+    let data_vecs: std::slice::Chunks<'_, SMatrix<u16, 8, 8>> = channel.chunks(chunk_size);
+    let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(thread_count);
+    let mut receivers: Vec<Receiver<Vec<SMatrix<i32, 8, 8>>>> = Vec::with_capacity(thread_count);
 
     for data in data_vecs {
         let (tx, rx) = mpsc::channel();
