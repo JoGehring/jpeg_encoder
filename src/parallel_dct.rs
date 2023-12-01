@@ -6,12 +6,8 @@ use crate::dct::arai_dct;
 use crate::image::Image;
 
 /// Perform the DCT on an image.
-/// Performing the DCT is split up to multiple threads:
-/// - At first, every channel gets the same amount of threads - if a channel is downsampled (ie has less data), it gets
-/// less by its downsampling factor. As an example, if Cb is downsampled by 4 and Cr is downsampled by 2, Y gets 4 threads, Cb gets 1 thread and Cr gets 2.
-/// - If an image is downsampled vertically (which is applied to Cb and Cr), Y gets twice the threads as it has twice the data.
-/// - While the CPU has more than twice the now distributed amount of threads available, double the threads for each channel. So if you have 6 threads (as you would
-///     if you downsampled 4-2-0) and the CPU supports 12 or more threads, double them. If the CPU supports 24 or more threads, quadruple them.
+/// The DCT is performed for each channel in sequence.
+/// DCT on a channel is parallelised with as many threads as the system has logical CPUs.
 /// 
 /// # Arguments
 /// * `image`: The image to calculate the DCT for.
@@ -23,49 +19,21 @@ pub fn dct(
     Vec<SMatrix<i32, 8, 8>>,
 ) {
     let (y_matrices, cb_matrices, cr_matrices) = image.to_matrices();
-    let (y_threads, cb_threads, cr_threads) = calculate_number_of_threads(image);
 
     let y_capacity = y_matrices.len();
     let cb_capacity = cb_matrices.len();
     let cr_capacity = cr_matrices.len();
 
-    let (y_handles, y_receivers) = spawn_threads_for_channel(y_matrices, y_threads);
-    let (cb_handles, cb_receivers) = spawn_threads_for_channel(cb_matrices, cb_threads);
-    let (cr_handles, cr_receivers) = spawn_threads_for_channel(cr_matrices, cr_threads);
-
+    let (y_handles, y_receivers) = spawn_threads_for_channel(y_matrices);
     let y_result = join_and_receive_threads_for_channel(y_handles, y_receivers, y_capacity);
+
+    let (cb_handles, cb_receivers) = spawn_threads_for_channel(cb_matrices);
     let cb_result = join_and_receive_threads_for_channel(cb_handles, cb_receivers, cb_capacity);
+
+    let (cr_handles, cr_receivers) = spawn_threads_for_channel(cr_matrices);
     let cr_result = join_and_receive_threads_for_channel(cr_handles, cr_receivers, cr_capacity);
 
     (y_result, cb_result, cr_result)
-}
-
-/// Calculate the number of threads for each channel.
-/// - At first, every channel gets the same amount of threads - if a channel is downsampled (ie has less data), it gets
-/// less by its downsampling factor. As an example, if Cb is downsampled by 4 and Cr is downsampled by 2, Y gets 4 threads, Cb gets 1 thread and Cr gets 2.
-/// - If an image is downsampled vertically (which is applied to Cb and Cr), Y gets twice the threads as it has twice the data.
-/// - While the CPU has more than twice the now distributed amount of threads available, double the threads for each channel. So if you have 6 threads (as you would
-///     if you downsampled 4-2-0) and the CPU supports 12 or more threads, double them. If the CPU supports 24 or more threads, quadruple them.
-/// 
-/// # Arguments
-/// * `image`: The image to calculate the DCT for.
-fn calculate_number_of_threads(image: &Image) -> (usize, usize, usize) {
-    let max_downsample_factor =
-        std::cmp::max(image.cb_downsample_factor(), image.cr_downsample_factor());
-    let mut y_threads = max_downsample_factor;
-    let mut cb_threads = max_downsample_factor / image.cb_downsample_factor();
-    let mut cr_threads = max_downsample_factor / image.cr_downsample_factor();
-    if image.downsampled_vertically() {
-        y_threads *= 2;
-    }
-
-    let available_threads = thread::available_parallelism().unwrap().get();
-    let factor = std::cmp::max(1, available_threads / (y_threads + cb_threads + cr_threads));
-    y_threads *= factor;
-    cb_threads *= factor;
-    cr_threads *= factor;
-
-    (y_threads, cb_threads, cr_threads)
 }
 
 /// Spawn the worker threads for each channel.
@@ -77,8 +45,8 @@ fn calculate_number_of_threads(image: &Image) -> (usize, usize, usize) {
 /// * `thread_count`: The number of threads this channel gets.
 fn spawn_threads_for_channel(
     channel: Vec<SMatrix<u16, 8, 8>>,
-    thread_count: usize,
 ) -> (Vec<JoinHandle<()>>, Vec<Receiver<Vec<SMatrix<i32, 8, 8>>>>) {
+    let thread_count = std::thread::available_parallelism().unwrap().get();
     let data_vecs: Vec<&[SMatrix<u16, 8, 8>]> = channel.chunks(thread_count).collect();
     let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(data_vecs.len());
     let mut receivers: Vec<Receiver<Vec<SMatrix<i32, 8, 8>>>> = Vec::with_capacity(data_vecs.len());

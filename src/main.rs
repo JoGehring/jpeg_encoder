@@ -2,7 +2,6 @@
 // remove this once integrating - this is to avoid exessive and useless warnings for the time being
 
 use ppm_parser::read_ppm_from_file;
-use crate::dct::arai_dct;
 
 /*
 use crate::bit_stream::BitStream;
@@ -72,10 +71,10 @@ fn main() {
     target_stream.flush_to_file("test/test_result.jpg");
     */
 
-    let image = read_ppm_from_file("test/valid_test_8x8.ppm");
+    let image = read_ppm_from_file("test/dwsample-ppm-4k.ppm");
     let (y, cb, cr) = crate::parallel_dct::dct(&image);
+    println!("done");
     println!("{:?}", y);
-
-    let (y_m, cb_m, cr_m) = image.to_matrices();
-    println!("{:?}", arai_dct(&y_m[0]))
+    println!("{:?}", cb);
+    println!("{:?}", cr);
 }
