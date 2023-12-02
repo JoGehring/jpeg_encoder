@@ -21,6 +21,7 @@ mod package_merge;
 mod dct;
 mod arai;
 mod parallel_dct;
+mod parallel_downsample;
 
 fn main() {
     /*
@@ -71,11 +72,10 @@ fn main() {
     target_stream.flush_to_file("test/test_result.jpg");
     */
 
-    let image = read_ppm_from_file("test/dwsample-ppm-4k.ppm");
+    let mut image = read_ppm_from_file("test/dwsample-ppm-4k.ppm");
     let start = std::time::Instant::now();
-    let (y, cb, cr) = crate::parallel_dct::dct(&image);
+    image.downsample(4, 4, 0);
     println!("{}", start.elapsed().as_millis());
-    println!("{:?}", y.len());
-    println!("{:?}", cb.len());
-    println!("{:?}", cr.len());
+    //parallel not-optimized/optimized: 147/31ms
+    //non-parallel not-optimized/optimized: 1115/182ms
 }

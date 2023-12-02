@@ -1,10 +1,12 @@
 extern crate nalgebra as na;
 
-use na::{Matrix3, SMatrix, Vector3};
 use std::sync::mpsc::{self, Receiver};
 use std::thread::{self, JoinHandle};
 
+use na::{Matrix3, SMatrix, Vector3};
+
 use crate::downsample::downsample_channel;
+use crate::parallel_downsample;
 
 /// Image data structure for parsed image files
 ///
@@ -303,6 +305,26 @@ impl Image {
         self.downsampled_vertically |= c == 0;
     }
 
+    pub fn downsample_parallel(&mut self, a: usize, b: usize, c: usize) {
+        if a == b && a == c && b == c {
+            return;
+        }
+        let product = (a * b * c) as isize;
+        if (product & (product - 1)) != 0 {
+            panic!("One of the values is not in power of two");
+        }
+        let result_cb = parallel_downsample::downsample_channel(&self.channel2, a, b, c == 0);
+        let cr_b = if c == 0 { b } else { c };
+        let result_cr = parallel_downsample::downsample_channel(&self.channel3, a, cr_b, c == 0);
+
+        self.channel2 = result_cb;
+        self.channel3 = result_cr;
+
+        self.cb_downsample_factor *= a / b;
+        self.cr_downsample_factor *= a / cr_b;
+        self.downsampled_vertically |= c == 0;
+    }
+
     /// Get this image's data as vectors of 8x8 matrices for each of the three channels.
     /// The matrices are ordered top to bottom, then in each row left to right.
     ///
@@ -404,7 +426,7 @@ mod tests {
                     vec![0, 32767],
                     vec![15291, 0],
                     vec![0, 15291],
-                    vec![32767, 0]
+                    vec![32767, 0],
                 ],
                 y_downsample_factor: 1,
                 cb_downsample_factor: 2,
@@ -792,5 +814,106 @@ mod tests {
         image.rgb_to_ycbcr();
         image.downsample(4, 2, 0);
         let _ = image.to_matrices();
+    }
+
+    #[test]
+    fn test_downsample_parallel_image_factor_two() {
+        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
+        read_image.downsample_parallel(4, 2, 2);
+        assert_eq!(
+            Image {
+                width: 4,
+                height: 4,
+                channel1: vec![
+                    vec![0, 0, 0, 65535],
+                    vec![0, 0, 0, 0],
+                    vec![0, 0, 0, 0],
+                    vec![65535, 0, 0, 0],
+                ],
+                channel2: vec![vec![0, 0], vec![32767, 0], vec![0, 32767], vec![0, 0]],
+                channel3: vec![
+                    vec![0, 32767],
+                    vec![15291, 0],
+                    vec![0, 15291],
+                    vec![32767, 0],
+                ],
+                y_downsample_factor: 1,
+                cb_downsample_factor: 2,
+                cr_downsample_factor: 2,
+                downsampled_vertically: false,
+            },
+            read_image
+        );
+    }
+
+    #[test]
+    fn test_downsample_parallel_image_no_downsample() {
+        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
+        read_image.downsample_parallel(4, 4, 4);
+        assert_eq!(
+            Image {
+                width: 4,
+                height: 4,
+                channel1: vec![
+                    vec![0, 0, 0, 65535],
+                    vec![0, 0, 0, 0],
+                    vec![0, 0, 0, 0],
+                    vec![65535, 0, 0, 0],
+                ],
+                channel2: vec![
+                    vec![0, 0, 0, 0],
+                    vec![0, 65535, 0, 0],
+                    vec![0, 0, 65535, 0],
+                    vec![0, 0, 0, 0],
+                ],
+                channel3: vec![
+                    vec![0, 0, 0, 65535],
+                    vec![0, 30583, 0, 0],
+                    vec![0, 0, 30583, 0],
+                    vec![65535, 0, 0, 0],
+                ],
+                y_downsample_factor: 1,
+                cb_downsample_factor: 1,
+                cr_downsample_factor: 1,
+                downsampled_vertically: false,
+            },
+            read_image
+        );
+    }
+
+    #[test]
+    fn test_downsample_parallel_image_factor_four_and_vertical() {
+        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
+        read_image.downsample_parallel(4, 1, 0);
+        assert_eq!(
+            Image {
+                width: 4,
+                height: 4,
+                channel1: vec![
+                    vec![0, 0, 0, 65535],
+                    vec![0, 0, 0, 0],
+                    vec![0, 0, 0, 0],
+                    vec![65535, 0, 0, 0],
+                ],
+                channel2: vec![vec![8191], vec![8191]],
+                channel3: vec![vec![12014], vec![12014]],
+                y_downsample_factor: 1,
+                cb_downsample_factor: 4,
+                cr_downsample_factor: 4,
+                downsampled_vertically: true,
+            },
+            read_image
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn test_downsample_parallel_normal_equal() {
+        let mut read_image = read_ppm_from_file("test/dwsample-ppm-640.ppm");
+        let mut read_image_p = read_ppm_from_file("test/dwsample-ppm-640.ppm");
+        assert_eq!(read_image, read_image_p);
+        read_image.downsample(4, 1, 0);
+        read_image_p.downsample_parallel(4, 1, 0);
+        assert_eq!(read_image, read_image_p);
     }
 }

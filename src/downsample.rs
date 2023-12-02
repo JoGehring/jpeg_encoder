@@ -58,7 +58,7 @@ pub fn downsample_channel(
 /// let row2 = &vec![16, 54, 4, 96, 77, 33, 18, 23, 58, 58, 5, 45];
 /// let (upper_row, lower_row) = downsample_rows(row1, row2, 4, 1, false);
 ///```
-fn downsample_rows(
+pub fn downsample_rows(
     row: &Vec<u16>,
     row2: &Vec<u16>,
     a: usize,
