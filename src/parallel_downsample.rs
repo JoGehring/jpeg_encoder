@@ -4,12 +4,20 @@ use std::thread::{self, JoinHandle};
 
 use crate::downsample::downsample_rows;
 
-/// Perform the DCT on an image.
-/// The DCT is performed for each channel in sequence.
-/// DCT on a channel is parallelised with as many threads as the system has logical CPUs.
+/// Down-sample a color channel of an image.
+/// `a` and `b` are expected to fit the first two parts of standard subsampling notation: https://en.wikipedia.org/wiki/Chroma_subsampling
 ///
 /// # Arguments
-/// * `image`: The image to calculate the DCT for.
+///
+/// * `channel`: The color channel to downsample.
+/// * `a`: `a` as per the standard subsampling notation.
+/// * `b`: `b` as per the standard subsampling notation.
+/// * `downsample_vertical`: Whether every set of two rows should also be combined into one (vertical downsampling).
+///
+/// # Examples
+///```
+/// let result_cb = downsample_channel(&self.data2, a, b, c != 0);
+/// ```
 pub fn downsample_channel(
     channel: &Vec<Vec<u16>>,
     a: usize,
@@ -31,8 +39,10 @@ pub fn downsample_channel(
 /// each of which is then passed into its own thread.
 ///
 /// # Arguments
-/// * `channel`: The channel of data to calculate the DCT on.
-/// * `thread_count`: The number of threads this channel gets.
+/// * `channel`: The color channel to downsample.
+/// * `a`: `a` as per the standard subsampling notation.
+/// * `b`: `b` as per the standard subsampling notation.
+/// * `downsample_vertical`: Whether every set of two rows should also be combined into one (vertical downsampling).
 fn spawn_threads_for_channel(
     channel: &Vec<Vec<u16>>,
     a: usize,
@@ -41,7 +51,7 @@ fn spawn_threads_for_channel(
 ) -> (Vec<JoinHandle<()>>, Vec<Receiver<Vec<Vec<u16>>>>) {
     let thread_count = thread::available_parallelism().unwrap().get();
     let mut chunk_size = channel.len() / thread_count + 1;
-    //ensure that we have at least two rows in each chunk
+    // ensure that chunk_size is divisible by two - otherwise, vertical downsampling breaks
     if chunk_size % 2 == 1 {
         chunk_size += 1
     };
@@ -87,7 +97,7 @@ fn spawn_threads_for_channel(
 /// # Arguments
 /// * `handles`: The thread handles.
 /// * `receivers`: The message receivers for each thread.
-/// * `capacity`: The amount of matrices in the result. Used to avoid having to reallocate.
+/// * `capacity`: The amount of vectors in the result. Used to avoid having to reallocate.
 fn join_and_receive_threads_for_channel(
     handles: Vec<JoinHandle<()>>,
     receivers: Vec<Receiver<Vec<Vec<u16>>>>,
