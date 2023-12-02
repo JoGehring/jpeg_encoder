@@ -16,7 +16,11 @@ pub fn downsample_channel(
     b: usize,
     downsample_vertical: bool,
 ) -> Vec<Vec<u16>> {
-    let len = if downsample_vertical { channel.len() / 2 } else { channel.len() };
+    let len = if downsample_vertical {
+        channel.len() / 2
+    } else {
+        channel.len()
+    };
     let (y_handles, y_receivers) = spawn_threads_for_channel(&channel, a, b, downsample_vertical);
     let final_channel = join_and_receive_threads_for_channel(y_handles, y_receivers, len);
     final_channel
@@ -38,7 +42,9 @@ fn spawn_threads_for_channel(
     let thread_count = thread::available_parallelism().unwrap().get();
     let mut chunk_size = channel.len() / thread_count + 1;
     //ensure that we have at least two rows in each chunk
-    if chunk_size == 1 { chunk_size += 1 };
+    if chunk_size % 2 == 1 {
+        chunk_size += 1
+    };
     let data_vecs: Chunks<'_, Vec<u16>> = channel.chunks(chunk_size);
     let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(thread_count);
     let mut receivers: Vec<Receiver<Vec<Vec<u16>>>> = Vec::with_capacity(thread_count);
@@ -101,7 +107,7 @@ fn join_and_receive_threads_for_channel(
 mod tests {
     use crate::parallel_downsample::downsample_channel;
 
-// #[test]
+    // #[test]
     // fn test_downsample_parallel_simple_image() {
     //     let image = read_ppm_from_file("test/valid_test_8x8.ppm");
     //     downsample_channel(image.channel1(), 4, 2, false);
