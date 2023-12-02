@@ -73,7 +73,7 @@ fn create_p(nodes: &mut [HuffmanNode<u8>]) -> Vec<(u8, u64)> {
 
 #[inline(always)]
 fn populate_first_q_row(
-    p: &Vec<(u8, u64)>,
+    p: &[(u8, u64)],
     lookup: &mut HashMap<u8, (u8, u64)>,
     q: &mut [Vec<Vec<(u8, u64)>>],
 ) {
@@ -148,20 +148,22 @@ fn map_codes_to_code_length(
 }
 
 fn nodes_to_code(nodes: &Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, (u8, u16)>, height: u16) {
-    if 2_i32.pow(height as u32) == nodes.len() as i32 { panic!("Avoiding 1* not possible") }
+    if 2_i32.pow(height as u32) == nodes.len() as i32 {
+        panic!("Avoiding 1* not possible")
+    }
     let mut current_code = 0;
     let mut start = true;
     // We iterate from shortest to longest code
     for (i, node) in nodes.iter().rev().enumerate() {
         let val = &node.content.unwrap();
-        let next_node_code_length: u8;
         let (mut code_length, _) = *map.get(val).unwrap();
-        if i < nodes.len() - 1 {
+
+        let next_node_code_length: u8 = if i < nodes.len() - 1 {
             let key = &nodes[nodes.len() - i - 2].content.unwrap();
-            next_node_code_length = map.get(key).unwrap().0;
+            map.get(key).unwrap().0
         } else {
-            next_node_code_length = 0;
-        }
+            0
+        };
         // If we're on the edge to the next code length, smooth out the transition by incrementing the
         // current code_length and incrementing and shifting the current_code, if not 0
         if code_length != next_node_code_length && next_node_code_length != 0 {
@@ -179,7 +181,10 @@ fn nodes_to_code(nodes: &Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, (u8, u16)>,
         }
         // update the map
         map.insert(*val, (code_length, current_code));
-        println!("value: {}, current code:{:08b}, code length: {}", *val, current_code, code_length);
+        println!(
+            "value: {}, current code:{:08b}, code length: {}",
+            *val, current_code, code_length
+        );
     }
 }
 
@@ -313,7 +318,7 @@ mod tests {
             .min_by_key(|(_, value)| value.0)
             .unwrap()
             .1
-            .0;
+             .0;
         // 27 is the most likely symbol so it should have the shortest code
         assert_eq!(shortest_code_len, map.get(&27u8).unwrap().0)
     }
@@ -425,7 +430,8 @@ mod tests {
         let mut expected: Vec<(u8, (u8, u16))> = map.into_iter().map(|(k, v)| (k, v)).collect();
         expected.sort_by_key(|val| val.0);
         let experimental_map = package_merge_experimental(&mut stream, 5);
-        let mut test: Vec<(u8, (u8, u16))> = experimental_map.into_iter().map(|(k, v)| (k, v)).collect();
+        let mut test: Vec<(u8, (u8, u16))> =
+            experimental_map.into_iter().map(|(k, v)| (k, v)).collect();
         test.sort_by_key(|val| val.0);
         // 27 is the most likely symbol so it should have the shortest code
         assert_eq!(expected, test);

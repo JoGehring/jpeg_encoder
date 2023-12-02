@@ -29,9 +29,8 @@ pub fn downsample_channel(
     } else {
         channel.len()
     };
-    let (y_handles, y_receivers) = spawn_threads_for_channel(&channel, a, b, downsample_vertical);
-    let final_channel = join_and_receive_threads_for_channel(y_handles, y_receivers, len);
-    final_channel
+    let (y_handles, y_receivers) = spawn_threads_for_channel(channel, a, b, downsample_vertical);
+    join_and_receive_threads_for_channel(y_handles, y_receivers, len)
 }
 
 /// Spawn the worker threads for each channel.
@@ -74,7 +73,7 @@ fn spawn_threads_for_channel(
                 };
 
                 let (final_row, final_lower_row) =
-                    downsample_rows(upper_row, &lower_row, a, b, downsample_vertical);
+                    downsample_rows(upper_row, lower_row, a, b, downsample_vertical);
 
                 result.push(final_row);
                 if !downsample_vertical && index + 1 < data_vec.len() {

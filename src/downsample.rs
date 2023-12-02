@@ -28,7 +28,7 @@ pub fn downsample_channel(
         };
 
         let (final_row, final_lower_row) =
-            downsample_rows(&channel[y], &lower_row, a, b, downsample_vertical);
+            downsample_rows(&channel[y], lower_row, a, b, downsample_vertical);
 
         final_channel.push(final_row);
         if !downsample_vertical && y + 1 < channel.len() {
@@ -116,7 +116,7 @@ fn copy_and_pad(row: &Vec<u16>, offset: usize, length: usize) -> Vec<u16> {
     };
     let row = &row[offset..bound];
     let mut row_vec: Vec<u16> = vec![0; row.len()];
-    row_vec.copy_from_slice(&row);
+    row_vec.copy_from_slice(row);
     while row_vec.len() < length {
         row_vec.push(row_vec[row_vec.len() - 1]);
     }
@@ -142,7 +142,7 @@ fn copy_and_pad(row: &Vec<u16>, offset: usize, length: usize) -> Vec<u16> {
 /// ```
 fn downsample_segment_of_row(row_segment: &[u16], a: usize, b: usize) -> Vec<u16> {
     let mut subresult: Vec<u16> = vec![0; row_segment.len()];
-    subresult.copy_from_slice(&row_segment);
+    subresult.copy_from_slice(row_segment);
     let mut factor = b;
     while factor != a {
         subresult = downsample_vec_by_two(&subresult);

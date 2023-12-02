@@ -29,10 +29,10 @@ pub enum SegmentType {
 pub fn write_segment_to_stream(stream: &mut BitStream, image: &Image, segment_type: SegmentType) {
     write_marker_for_segment(stream, &segment_type);
     match segment_type {
-        SegmentType::SOI => return,
+        SegmentType::SOI => (),
         SegmentType::APP0 => write_app0_segment(stream, image),
         SegmentType::SOF0 => write_sof0_segment(stream, image),
-        SegmentType::EOI => return,
+        SegmentType::EOI => (),
         _ => panic!("Not implemented yet!"),
     };
 }
@@ -165,18 +165,21 @@ pub fn write_dht_segment(
     stream.append(len);
     let dht_info_byte = current_dht_id + (u8::from(is_ac) << 4);
     stream.append(dht_info_byte);
+
     for i in 1..17 {
-        let amount: u8 = code_map.iter().filter(|val| val.1.0 == i).count() as u8;
+        let amount: u8 = code_map.iter().filter(|val| val.1 .0 == i).count() as u8;
         stream.append(amount);
     }
     let mut code_vec: Vec<(&u8, &(u8, u16))> = code_map.iter().collect();
+
     code_vec.sort_by(|(_, code), (_2, code2)| {
-        return if code.0 == code2.0 {
+        if code.0 == code2.0 {
             code.1.cmp(&code2.1)
         } else {
             code.0.cmp(&code2.0)
-        };
+        }
     });
+
     for code in code_vec {
         stream.append(*code.0);
     }
@@ -187,8 +190,8 @@ mod tests {
     use crate::bit_stream::BitStream;
     use crate::huffman::encode;
     use crate::jpg_writer::{
-        SegmentType, write_app0_segment, write_dht_segment, write_marker_for_segment,
-        write_segment_to_stream, write_sof0_segment, write_sof0_segment_component,
+        write_app0_segment, write_dht_segment, write_marker_for_segment, write_segment_to_stream,
+        write_sof0_segment, write_sof0_segment_component, SegmentType,
     };
     use crate::ppm_parser::read_ppm_from_file;
 

@@ -201,7 +201,7 @@ impl BitStream {
         let index = self.data.len() - 1;
         let mut last_byte = self.data[index];
         let bits_available = 8 - bits_to_occupy - self.bits_in_last_byte;
-        value = value << bits_available;
+        value <<= bits_available;
         last_byte += value;
         self.data[index] = last_byte;
         self.bits_in_last_byte += bits_to_occupy;
@@ -299,12 +299,11 @@ impl BitStream {
             8
         };
         *bits_in_result = bits_in_first_byte - self.bits_read_from_first_byte;
-        let result = get_n_bits_at_offset(
+        get_n_bits_at_offset(
             self.data[0],
             bits_in_first_byte - self.bits_read_from_first_byte,
             self.bits_read_from_first_byte,
-        ) as u16;
-        result
+        ) as u16
     }
 
     /// Submethod of read_n_bits_padded().
@@ -388,21 +387,19 @@ impl BitStream {
             self.data.remove(0);
         }
         self.bits_read_from_first_byte = amount;
-        if self.data.len() <= 1 {
-            if self.data.len() == 0 || self.bits_in_last_byte <= self.bits_read_from_first_byte {
-                // if we're empty, reset the stream
-                self.data = vec![];
-                self.bits_in_last_byte = 0;
-                self.bits_read_from_first_byte = 0;
-            }
+        if self.is_empty() {
+            // if we're empty, reset the stream
+            self.data = vec![];
+            self.bits_in_last_byte = 0;
+            self.bits_read_from_first_byte = 0;
         }
     }
 
     /// Check whether this stream is empty, i.e. it no longer contains any data or all the data in it
     /// has already been read.
     pub fn is_empty(&self) -> bool {
-        return self.data.len() == 0
-            || (self.data.len() == 1 && self.bits_in_last_byte == self.bits_read_from_first_byte);
+        self.data.len() == 0
+            || (self.data.len() == 1 && self.bits_in_last_byte == self.bits_read_from_first_byte)
     }
 
     /// Append the given data to this bit stream.

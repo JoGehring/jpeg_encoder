@@ -83,7 +83,7 @@ pub(crate) fn get_single_leaves(stream: &mut BitStream) -> Vec<HuffmanNode<u8>> 
 /// * nodes: The vec of nodes to alter.
 /// * value: The value to add or increment.
 fn increment_or_append(nodes: &mut Vec<HuffmanNode<u8>>, value: u8) {
-    if let Some(node) = nodes.into_iter().find(|n| n.content.unwrap() == value) {
+    if let Some(node) = nodes.iter_mut().find(|n| n.content.unwrap() == value) {
         node.chance += 1;
     } else {
         nodes.push(HuffmanNode {
@@ -115,11 +115,11 @@ fn build_huffman_tree(nodes: &mut Vec<HuffmanNode<u8>>) -> HuffmanNode<u8> {
 /// * `nodes`: The leaf nodes to build a tree from.
 /// * `sort_lambda`: The function to sort nodes with.
 fn build_tree<K, F>(nodes: &mut Vec<HuffmanNode<u8>>, sort_lambda: &mut F) -> HuffmanNode<u8>
-    where
-        F: FnMut(&HuffmanNode<u8>) -> K,
-        K: Ord,
+where
+    F: FnMut(&HuffmanNode<u8>) -> K,
+    K: Ord,
 {
-    while nodes.len() > 1 {
+    while !nodes.len() > 1 {
         nodes.sort_by_key(&mut *sort_lambda);
         // use swap_remove because we don't care how elements are reordered and it's O(1) rather than O(n)
         let mut bigger_node = nodes.swap_remove(1);
@@ -127,7 +127,7 @@ fn build_tree<K, F>(nodes: &mut Vec<HuffmanNode<u8>>, sort_lambda: &mut F) -> Hu
         bigger_node = combine_nodes(bigger_node, smaller_node);
         nodes.push(bigger_node);
     }
-    if nodes.len() == 0 {
+    if nodes.is_empty() {
         return HuffmanNode::default();
     }
     nodes.remove(0)
@@ -183,7 +183,7 @@ pub fn code_len_to_tree(
     let mut root = HuffmanNode::default();
     let mut current = &mut root;
     let mut current_height = 0;
-    while nodes.len() > 0 {
+    while !nodes.is_empty() {
         let leaf = nodes.remove(0);
         let destination = map.get(&leaf.content().unwrap()).unwrap().0 - 1;
         while current_height < destination {
@@ -192,14 +192,14 @@ pub fn code_len_to_tree(
                 current = current.right_unchecked_mut();
             } else if current.right().is_some()
                 && current
-                .right_unchecked()
-                .has_space_at_depth((destination - current_height - 1) as u16, false)
+                    .right_unchecked()
+                    .has_space_at_depth((destination - current_height - 1) as u16, false)
             {
                 current = current.right_unchecked_mut();
             } else if current.left().is_some()
                 && current
-                .left_unchecked()
-                .has_space_at_depth((destination - current_height - 1) as u16, false)
+                    .left_unchecked()
+                    .has_space_at_depth((destination - current_height - 1) as u16, false)
             {
                 current = current.left_unchecked_mut();
             } else if current.left().is_none() {
@@ -228,7 +228,7 @@ impl HuffmanNode<u8> {
     ///
     /// # Panics
     /// * if the left child is None.
-    pub fn left_unchecked(&self) -> &Box<HuffmanNode<u8>> {
+    pub fn left_unchecked(&self) -> &HuffmanNode<u8> {
         self.left.as_ref().unwrap()
     }
 
@@ -236,7 +236,7 @@ impl HuffmanNode<u8> {
     ///
     /// # Panics
     /// * if the right child is None.
-    pub fn right_unchecked(&self) -> &Box<HuffmanNode<u8>> {
+    pub fn right_unchecked(&self) -> &HuffmanNode<u8> {
         self.right.as_ref().unwrap()
     }
 
@@ -244,7 +244,7 @@ impl HuffmanNode<u8> {
     ///
     /// # Panics
     /// * if the left child is None.
-    pub fn left_unchecked_mut(&mut self) -> &mut Box<HuffmanNode<u8>> {
+    pub fn left_unchecked_mut(&mut self) -> &mut HuffmanNode<u8> {
         self.left.as_mut().unwrap()
     }
 
@@ -252,7 +252,7 @@ impl HuffmanNode<u8> {
     ///
     /// # Panics
     /// * if the right child is None.
-    pub fn right_unchecked_mut(&mut self) -> &mut Box<HuffmanNode<u8>> {
+    pub fn right_unchecked_mut(&mut self) -> &mut HuffmanNode<u8> {
         self.right.as_mut().unwrap()
     }
     /// Calculate the chance/frequency for all symbols in this node and its child nodes.
@@ -292,20 +292,14 @@ impl HuffmanNode<u8> {
     /// of this node.
     /// Leaves are counted too, so if this node is a leaf, this function returns 1.
     pub fn min_depth(&self) -> u16 {
-        let left = match &self.left {
-            Some(left) => Some(left.min_depth()),
-            None => None,
-        };
-        let right = match &self.right {
-            Some(right) => Some(right.min_depth()),
-            None => None,
-        };
+        let left = self.left.as_ref().map(|left| left.min_depth());
+        let right = self.right.as_ref().map(|right| right.min_depth());
 
         if left.is_none() && right.is_none() {
             return 1;
         }
 
-        return 1 + std::cmp::min(
+        1 + std::cmp::min(
             match left {
                 Some(value) => value,
                 None => u16::MAX,
@@ -314,7 +308,7 @@ impl HuffmanNode<u8> {
                 Some(value) => value,
                 None => u16::MAX,
             },
-        );
+        )
     }
 
     /// Create a clone of this leaf node.
@@ -362,15 +356,15 @@ impl HuffmanNode<u8> {
     /// Unused but left in to show it.
     fn ensure_tree_grows_right(&mut self) {
         if self.left.is_some() && self.right.is_none() {
-            let left = mem::replace(&mut self.left, None);
+            let left = self.left.take();
             self.right = left;
-        } else if self.left.is_some() {
-            if self.left_unchecked().max_depth() > self.right_unchecked().min_depth() {
-                if self.left_unchecked().min_depth() >= self.right_unchecked().max_depth() {
-                    mem::swap(&mut self.right, &mut self.left);
-                } else {
-                    self.swap_inner_nodes();
-                }
+        } else if self.left.is_some()
+            && self.left_unchecked().max_depth() > self.right_unchecked().min_depth()
+        {
+            if self.left_unchecked().min_depth() >= self.right_unchecked().max_depth() {
+                mem::swap(&mut self.right, &mut self.left);
+            } else {
+                self.swap_inner_nodes();
             }
         }
 
@@ -439,22 +433,22 @@ impl HuffmanNode<u8> {
     /// ```
     fn has_space_at_depth(&self, depth: u16, leaves_count_as_space: bool) -> bool {
         if self.content.is_some() {
-            return if leaves_count_as_space {
+            if leaves_count_as_space {
                 depth != 0
             } else {
                 false
-            };
+            }
         } else if self.right.is_none() || self.left.is_none() {
-            return true;
+            true
         } else if depth == 0 {
-            return false;
+            false
         } else {
             return self
                 .left_unchecked()
                 .has_space_at_depth(depth - 1, leaves_count_as_space)
                 || self
-                .right_unchecked()
-                .has_space_at_depth(depth - 1, leaves_count_as_space);
+                    .right_unchecked()
+                    .has_space_at_depth(depth - 1, leaves_count_as_space);
         }
     }
 }
@@ -474,9 +468,9 @@ impl fmt::Debug for HuffmanNode<u8> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         defer_print!();
         build_debug_tree(self, true);
-        write!(
+        writeln!(
             f,
-            "=========================================================\n"
+            "========================================================="
         )
     }
 }
@@ -491,10 +485,10 @@ fn build_debug_tree(current: &HuffmanNode<u8>, is_left: bool) {
     } else {
         add_branch!("{}", u8::from(!is_left));
         if current.left.is_some() {
-            build_debug_tree(&current.left_unchecked(), true);
+            build_debug_tree(current.left_unchecked(), true);
         }
         if current.right.is_some() {
-            build_debug_tree(&current.right_unchecked(), false);
+            build_debug_tree(current.right_unchecked(), false);
         }
     }
 }
@@ -507,9 +501,9 @@ mod tests {
 
     use crate::{bit_stream::BitStream, huffman::increment_or_append};
 
-    use super::{encode, HuffmanNode, parse_u8_stream};
+    use super::{encode, parse_u8_stream, HuffmanNode};
 
-// TODO: tests zumindest für remove_only_ones_code, code_len_to_tree, has_space_at_depth
+    // TODO: tests zumindest für remove_only_ones_code, code_len_to_tree, has_space_at_depth
     // TODO: tests für parse_u8_stream() müssen auch nach rechtswachsendheit prüfen!
 
     #[test]
@@ -609,7 +603,7 @@ mod tests {
             .min_by_key(|(_, value)| value.0)
             .unwrap()
             .1
-            .0;
+             .0;
         assert_eq!(shortest_code_len, map.get(&6u8).unwrap().0)
     }
 

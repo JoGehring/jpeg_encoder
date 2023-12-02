@@ -14,7 +14,6 @@ pub fn decode(stream: &mut BitStream, code: HashMap<u8, (u8, u16)>) -> BitStream
     let (canonical_table, max_len) = create_canonical_table(code);
 
     // let last_code = canonical_table.last().unwrap().0;
-    let mut iter = 1;
     while !stream.is_empty() {
         let value = stream.read_n_bits_padded(max_len, true);
         let mut symbol = 0;
@@ -25,10 +24,6 @@ pub fn decode(stream: &mut BitStream, code: HashMap<u8, (u8, u16)>) -> BitStream
             symbol = *sym;
             stream.flush_n_bits(*len);
             break;
-        }
-        iter += 1;
-        if iter >= 100 {
-            assert!(false)
         }
 
         result.append(symbol);
@@ -74,7 +69,7 @@ fn get_max_len_from_code(code: &HashMap<u8, (u8, u16)>) -> u8 {
 ///
 /// * `code`: The code to convert.
 fn create_code_vec_from_map(code: &HashMap<u8, (u8, u16)>) -> Vec<(u16, u8, u8)> {
-    code.into_iter()
+    code.iter()
         .map(|(symbol, len_and_code)| (len_and_code.1, *symbol, len_and_code.0))
         .collect()
 }
@@ -84,12 +79,12 @@ fn create_code_vec_from_map(code: &HashMap<u8, (u8, u16)>) -> Vec<(u16, u8, u8)>
 /// # Arguments
 ///
 /// * `all_codes`: The vector to sort.
-fn sort_code_vector_by_length_and_code(all_codes: &mut Vec<(u16, u8, u8)>) {
+fn sort_code_vector_by_length_and_code(all_codes: &mut [(u16, u8, u8)]) {
     all_codes.sort_by(|a, b| {
         if a.2 == b.2 {
             return a.0.cmp(&b.0);
         }
-        return a.2.cmp(&b.2);
+        a.2.cmp(&b.2)
     });
 }
 
@@ -99,13 +94,13 @@ fn sort_code_vector_by_length_and_code(all_codes: &mut Vec<(u16, u8, u8)>) {
 ///
 /// * `all_codes`: The vector to work on.
 /// * `max_len`: The length of the longest code in `all_codes`.
-fn pad_code_with_ones(all_codes: &mut Vec<(u16, u8, u8)>, max_len: u8) -> Vec<(u16, u8, u8)> {
+fn pad_code_with_ones(all_codes: &mut [(u16, u8, u8)], max_len: u8) -> Vec<(u16, u8, u8)> {
     all_codes
         .iter()
         .map(|v| {
             let mut new_code = v.0;
             for _ in 0..(max_len - v.2) {
-                new_code = new_code << 1;
+                new_code <<= 1;
                 new_code += 1;
             }
             (new_code, v.1, v.2)
