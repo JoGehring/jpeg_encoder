@@ -5,10 +5,10 @@ use crate::huffman::{code_len_to_tree, get_single_leaves, HuffmanNode};
 
 pub fn package_merge(stream: &mut BitStream, height: u16) -> HuffmanNode<u8> {
     let mut nodes = get_single_leaves(stream);
-    if nodes.len() == 0 {
+    if nodes.is_empty() {
         return HuffmanNode::default();
     }
-    if (nodes.len() as f64).log2().ceil() > height as f64 {
+    if usize::BITS - nodes.len().leading_zeros() > height as u32 {
         panic!("Package merge not possible");
     }
 
@@ -63,24 +63,23 @@ pub fn package_merge_experimental(stream: &mut BitStream, height: u16) -> HashMa
     map
 }
 
-fn create_p(nodes: &mut Vec<HuffmanNode<u8>>) -> Vec<(u8, u64)> {
+#[inline(always)]
+fn create_p(nodes: &mut [HuffmanNode<u8>]) -> Vec<(u8, u64)> {
     nodes
         .iter()
         .map(|node| (node.content().unwrap(), node.chance()))
         .collect()
 }
 
+#[inline(always)]
 fn populate_first_q_row(
     p: &Vec<(u8, u64)>,
     lookup: &mut HashMap<u8, (u8, u64)>,
-    q: &mut Vec<Vec<Vec<(u8, u64)>>>,
+    q: &mut [Vec<Vec<(u8, u64)>>],
 ) {
-    let mut index = 0;
-
-    for i in p {
-        lookup.insert(i.0, (index, i.1));
-        q[0].push(vec![*i]);
-        index += 1;
+    for (index, val) in p.iter().enumerate() {
+        lookup.insert(val.0, (index as u8, val.1));
+        q[0].push(vec![*val]);
     }
 }
 
@@ -93,8 +92,8 @@ fn calculate_further_q_rows(q: &mut Vec<Vec<Vec<(u8, u64)>>>, height: u16) {
     }
 }
 
-fn package(q: &mut Vec<Vec<(u8, u64)>>, q_0: &mut Vec<Vec<(u8, u64)>>) -> Vec<Vec<(u8, u64)>> {
-    let mut next_row = q_0.clone();
+fn package(q: &mut Vec<Vec<(u8, u64)>>, q_0: &mut [Vec<(u8, u64)>]) -> Vec<Vec<(u8, u64)>> {
+    let mut next_row = q_0.to_owned();
     for i in (0..q.len() - q.len() % 2).step_by(2) {
         let mut node: Vec<(u8, u64)> = vec![];
         let mut left: Vec<(u8, u64)> = q[i].clone();
@@ -112,7 +111,7 @@ fn package(q: &mut Vec<Vec<(u8, u64)>>, q_0: &mut Vec<Vec<(u8, u64)>>) -> Vec<Ve
 }
 
 fn calculate_code_lengths(
-    q: &Vec<Vec<(u8, u64)>>,
+    q: &[Vec<(u8, u64)>],
     lookup: &mut HashMap<u8, (u8, u64)>,
     number_of_nodes: usize,
 ) -> Vec<u64> {
@@ -131,9 +130,9 @@ fn calculate_code_lengths(
 
 fn map_codes_to_code_length(
     p: &Vec<(u8, u64)>,
-    l: &Vec<u64>,
+    l: &[u64],
     lookup: &HashMap<u8, (u8, u64)>,
-    nodes: &mut Vec<HuffmanNode<u8>>,
+    nodes: &mut [HuffmanNode<u8>],
     height: u16,
 ) -> HashMap<u8, (u8, u16)> {
     let mut map: HashMap<u8, (u8, u16)> = HashMap::with_capacity(p.len());
