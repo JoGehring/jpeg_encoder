@@ -111,7 +111,8 @@ fn channel_to_matrices(channel: &Vec<Vec<u16>>) -> Vec<SMatrix<u16, 8, 8>> {
     chunk_size += 8 - chunk_size % 8;
     let chunks: std::slice::Chunks<'_, Vec<u16>> = channel.chunks(chunk_size);
     let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(available_threads);
-    let mut receivers: Vec<Receiver<Vec<SMatrix<u16, 8, 8>>>> = Vec::with_capacity(available_threads);
+    let mut receivers: Vec<Receiver<Vec<SMatrix<u16, 8, 8>>>> =
+        Vec::with_capacity(available_threads);
 
     for chunk in chunks {
         let (tx, rx) = mpsc::channel();
@@ -352,6 +353,18 @@ impl Image {
             channel_to_matrices(&self.channel2),
             channel_to_matrices(&self.channel3),
         )
+    }
+
+    /// Get the data of this image's first channel (Y) as a vector of 8x8 matrices.
+    /// The matrices are ordered top to bottom, then in each row left to right.
+    /// 
+    /// # Panics
+    /// * If the image's height or width cannot be divided by 8.
+    pub fn single_channel_to_matrices(&self) -> Vec<SMatrix<u16, 8, 8>> {
+        if self.channel1.len() % 8 != 0 || (self.channel1[0].len()) % 8 != 0 {
+            panic!("attempted to convert image to matrices, but image dimensions are not divisible by 8 for at least one channel!");
+        }
+        channel_to_matrices(&self.channel1)
     }
 
     pub fn channel1(&self) -> &Vec<Vec<u16>> {

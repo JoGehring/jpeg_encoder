@@ -1,27 +1,29 @@
 #![allow(dead_code)]
 // remove this once integrating - this is to avoid exessive and useless warnings for the time being
 
-use ppm_parser::read_ppm_from_file;
+use dct::DCTMode;
+
+use crate::image::create_image;
 
 /*
 use crate::bit_stream::BitStream;
 use crate::huffman::encode;
 use crate::jpg_writer::write_dht_segment;
  */
-mod image;
-mod downsample;
-mod ppm_parser;
-mod bit_stream;
-mod jpg_writer;
 mod appendable_to_bit_stream;
+mod arai;
+mod bit_stream;
+mod dct;
+mod downsample;
 mod huffman;
 mod huffman_decoder;
-mod utils;
+mod image;
+mod jpg_writer;
 mod package_merge;
-mod dct;
-mod arai;
 mod parallel_dct;
 mod parallel_downsample;
+mod ppm_parser;
+mod utils;
 
 fn main() {
     /*
@@ -71,11 +73,47 @@ fn main() {
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::EOI);
     target_stream.flush_to_file("test/test_result.jpg");
     */
-
-    let mut image = read_ppm_from_file("test/dwsample-ppm-4k.ppm");
-    let start = std::time::Instant::now();
+    /*
+    // let mut image = read_ppm_from_file("test/dwsample-ppm-4k.ppm");
+    let downsample_timer = std::time::Instant::now();
     image.downsample(4, 4, 0);
-    println!("{}", start.elapsed().as_millis());
+    println!("{}", downsample_timer.elapsed().as_millis());
+    let dct_timer = std::time::Instant::now();
+    parallel_dct::dct(&image);
+    println!("{}", dct_timer.elapsed().as_millis());
     //parallel not-optimized/optimized: 147/31ms
     //non-parallel not-optimized/optimized: 1115/182ms
+    */
+
+    let mut image_data: Vec<Vec<u16>> = Vec::with_capacity(2160);
+    for y in 0..2160 {
+        image_data.push(Vec::with_capacity(3840));
+        let index = image_data.len() - 1;
+        let current_vec = &mut image_data[index];
+        for x in 0..3840 {
+            current_vec.push((x + y * 8) % 256);
+        }
+    }
+
+    let image = create_image(2160, 3840, image_data, vec![], vec![]);
+    for mode in [DCTMode::Arai, DCTMode::Direct, DCTMode::Matrix] {
+        println!("Starting to test mode {}", mode);
+        let timer_start = std::time::Instant::now();
+        // 200 should be plenty - would be enough for 50ms runs
+        let mut times = Vec::with_capacity(200);
+        // do this for about 10 seconds
+        while timer_start.elapsed().as_millis() < 10000 {
+            let timer_single_run = std::time::Instant::now();
+            let _ = parallel_dct::dct_single_channel(&image, &mode);
+            times.push(timer_single_run.elapsed().as_millis());
+        }
+        println!("Finished!");
+        times.sort();
+        let min = times.first().unwrap();
+        let max = times.last().unwrap();
+        let mean: u128 = times.iter().sum::<u128>() / (times.len() as u128);
+        let median = times[times.len() / 2];
+        println!("Min ::: Median ::: Max ::::: Mean");
+        println!("{} ::: {} ::: {} ::::: {}", min, median, max, mean);
+    }
 }

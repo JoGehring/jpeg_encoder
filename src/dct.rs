@@ -1,6 +1,6 @@
 use core::f32::consts::PI;
-use std::{ops::Mul, f32::consts::SQRT_2};
 use lazy_static::lazy_static;
+use std::{f32::consts::SQRT_2, ops::Mul};
 
 use nalgebra::SMatrix;
 
@@ -9,6 +9,26 @@ use crate::arai::arai_1d;
 const MATRIX_C0: f32 = 1.0 / SQRT_2;
 lazy_static! {
     static ref MATRIX_SQRT_CONST: f32 = 0.25f32.sqrt();
+}
+
+pub enum DCTMode {
+    Direct,
+    Matrix,
+    Arai,
+}
+
+impl std::fmt::Display for DCTMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                DCTMode::Direct => "direct",
+                DCTMode::Matrix => "matrix",
+                DCTMode::Arai => "arai",
+            }
+        )
+    }
 }
 
 /// Discrete Cosine Transform on a 8x8 u16 matrix, implemented directly using the standard
