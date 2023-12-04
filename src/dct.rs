@@ -6,9 +6,23 @@ use nalgebra::SMatrix;
 
 use crate::arai::arai_1d;
 
+/// The matrix used as A in the matrix approach.
+/// We only need to create this once, so lazy_static!.
+fn matrix_dct_a_matrix() -> SMatrix<f32, 8, 8> {
+    let mut a_matrix: SMatrix<f32, 8, 8> = SMatrix::from_element(0.0);
+    for k in 0..8 {
+        for n in 0..8 {
+            let cos_val = (((2 * n + 1) * k) as f32 * PI / 16.0f32).cos();
+            a_matrix[(k, n)] = cos_val * *MATRIX_SQRT_CONST * if k == 0 { MATRIX_C0 } else { 1.0 };
+        }
+    }
+    a_matrix
+}
 const MATRIX_C0: f32 = 1.0 / SQRT_2;
+// use lazy_static! because float math isn't const
 lazy_static! {
     static ref MATRIX_SQRT_CONST: f32 = 0.25f32.sqrt();
+    static ref MATRIX_A_MATRIX: SMatrix<f32, 8, 8> = matrix_dct_a_matrix();
 }
 
 pub enum DCTMode {
@@ -65,16 +79,10 @@ pub fn direct_dct(input: &SMatrix<u16, 8, 8>) -> SMatrix<i32, 8, 8> {
 /// # Arguments
 /// * `input`: The matrix to perform the DCT on.
 pub fn matrix_dct(input: &SMatrix<u16, 8, 8>) -> SMatrix<i32, 8, 8> {
-    let mut a_matrix: SMatrix<f32, 8, 8> = SMatrix::from_element(0.0);
-    let mut x_matrix: SMatrix<f32, 8, 8> = SMatrix::from_element(0.0);
-    for k in 0..8 {
-        for n in 0..8 {
-            let cos_val = (((2 * n + 1) * k) as f32 * PI / 16.0f32).cos();
-            a_matrix[(k, n)] = cos_val * *MATRIX_SQRT_CONST * if k == 0 { MATRIX_C0 } else { 1.0 };
-            x_matrix[(k, n)] = input[(k, n)] as f32;
-        }
-    }
-    let y = a_matrix.mul(x_matrix).mul(a_matrix.transpose());
+    let x_matrix = input.cast::<f32>();
+    let y = MATRIX_A_MATRIX
+        .mul(x_matrix)
+        .mul(MATRIX_A_MATRIX.transpose());
     y.map(|x| x.round() as i32)
 }
 
