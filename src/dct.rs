@@ -25,8 +25,18 @@ fn direct_dct_lookup_table() -> [[[[f32; 8]; 8]; 8]; 8] {
         for j in 0..8 {
             for x in 0..8 {
                 for y in 0..8 {
+                    // multiplications with 2/N, C(i) and C(j) are moved in here for optimisation
                     result[i][j][x][y] = ((((2 * x + 1) * i) as f32 * PI) / 16.0).cos()
-                        * ((((2 * y + 1) * j) as f32 * PI) / 16.0).cos();
+                        * ((((2 * y + 1) * j) as f32 * PI) / 16.0).cos()
+                        * 0.25; // 2/N
+                    // this is semantically the same as new_y /= SQRT_2 - optimised because multiplication is faster than division
+                    // new_y/SQRT_2 == new_y*SQRT_2/2, SQRT_2_DIV_2 == SQRT_2/2
+                    if i == 0 { // C(i)
+                        result[i][j][x][y] *= SQRT_2_DIV_2
+                    }
+                    if j == 0 { // C(j)
+                        result[i][j][x][y] *= SQRT_2_DIV_2
+                    }
                 }
             }
         }
@@ -76,17 +86,9 @@ pub fn direct_dct(input: &SMatrix<u16, 8, 8>) -> SMatrix<i32, 8, 8> {
             let mut new_y: f32 = 0.0;
             for x in 0..8 {
                 for y in 0..8 {
+                    // all logic for new_y is in DIRECT_LOOKUP_TABLE
                     new_y += input[(x, y)] as f32 * DIRECT_LOOKUP_TABLE[i][j][x][y];
                 }
-            }
-            new_y *= 0.25;
-            // this is semantically the same as new_y /= SQRT_2 - optimised because multiplication is faster than division
-            // new_y/SQRT_2 == new_y*SQRT_2/2, SQRT_2_DIV_2 == SQRT_2/2
-            if i == 0 {
-                new_y *= SQRT_2_DIV_2
-            }
-            if j == 0 {
-                new_y *= SQRT_2_DIV_2
             }
             output[(i, j)] = new_y.round() as i32;
         }
