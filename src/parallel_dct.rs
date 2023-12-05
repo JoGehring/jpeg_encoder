@@ -46,9 +46,7 @@ pub fn dct_single_channel(image: &Image, mode: &DCTMode) -> Vec<SMatrix<i32, 8, 
     };
     let y_matrices = image.single_channel_to_matrices();
 
-    let y_result = dct_channel(y_matrices, function);
-
-    y_result
+    dct_channel(y_matrices, function)
 }
 
 /// process the channel.
@@ -73,7 +71,7 @@ fn dct_channel(
             handles.push(s.spawn(move || {
                 let mut result: Vec<SMatrix<i32, 8, 8>> = Vec::with_capacity(chunk.len());
                 for matrix in chunk {
-                    result.push(function(&matrix))
+                    result.push(function(matrix))
                 }
                 result
             }));
