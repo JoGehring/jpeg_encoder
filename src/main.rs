@@ -99,8 +99,8 @@ fn main() {
     for mode in [DCTMode::Arai, DCTMode::Direct, DCTMode::Matrix] {
         println!("Starting to test mode {}", mode);
         let timer_start = std::time::Instant::now();
-        // 200 should be plenty - would be enough for 50ms runs
-        let mut times = Vec::with_capacity(200);
+        // 2000 should be plenty - would be enough for 5ms runs
+        let mut times = Vec::with_capacity(2000);
         // do this for about 10 seconds
         while timer_start.elapsed().as_millis() < 10000 {
             let timer_single_run = std::time::Instant::now();
