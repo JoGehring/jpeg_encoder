@@ -18,9 +18,28 @@ fn matrix_dct_a_matrix() -> SMatrix<f32, 8, 8> {
     }
     a_matrix
 }
+
+fn direct_dct_lookup_table() -> [[[[f32; 8]; 8]; 8]; 8] {
+    let mut result = [[[[0f32; 8]; 8]; 8]; 8];
+    for i in 0..8 {
+        for j in 0..8 {
+            for x in 0..8 {
+                for y in 0..8 {
+                    result[i][j][x][y] = ((((2 * x + 1) * i) as f32 * PI) / 16.0).cos()
+                        * ((((2 * y + 1) * j) as f32 * PI) / 16.0).cos();
+                }
+            }
+        }
+    }
+
+    result
+}
+
+const SQRT_2_DIV_2: f32 = SQRT_2 / 2f32;
 const MATRIX_C0: f32 = 1.0 / SQRT_2;
 // use lazy_static! because float math isn't const
 lazy_static! {
+    static ref DIRECT_LOOKUP_TABLE: [[[[f32; 8]; 8]; 8]; 8] = direct_dct_lookup_table();
     static ref MATRIX_SQRT_CONST: f32 = 0.25f32.sqrt();
     static ref MATRIX_A_MATRIX: SMatrix<f32, 8, 8> = matrix_dct_a_matrix();
 }
@@ -56,17 +75,17 @@ pub fn direct_dct(input: &SMatrix<u16, 8, 8>) -> SMatrix<i32, 8, 8> {
             let mut new_y: f32 = 0.0;
             for x in 0..8 {
                 for y in 0..8 {
-                    new_y += input[(x, y)] as f32
-                        * (((2 * x + 1) as f32 * i as f32 * PI) / 16.0).cos()
-                        * (((2 * y + 1) as f32 * j as f32 * PI) / 16.0).cos();
+                    new_y += input[(x, y)] as f32 * DIRECT_LOOKUP_TABLE[i][j][x][y];
                 }
             }
             new_y *= 0.25;
+            // this is semantically the same as new_y /= SQRT_2 - optimised because multiplication is faster than division
+            // new_y/SQRT_2 == new_y*SQRT_2/2, SQRT_2_DIV_2 == SQRT_2/2
             if i == 0 {
-                new_y *= 1.0 / 2_f32.sqrt()
+                new_y *= SQRT_2_DIV_2
             }
             if j == 0 {
-                new_y *= 1.0 / 2_f32.sqrt()
+                new_y *= SQRT_2_DIV_2
             }
             output[(i, j)] = new_y.round() as i32;
         }
