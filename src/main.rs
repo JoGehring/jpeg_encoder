@@ -107,13 +107,14 @@ fn main() {
             let _ = parallel_dct::dct_single_channel(&image, &mode);
             times.push(timer_single_run.elapsed().as_millis());
         }
-        println!("Finished!");
         times.sort();
         let min = times.first().unwrap();
         let max = times.last().unwrap();
         let mean: u128 = times.iter().sum::<u128>() / (times.len() as u128);
         let median = times[times.len() / 2];
-        println!("Min ::: Median ::: Max ::::: Mean");
-        println!("{} ::: {} ::: {} ::::: {}", min, median, max, mean);
+        let twenty_fifth = times[times.len() / 4];
+        let seventy_fifth = times[times.len() / 2 + times.len() / 4];
+        println!("Mode ::::: Min ::: 25th ::: Median ::: 75th ::: Max ::::: Mean");
+        println!("{} ::::: {} ::: {} ::: {} ::: {} ::: {} ::::: {}", mode, min, twenty_fifth, median, seventy_fifth, max, mean);
     }
 }
