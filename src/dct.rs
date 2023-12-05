@@ -42,6 +42,7 @@ lazy_static! {
     static ref DIRECT_LOOKUP_TABLE: [[[[f32; 8]; 8]; 8]; 8] = direct_dct_lookup_table();
     static ref MATRIX_SQRT_CONST: f32 = 0.25f32.sqrt();
     static ref MATRIX_A_MATRIX: SMatrix<f32, 8, 8> = matrix_dct_a_matrix();
+    static ref MATRIX_A_MATRIX_TRANSPOSED: SMatrix<f32, 8, 8> = matrix_dct_a_matrix().transpose();
 }
 
 pub enum DCTMode {
@@ -101,7 +102,7 @@ pub fn matrix_dct(input: &SMatrix<u16, 8, 8>) -> SMatrix<i32, 8, 8> {
     let x_matrix = input.cast::<f32>();
     let y = MATRIX_A_MATRIX
         .mul(x_matrix)
-        .mul(MATRIX_A_MATRIX.transpose());
+        .mul(*MATRIX_A_MATRIX_TRANSPOSED);
     y.map(|x| x.round() as i32)
 }
 
