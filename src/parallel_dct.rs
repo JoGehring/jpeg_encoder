@@ -1,6 +1,5 @@
 use nalgebra::SMatrix;
-use std::sync::mpsc::{self, Receiver};
-use std::thread::{self, JoinHandle};
+use std::thread;
 
 use crate::dct::{arai_dct, direct_dct, matrix_dct, DCTMode};
 use crate::image::Image;
@@ -27,18 +26,9 @@ pub fn dct(
 
     let (y_matrices, cb_matrices, cr_matrices) = image.to_matrices();
 
-    let y_capacity = y_matrices.len();
-    let cb_capacity = cb_matrices.len();
-    let cr_capacity = cr_matrices.len();
-
-    let (y_handles, y_receivers) = spawn_threads_for_channel(y_matrices, function);
-    let y_result = join_and_receive_threads_for_channel(y_handles, y_receivers, y_capacity);
-
-    let (cb_handles, cb_receivers) = spawn_threads_for_channel(cb_matrices, function);
-    let cb_result = join_and_receive_threads_for_channel(cb_handles, cb_receivers, cb_capacity);
-
-    let (cr_handles, cr_receivers) = spawn_threads_for_channel(cr_matrices, function);
-    let cr_result = join_and_receive_threads_for_channel(cr_handles, cr_receivers, cr_capacity);
+    let y_result = dct_channel(y_matrices, function);
+    let cb_result = dct_channel(cb_matrices, function);
+    let cr_result = dct_channel(cr_matrices, function);
 
     (y_result, cb_result, cr_result)
 }
@@ -56,72 +46,43 @@ pub fn dct_single_channel(image: &Image, mode: &DCTMode) -> Vec<SMatrix<i32, 8, 
     };
     let y_matrices = image.single_channel_to_matrices();
 
-    let y_capacity = y_matrices.len();
-
-    let (y_handles, y_receivers) = spawn_threads_for_channel(y_matrices, function);
-    let y_result = join_and_receive_threads_for_channel(y_handles, y_receivers, y_capacity);
+    let y_result = dct_channel(y_matrices, function);
 
     y_result
 }
 
-/// Spawn the worker threads for each channel.
+/// process the channel.
 /// The channel data is split up into chunks of equal size,
 /// each of which is then passed into its own thread.
+/// This uses as many threads as the system has logical CPUs.
 ///
 /// # Arguments
 /// * `channel`: The channel of data to calculate the DCT on.
-/// * `thread_count`: The number of threads this channel gets.
-fn spawn_threads_for_channel(
+/// * `function`: The DCT function to use.
+fn dct_channel(
     channel: Vec<SMatrix<u16, 8, 8>>,
     function: fn(&SMatrix<u16, 8, 8>) -> SMatrix<i32, 8, 8>,
-) -> (Vec<JoinHandle<()>>, Vec<Receiver<Vec<SMatrix<i32, 8, 8>>>>) {
-    let thread_count = std::thread::available_parallelism().unwrap().get();
-    // + 1 to avoid creating a new chunk with just the last element
-    let chunk_size = (channel.len() / thread_count) + 1;
-    let data_vecs: std::slice::Chunks<'_, SMatrix<u16, 8, 8>> = channel.chunks(chunk_size);
-    let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(thread_count);
-    let mut receivers: Vec<Receiver<Vec<SMatrix<i32, 8, 8>>>> = Vec::with_capacity(thread_count);
-
-    for data in data_vecs {
-        let (tx, rx) = mpsc::channel();
-        // slow copy because directly using `data` leads to borrow issues. maybe fixable with lifetimes?
-        let data_vec = data.to_vec();
-
-        let handle = thread::spawn(move || {
-            let mut result: Vec<SMatrix<i32, 8, 8>> = Vec::with_capacity(data_vec.len());
-            for matrix in data_vec {
-                result.push(function(&matrix))
-            }
-            tx.send(result).unwrap()
-        });
-
-        handles.push(handle);
-        receivers.push(rx);
-    }
-
-    (handles, receivers)
-}
-
-/// Join and receive worker threads for this channel,
-/// then combine their resulting data into a single Vec.
-///
-/// # Arguments
-/// * `handles`: The thread handles.
-/// * `receivers`: The message receivers for each thread.
-/// * `capacity`: The amount of matrices in the result. Used to avoid having to reallocate.
-fn join_and_receive_threads_for_channel(
-    handles: Vec<JoinHandle<()>>,
-    receivers: Vec<Receiver<Vec<SMatrix<i32, 8, 8>>>>,
-    capacity: usize,
 ) -> Vec<SMatrix<i32, 8, 8>> {
-    let mut result: Vec<SMatrix<i32, 8, 8>> = Vec::with_capacity(capacity);
-    for handle in handles {
-        handle.join().unwrap();
-    }
-    for receiver in receivers {
-        result.extend(receiver.recv().unwrap());
-    }
-    result
+    let thread_count = thread::available_parallelism().unwrap().get();
+    let chunk_size = (channel.len() / thread_count) + 1;
+    let chunks: std::slice::Chunks<'_, SMatrix<u16, 8, 8>> = channel.chunks(chunk_size);
+    thread::scope(|s| {
+        let mut result = Vec::with_capacity(channel.len());
+        let mut handles = Vec::with_capacity(chunks.len());
+        for chunk in chunks {
+            handles.push(s.spawn(move || {
+                let mut result: Vec<SMatrix<i32, 8, 8>> = Vec::with_capacity(chunk.len());
+                for matrix in chunk {
+                    result.push(function(&matrix))
+                }
+                result
+            }));
+        }
+        for handle in handles {
+            result.extend(handle.join().unwrap());
+        }
+        result
+    })
 }
 
 #[cfg(test)]
@@ -175,7 +136,7 @@ mod tests {
         assert_eq!(cb_expected, cb);
         assert_eq!(cr_expected, cr);
     }
-    
+
     #[test]
     fn test_single_channel_simple_image() {
         let image = read_ppm_from_file("test/valid_test_8x8.ppm");
