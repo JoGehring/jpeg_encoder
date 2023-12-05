@@ -129,6 +129,7 @@ fn second_multiplications(vector: &SVector<f32, 8>) -> SVector<i32, 8> {
     result
 }
 
+#[inline(always)]
 fn multiply_and_cast(value: f32, index: usize) -> i32 {
     (value * ARAI_S[index]).round() as i32
 }
