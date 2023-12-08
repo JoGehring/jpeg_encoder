@@ -4,7 +4,7 @@ use std::{f32::consts::SQRT_2, ops::Mul};
 
 use nalgebra::SMatrix;
 
-use crate::arai::arai_1d;
+use crate::arai::{arai_1d_column, arai_1d_row};
 
 /// The matrix used as A in the matrix approach.
 /// We only need to create this once, so lazy_static!.
@@ -120,14 +120,14 @@ pub fn arai_dct(input: &SMatrix<u16, 8, 8>) -> SMatrix<i32, 8, 8> {
     for (i, input_row) in input.row_iter().enumerate() {
         after_row_dct.set_row(
             i,
-            &arai_1d(&input_row.clone_owned().cast::<i32>().transpose()).transpose(),
+            &arai_1d_row(&input_row.clone_owned().cast::<i32>()),
         )
     }
 
     // then, do all columns
     let mut result: SMatrix<i32, 8, 8> = SMatrix::zeros();
     for (i, input_column) in after_row_dct.column_iter().enumerate() {
-        result.set_column(i, &arai_1d(&input_column.clone_owned()))
+        result.set_column(i, &arai_1d_column(&input_column.clone_owned()))
     }
 
     result

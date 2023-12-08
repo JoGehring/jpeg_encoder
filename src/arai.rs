@@ -1,7 +1,61 @@
 use std::f32::consts::{PI, SQRT_2};
 
 use lazy_static::lazy_static;
-use nalgebra::SVector;
+use nalgebra::{RowSVector, SVector};
+
+/// Wrapper trait so we can use the same logic on both SVector and RowSVector
+trait Vector8 {
+    /// Get the `index`th value of this vector.
+    ///
+    /// # Arguments
+    /// * `index`: The value index.
+    fn at(&self, index: usize) -> i32;
+    /// Set the index-th value.
+    ///
+    /// # Arguments
+    /// * `index`: The value index.
+    fn set(&mut self, index: usize, value: i32);
+    /// Get the sum of all values in this vector.
+    fn sum(&self) -> i32;
+    /// Get an empty vector.
+    fn zeros() -> Self;
+}
+impl Vector8 for SVector<i32, 8> {
+    #[inline(always)]
+    fn at(&self, index: usize) -> i32 {
+        self[index]
+    }
+    #[inline(always)]
+    fn set(&mut self, index: usize, value: i32) {
+        self[index] = value;
+    }
+    #[inline(always)]
+    fn sum(&self) -> i32 {
+        self.sum()
+    }
+    #[inline(always)]
+    fn zeros() -> Self {
+        SVector::zeros()
+    }
+}
+impl Vector8 for RowSVector<i32, 8> {
+    #[inline(always)]
+    fn at(&self, index: usize) -> i32 {
+        self[index]
+    }
+    #[inline(always)]
+    fn set(&mut self, index: usize, value: i32) {
+        self[index] = value;
+    }
+    #[inline(always)]
+    fn sum(&self) -> i32 {
+        self.sum()
+    }
+    #[inline(always)]
+    fn zeros() -> Self {
+        RowSVector::zeros()
+    }
+}
 
 // use lazy_static rather than consts because cos() isn't a const fn
 // see https://github.com/rust-lang/rust/issues/57241
@@ -36,6 +90,22 @@ lazy_static! {
     ];
 }
 
+/// Perform the DCT using Arai's algorithm on a row Vector of size 8.
+///
+/// # Arguments
+/// * `input`: A vector of integers.
+pub fn arai_1d_row(input: &RowSVector<i32, 8>) -> RowSVector<i32, 8> {
+    arai_1d_internal(input)
+}
+
+/// Perform the DCT using Arai's algorithm on a column Vector of size 8.
+///
+/// # Arguments
+/// * `input`: A vector of integers.
+pub fn arai_1d_column(input: &SVector<i32, 8>) -> SVector<i32, 8> {
+    arai_1d_internal(input)
+}
+
 /// Perform the DCT using Arai's algorithm on a Vector of size 8.
 /// Arai's algorithm is split up into 4 steps, corresponding to a set
 /// of additions or multiplications.
@@ -44,7 +114,7 @@ lazy_static! {
 ///
 /// # Arguments
 /// * `input`: A vector of integers.
-pub fn arai_1d(input: &SVector<i32, 8>) -> SVector<i32, 8> {
+fn arai_1d_internal<T: Vector8>(input: &T) -> T {
     let mut float_vector = additions_before_first_multiplication(input);
     first_multiplications(&mut float_vector);
     additions_before_second_multiplication(&mut float_vector);
@@ -56,21 +126,24 @@ pub fn arai_1d(input: &SVector<i32, 8>) -> SVector<i32, 8> {
 /// # Arguments
 /// * `input`: A vector of integers.
 #[inline(always)]
-fn additions_before_first_multiplication(input: &SVector<i32, 8>) -> SVector<f32, 8> {
+fn additions_before_first_multiplication<T: Vector8>(input: &T) -> SVector<f32, 8> {
     let mut result_vector: SVector<f32, 8> = SVector::zeros();
 
     result_vector[0] = (input.sum()) as f32;
-    result_vector[1] =
-        (input[0] + input[7] + input[3] + input[4] - input[1] - input[6] - input[2] - input[5])
-            as f32;
-    result_vector[2] = (input[1] + input[6] - input[2] - input[5] + input[0] + input[7]
-        - input[3]
-        - input[4]) as f32;
-    result_vector[3] = (input[0] + input[7] - input[3] - input[4]) as f32;
-    result_vector[4] = (input[4] - input[3] + input[5] - input[2]) as f32;
-    result_vector[5] = (input[2] - input[5] + input[1] - input[6]) as f32;
-    result_vector[6] = (input[1] - input[6] + input[0] - input[7]) as f32;
-    result_vector[7] = (input[0] - input[7]) as f32;
+    result_vector[1] = (input.at(0) + input.at(7) + input.at(3) + input.at(4)
+        - input.at(1)
+        - input.at(6)
+        - input.at(2)
+        - input.at(5)) as f32;
+    result_vector[2] =
+        (input.at(1) + input.at(6) - input.at(2) - input.at(5) + input.at(0) + input.at(7)
+            - input.at(3)
+            - input.at(4)) as f32;
+    result_vector[3] = (input.at(0) + input.at(7) - input.at(3) - input.at(4)) as f32;
+    result_vector[4] = (input.at(4) - input.at(3) + input.at(5) - input.at(2)) as f32;
+    result_vector[5] = (input.at(2) - input.at(5) + input.at(1) - input.at(6)) as f32;
+    result_vector[6] = (input.at(1) - input.at(6) + input.at(0) - input.at(7)) as f32;
+    result_vector[7] = (input.at(0) - input.at(7)) as f32;
 
     result_vector
 }
@@ -116,16 +189,16 @@ fn additions_before_second_multiplication(vector: &mut SVector<f32, 8>) {
 /// # Arguments
 /// * `vector`: the vector to perform the multiplications on.
 #[inline(always)]
-fn second_multiplications(vector: &SVector<f32, 8>) -> SVector<i32, 8> {
-    let mut result: SVector<i32, 8> = SVector::zeros();
-    result[0] = multiply_and_cast(vector[0], 0);
-    result[1] = multiply_and_cast(vector[5], 1);
-    result[2] = multiply_and_cast(vector[2], 2);
-    result[3] = multiply_and_cast(vector[7], 3);
-    result[4] = multiply_and_cast(vector[1], 4);
-    result[5] = multiply_and_cast(vector[4], 5);
-    result[6] = multiply_and_cast(vector[3], 6);
-    result[7] = multiply_and_cast(vector[6], 7);
+fn second_multiplications<T: Vector8>(vector: &SVector<f32, 8>) -> T {
+    let mut result: T = T::zeros();
+    result.set(0, multiply_and_cast(vector[0], 0));
+    result.set(1, multiply_and_cast(vector[5], 1));
+    result.set(2, multiply_and_cast(vector[2], 2));
+    result.set(3, multiply_and_cast(vector[7], 3));
+    result.set(4, multiply_and_cast(vector[1], 4));
+    result.set(5, multiply_and_cast(vector[4], 5));
+    result.set(6, multiply_and_cast(vector[3], 6));
+    result.set(7, multiply_and_cast(vector[6], 7));
     result
 }
 
@@ -136,35 +209,57 @@ fn multiply_and_cast(value: f32, index: usize) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use nalgebra::SVector;
+    use nalgebra::{RowSVector, SVector};
 
-    use crate::arai::{
-        additions_before_second_multiplication, first_multiplications, second_multiplications,
+    use super::{
+        additions_before_first_multiplication, additions_before_second_multiplication,
+        arai_1d_column, arai_1d_row, first_multiplications, second_multiplications,
     };
 
-    use super::{additions_before_first_multiplication, arai_1d};
-
-    fn test_arai_1d() {
+    #[test]
+    fn test_arai_1d_column() {
         let expected_vector: Vec<i32> = vec![12728, -6442, 0, -673, 0, -201, 0, -51];
         let expected: SVector<i32, 8> = SVector::from_row_iterator(expected_vector.into_iter());
 
         let values: Vec<i32> = vec![1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000];
-        let result = arai_1d(&SVector::from_row_iterator(values.into_iter()));
+        let result = arai_1d_column(&SVector::from_row_iterator(values.into_iter()));
 
         assert_eq!(expected, result);
     }
 
     #[test]
-    fn test_arai_1d_small_values() {
+    fn test_arai_1d_column_small_values() {
         let expected_vector: Vec<i32> = vec![106, -26, 1, 56, -13, 2, 21, -10];
         let expected: SVector<i32, 8> = SVector::from_row_iterator(expected_vector.into_iter());
 
         let values: Vec<i32> = vec![47, 18, 13, 16, 41, 90, 47, 27];
-        let result = arai_1d(&SVector::from_row_iterator(values.into_iter()));
+        let result = arai_1d_column(&SVector::from_row_iterator(values.into_iter()));
 
         assert_eq!(expected, result);
     }
 
+    #[test]
+    fn test_arai_1d_row() {
+        let expected_vector: Vec<i32> = vec![12728, -6442, 0, -673, 0, -201, 0, -51];
+        let expected: RowSVector<i32, 8> =
+            RowSVector::from_row_iterator(expected_vector.into_iter());
+
+        let values: Vec<i32> = vec![1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000];
+        let result = arai_1d_row(&RowSVector::from_row_iterator(values.into_iter()));
+
+        assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn test_arai_1d_row_small_values() {
+        let expected_vector: Vec<i32> = vec![106, -26, 1, 56, -13, 2, 21, -10];
+        let expected: RowSVector<i32, 8> = RowSVector::from_row_iterator(expected_vector.into_iter());
+
+        let values: Vec<i32> = vec![47, 18, 13, 16, 41, 90, 47, 27];
+        let result = arai_1d_row(&RowSVector::from_row_iterator(values.into_iter()));
+
+        assert_eq!(expected, result);
+    }
     #[test]
     fn test_first_additions() {
         let values_vector: Vec<i32> = vec![47, 18, 13, 16, 41, 90, 47, 27];
@@ -211,7 +306,7 @@ mod tests {
         ];
         let values: SVector<f32, 8> = SVector::from_row_iterator(values_vector.into_iter());
 
-        let result = second_multiplications(&values);
+        let result = second_multiplications::<SVector<i32, 8>>(&values);
         let expected_vector: Vec<i32> = vec![106, -26, 1, 56, -13, 2, 21, -10];
         let expected: SVector<i32, 8> = SVector::from_row_iterator(expected_vector.into_iter());
 
