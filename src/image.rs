@@ -360,11 +360,16 @@ impl Image {
     /// 
     /// # Panics
     /// * If the image's height or width cannot be divided by 8.
-    pub fn single_channel_to_matrices(&self) -> Vec<SMatrix<u16, 8, 8>> {
+    pub fn single_channel_to_matrices<const C: usize>(&self) -> Vec<SMatrix<u16, 8, 8>> {
         if self.channel1.len() % 8 != 0 || (self.channel1[0].len()) % 8 != 0 {
             panic!("attempted to convert image to matrices, but image dimensions are not divisible by 8 for at least one channel!");
         }
-        channel_to_matrices(&self.channel1)
+        let channel = match C {
+            2 => &self.channel2,
+            3 => &self.channel3,
+            _ => &self.channel1
+        };
+        channel_to_matrices(channel)
     }
 
     pub fn channel1(&self) -> &Vec<Vec<u16>> {
