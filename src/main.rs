@@ -99,15 +99,17 @@ fn main() {
     }
 
     let image = create_image(2160, 3840, image_data, vec![], vec![]);
+    let y_matrix = image.single_channel_to_matrices::<1>();
+
     for mode in [DCTMode::Arai, DCTMode::Direct, DCTMode::Matrix] {
         println!("Starting to test mode {}", mode);
         let timer_start = std::time::Instant::now();
-        // 2000 should be plenty - would be enough for 5ms runs
-        let mut times = Vec::with_capacity(2000);
+        // 2000 should be plenty - would be enough for 2.5ms runs
+        let mut times = Vec::with_capacity(4000);
         // do this for about 10 seconds
         while timer_start.elapsed().as_millis() < 10000 {
             let timer_single_run = std::time::Instant::now();
-            let _ = parallel_dct::dct_single_channel(&image, &mode);
+            let _ = parallel_dct::dct_matrix_vector(&y_matrix, &mode);
             times.push(timer_single_run.elapsed().as_millis());
         }
         times.sort();

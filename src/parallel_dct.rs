@@ -26,9 +26,9 @@ pub fn dct(
 
     let (y_matrices, cb_matrices, cr_matrices) = image.to_matrices();
 
-    let y_result = dct_channel(y_matrices, function);
-    let cb_result = dct_channel(cb_matrices, function);
-    let cr_result = dct_channel(cr_matrices, function);
+    let y_result = dct_channel(&y_matrices, &function);
+    let cb_result = dct_channel(&cb_matrices, &function);
+    let cr_result = dct_channel(&cr_matrices, &function);
 
     (y_result, cb_result, cr_result)
 }
@@ -44,9 +44,24 @@ pub fn dct_single_channel(image: &Image, mode: &DCTMode) -> Vec<SMatrix<i32, 8, 
         DCTMode::Matrix => crate::dct::matrix_dct,
         DCTMode::Arai => crate::dct::arai_dct,
     };
-    let y_matrices = image.single_channel_to_matrices();
+    let y_matrices = image.single_channel_to_matrices::<1>();
 
-    dct_channel(y_matrices, function)
+    dct_channel(&y_matrices, &function)
+}
+
+/// Perform the DCT on a matrix vector representation of an image.
+/// The DCT on a channel is parallelised with as many threads as the system has logical CPUs.
+///
+/// # Arguments
+/// * `image`: The image to calculate the DCT for.
+pub fn dct_matrix_vector(matrices: &Vec<SMatrix<u16, 8, 8>>, mode: &DCTMode) -> Vec<SMatrix<i32, 8, 8>> {
+    let function = match mode {
+        DCTMode::Direct => crate::dct::direct_dct,
+        DCTMode::Matrix => crate::dct::matrix_dct,
+        DCTMode::Arai => crate::dct::arai_dct,
+    };
+
+    dct_channel(matrices, &function)
 }
 
 /// process the channel.
@@ -58,8 +73,8 @@ pub fn dct_single_channel(image: &Image, mode: &DCTMode) -> Vec<SMatrix<i32, 8, 
 /// * `channel`: The channel of data to calculate the DCT on.
 /// * `function`: The DCT function to use.
 fn dct_channel(
-    channel: Vec<SMatrix<u16, 8, 8>>,
-    function: fn(&SMatrix<u16, 8, 8>) -> SMatrix<i32, 8, 8>,
+    channel: &Vec<SMatrix<u16, 8, 8>>,
+    function: &fn(&SMatrix<u16, 8, 8>) -> SMatrix<i32, 8, 8>,
 ) -> Vec<SMatrix<i32, 8, 8>> {
     let thread_count = thread::available_parallelism().unwrap().get();
     let chunk_size = (channel.len() / thread_count) + 1;
