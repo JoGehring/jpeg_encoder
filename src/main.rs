@@ -22,9 +22,9 @@ mod huffman_decoder;
 mod image;
 mod jpg_writer;
 mod package_merge;
-mod parallel_idct;
 mod parallel_dct;
 mod parallel_downsample;
+mod parallel_idct;
 mod ppm_parser;
 mod utils;
 
@@ -120,13 +120,22 @@ fn main() {
         let twenty_fifth = times[times.len() / 4];
         let seventy_fifth = times[times.len() / 2 + times.len() / 4];
         println!("Mode ::::: Min ::: 25th ::: Median ::: 75th ::: Max ::::: Mean");
-        println!("{} ::::: {} ::: {} ::: {} ::: {} ::: {} ::::: {}", mode, min, twenty_fifth, median, seventy_fifth, max, mean);
-}
+        println!(
+            "{} ::::: {} ::: {} ::: {} ::: {} ::: {} ::::: {}",
+            mode, min, twenty_fifth, median, seventy_fifth, max, mean
+        );
+    }
 
     // ppm --> dct --> idct --> ppm pipeline
 
     let image = ppm_parser::read_ppm_from_file("test/dwsample-ppm-4k.ppm");
     let (r_dct, g_dct, b_dct) = parallel_dct::dct(&image, &DCTMode::Matrix);
     let (ir_dct, ig_dct, ib_dct) = parallel_idct::idct(&r_dct, &g_dct, &b_dct);
-    dct_to_ppm::to_ppm((&ir_dct, &ig_dct, &ib_dct), image.height(), image.width(), "test/ppm_write.ppm").unwrap();
+    dct_to_ppm::to_ppm(
+        (&ir_dct, &ig_dct, &ib_dct),
+        image.height(),
+        image.width(),
+        "test/ppm_write.ppm",
+    )
+    .unwrap();
 }
