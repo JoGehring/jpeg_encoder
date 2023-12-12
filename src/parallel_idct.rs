@@ -10,9 +10,9 @@ use crate::dct::inverse_dct;
 ///
 /// # Arguments
 pub fn idct(
-    y_matrices: &Vec<SMatrix<i32, 8, 8>>,
-    cb_matrices: &Vec<SMatrix<i32, 8, 8>>,
-    cr_matrices: &Vec<SMatrix<i32, 8, 8>>,
+    y_matrices: &Vec<SMatrix<f32, 8, 8>>,
+    cb_matrices: &Vec<SMatrix<f32, 8, 8>>,
+    cr_matrices: &Vec<SMatrix<f32, 8, 8>>,
 ) -> (
     Vec<SMatrix<u16, 8, 8>>,
     Vec<SMatrix<u16, 8, 8>>,
@@ -43,12 +43,12 @@ pub fn idct(
 /// * `channel`: The channel of data to calculate the DCT on.
 /// * `thread_count`: The number of threads this channel gets.
 fn spawn_threads_for_channel(
-    channel: &Vec<SMatrix<i32, 8, 8>>,
+    channel: &Vec<SMatrix<f32, 8, 8>>,
 ) -> (Vec<JoinHandle<()>>, Vec<Receiver<Vec<SMatrix<u16, 8, 8>>>>) {
     let thread_count = std::thread::available_parallelism().unwrap().get();
     // + 1 to avoid creating a new chunk with just the last element
     let chunk_size = (channel.len() / thread_count) + 1;
-    let data_vecs: std::slice::Chunks<'_, SMatrix<i32, 8, 8>> = channel.chunks(chunk_size);
+    let data_vecs: std::slice::Chunks<'_, SMatrix<f32, 8, 8>> = channel.chunks(chunk_size);
     let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(thread_count);
     let mut receivers: Vec<Receiver<Vec<SMatrix<u16, 8, 8>>>> = Vec::with_capacity(thread_count);
 
@@ -96,54 +96,117 @@ fn join_and_receive_threads_for_channel(
 
 #[cfg(test)]
 mod tests {
+    use approx::assert_abs_diff_eq;
     use nalgebra::SMatrix;
-
     use crate::ppm_parser::read_ppm_from_file;
-    use crate::dct::DCTMode;
+
+    use super::idct;
     #[test]
-    fn test_dct_parallel_simple_image() {
+    fn test_idct_parallel_simple_image() {
         let image = read_ppm_from_file("test/valid_test_8x8.ppm");
+        let (y_expected, cb_expected, cr_expected) = image.to_matrices();
 
-        let (y, cb, cr) = crate::parallel_dct::dct(&image, &DCTMode::Arai);
-
-        let y_expected_vec: Vec<i32> = vec![
-            65535, 0, 0, 0, 65535, 0, 0, 0, // row 1
-            0, -20228, 0, -35709, 0, 7103, 0, -30273, // row 2
-            0, 0, 0, 0, 0, 0, 0, 0, 0, // row 3
-            -35710, 0, -63041, 0, 12540, 0, -53444, 65535, // row 4
-            0, 0, 0, 65535, 0, 0, 0, 0, // row 5
-            7103, 0, 12540, 0, -2494, 0, 10631, 0, // row 6
-            0, 0, 0, 0, 0, 0, 0, 0, // row 7
-            -30274, 0, -53444, 0, 10631, 0, -45308, // row 8
+        let y_dct_vec: Vec<f32> = vec![
+            65534.996, 0.0, 0.0, 0.0, 65534.996, 0.0, 0.0, 0.0, // row 1
+            0.0, -20227.922, 0.0, -35709.7, 0.0, 7103.1016, 0.0, -30273.236, // row 2
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 3
+            -35709.7, 0.0, -63040.715, 0.0, 12539.579, 0.0, -53443.37, 65534.996, // row 4
+            0.0, 0.0, 0.0, 65534.996, 0.0, 0.0, 0.0, 0.0, // row 5
+            7103.1035, 0.0, 12539.577, 0.0, -2494.2773, 0.0, 10630.548, 0.0, // row 6
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 7
+            -30273.24, 0.0, -53443.367, 0.0, 10630.547, 0.0, -45307.133, // row 8
         ];
-        let y_expected: Vec<SMatrix<i32, 8, 8>> = vec![SMatrix::from_iterator(y_expected_vec)];
+        let y_dct: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_iterator(y_dct_vec)];
 
-        let cb_expected_vec: Vec<i32> = vec![
-            65535, 0, 0, 0, -65535, 0, 0, 0, // row 1
-            0, 2494, 0, 7103, 0, -10631, 0, -12540, // row 2
-            0, 0, 0, 0, 0, 0, 0, 0, // row 3
-            0, 7103, 0, 20228, 0, -30273, 0, -35709, // row 4
-            -65535, 0, 0, 0, 65535, 0, 0, 0, 0, // row 5
-            -10631, 0, -30274, 0, 45308, 0, 53444, 0, // row 6
-            0, 0, 0, 0, 0, 0, 0, 0, // row 7
-            -12540, 0, -35710, 0, 53444, 0, 63041, // row 8
+        let cb_dct_vec: Vec<f32> = vec![
+            65534.996, 0.0, 0.0, 0.0, -65534.996, 0.0, 0.0, 0.0, // row 1
+            0.0, 2494.2776, 0.0, 7103.0996, 0.0, -10630.543, 0.0, -12539.582, // row 2
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 3
+            0.0, 7103.101, 0.0, 20227.92, 0.0, -30273.223, 0.0, -35709.715, // row 4
+            -65534.996, 0.0, 0.0, 0.0, 65534.996, 0.0, 0.0, 0.0, 0.0, // row 5
+            -10630.543, 0.0, -30273.225, 0.0, 45307.086, 0.0, 53443.37, 0.0, // row 6
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 7
+            -12539.585, 0.0, -35709.707, 0.0, 53443.367, 0.0, 63040.758, // row 8
         ];
-        let cb_expected: Vec<SMatrix<i32, 8, 8>> = vec![SMatrix::from_iterator(cb_expected_vec)];
+        let cb_dct: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_iterator(cb_dct_vec)];
 
-        let cr_expected_vec: Vec<i32> = vec![
-            96117, 0, 0, 0, 34952, 0, 0, 0, // row 1
-            0, -19064, 0, -32394, 0, 2142, 0, -36125, // row 2
-            0, 0, 0, 0, 0, 0, 0, 0, // row 3
-            0, -32395, 0, -53602, 0, -1587, 0, -70107, // row 4
-            34952, 0, 0, 0, 96117, 0, 0, 0, // row 5
-            0, 2143, 0, -1587, 0, 18649, 0, 35571, // row 6
-            0, 0, 0, 0, 0, 0, 0, 0, // row 7
-            0, -36125, 0, -70109, 0, 35571, 0, -15889, // row 8
+        let cr_dct_vec: Vec<f32> = vec![
+            96118.01,
+            0.00069053395,
+            0.0,
+            0.0,
+            34951.996,
+            0.0,
+            0.0,
+            0.0, // row 1
+            0.0,
+            -19063.924,
+            0.0,
+            -32394.918,
+            0.0,
+            2142.1814,
+            0.0,
+            -36125.047, // row 2
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0, // row 3
+            0.0,
+            -32394.922,
+            0.0,
+            -53601.016,
+            0.0,
+            -1587.9264,
+            0.0,
+            -70107.9, // row 4
+            34951.996,
+            0.0,
+            0.0,
+            0.0,
+            96118.01,
+            0.0,
+            0.0,
+            0.0, // row 5
+            0.0,
+            2142.1826,
+            0.0,
+            -1587.9272,
+            0.0,
+            18649.031,
+            0.0,
+            35570.785, // row 6
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0, // row 7
+            0.0,
+            -36125.05,
+            0.0,
+            -70107.91,
+            0.0,
+            35570.79,
+            0.0,
+            -15888.09, // row 8
         ];
-        let cr_expected: Vec<SMatrix<i32, 8, 8>> = vec![SMatrix::from_iterator(cr_expected_vec)];
+        let cr_dct: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_iterator(cr_dct_vec)];
 
-        assert_eq!(y_expected, y);
-        assert_eq!(cb_expected, cb);
-        assert_eq!(cr_expected, cr);
+        let (y, cb, cr) = idct(&y_dct, &cb_dct, &cr_dct);
+        for index in 0..cb_dct.len() {
+            for i in 0..8 {
+                for j in 0..8 {
+                    assert_abs_diff_eq!(y_expected[index][(i, j)], y[index][(i, j)], epsilon = 1);
+                    assert_abs_diff_eq!(cb_expected[index][(i, j)], cb[index][(i, j)], epsilon = 1);
+                    assert_abs_diff_eq!(cr_expected[index][(i, j)], cr[index][(i, j)], epsilon = 1);
+                }
+            }
+        }
     }
 }
