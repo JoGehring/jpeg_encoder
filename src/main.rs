@@ -142,6 +142,4 @@ fn main() {
     .unwrap();
 
     */
-
-    dct_constant_calculator::write_dct_constants_file();
 }

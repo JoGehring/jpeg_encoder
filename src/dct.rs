@@ -1,59 +1,10 @@
 use core::f32::consts::PI;
-use lazy_static::lazy_static;
-use std::{f32::consts::SQRT_2, ops::Mul};
+use std::ops::Mul;
 
 use nalgebra::SMatrix;
 
 use crate::arai::{arai_1d_column, arai_1d_row};
-
-/// The matrix used as A in the matrix approach.
-/// We only need to create this once, so lazy_static!.
-fn matrix_dct_a_matrix() -> SMatrix<f32, 8, 8> {
-    let mut a_matrix: SMatrix<f32, 8, 8> = SMatrix::from_element(0.0);
-    for k in 0..8 {
-        for n in 0..8 {
-            let cos_val = (((2 * n + 1) * k) as f32 * PI / 16.0f32).cos();
-            a_matrix[(k, n)] = cos_val * *MATRIX_SQRT_CONST * if k == 0 { MATRIX_C0 } else { 1.0 };
-        }
-    }
-    a_matrix
-}
-
-fn direct_dct_lookup_table() -> [[[[f32; 8]; 8]; 8]; 8] {
-    let mut result = [[[[0f32; 8]; 8]; 8]; 8];
-    for i in 0..8 {
-        for j in 0..8 {
-            for x in 0..8 {
-                for y in 0..8 {
-                    // multiplications with 2/N, C(i) and C(j) are moved in here for optimisation
-                    result[i][j][x][y] = ((((2 * x + 1) * i) as f32 * PI) / 16.0).cos()
-                        * ((((2 * y + 1) * j) as f32 * PI) / 16.0).cos()
-                        * 0.25; // 2/N
-                    // this is semantically the same as new_y /= SQRT_2 - optimised because multiplication is faster than division
-                    // new_y/SQRT_2 == new_y*SQRT_2/2, SQRT_2_DIV_2 == SQRT_2/2
-                    if i == 0 { // C(i)
-                        result[i][j][x][y] *= SQRT_2_DIV_2
-                    }
-                    if j == 0 { // C(j)
-                        result[i][j][x][y] *= SQRT_2_DIV_2
-                    }
-                }
-            }
-        }
-    }
-
-    result
-}
-
-const SQRT_2_DIV_2: f32 = SQRT_2 / 2f32;
-const MATRIX_C0: f32 = 1.0 / SQRT_2;
-// use lazy_static! because float math isn't const
-lazy_static! {
-    static ref DIRECT_LOOKUP_TABLE: [[[[f32; 8]; 8]; 8]; 8] = direct_dct_lookup_table();
-    static ref MATRIX_SQRT_CONST: f32 = 0.25f32.sqrt();
-    static ref MATRIX_A_MATRIX: SMatrix<f32, 8, 8> = matrix_dct_a_matrix();
-    static ref MATRIX_A_MATRIX_TRANSPOSED: SMatrix<f32, 8, 8> = matrix_dct_a_matrix().transpose();
-}
+use crate::dct_constants::{MATRIX_A_MATRIX, MATRIX_A_MATRIX_TRANS, DIRECT_LOOKUP_TABLE};
 
 pub enum DCTMode {
     Direct,
@@ -104,7 +55,7 @@ pub fn matrix_dct(input: &SMatrix<u16, 8, 8>) -> SMatrix<i32, 8, 8> {
     let x_matrix = input.cast::<f32>();
     let y = MATRIX_A_MATRIX
         .mul(x_matrix)
-        .mul(*MATRIX_A_MATRIX_TRANSPOSED);
+        .mul(MATRIX_A_MATRIX_TRANS);
     y.map(|x| x.round() as i32)
 }
 
