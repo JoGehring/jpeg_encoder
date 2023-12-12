@@ -5,6 +5,14 @@ use std::fs::File;
 use std::io::{Error, Write};
 use std::usize;
 
+/// This regex checks correct paths given to the to_ppm function
+/// - We start at the beginning of the path string
+/// - The first group checks for (back-)slashes, in case of unixoid systems zero or forward,
+/// in case of Windows zero to two backslashes
+/// - Then we check for dots, there are zero to two allowed
+/// - then we allow every char which is not forbidden by the OS as part of a file/directory
+/// - This whole block has to appear at least once
+/// - Then we check for the right file suffix and the ending of the string
 lazy_static! {
     static ref PPM_FILEPATH_REGEX: Regex =
         Regex::new(r#"^(([/]{0,1} | [\\]{0,2}){0,1}[.]{0,2}[^,;<>:"|\?\*]+)+(.ppm)$"#).unwrap();
