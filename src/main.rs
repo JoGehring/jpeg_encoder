@@ -2,7 +2,6 @@
 // remove this once integrating - this is to avoid exessive and useless warnings for the time being
 
 use dct::DCTMode;
-use parallel_dct::dct_single_channel;
 
 use crate::image::create_image;
 
@@ -27,6 +26,8 @@ mod parallel_downsample;
 mod parallel_idct;
 mod ppm_parser;
 mod utils;
+mod dct_constant_calculator;
+mod dct_constants;
 
 fn main() {
     /*
@@ -126,6 +127,7 @@ fn main() {
         );
     }
 
+    /*
     // ppm --> dct --> idct --> ppm pipeline
 
     let image = ppm_parser::read_ppm_from_file("test/dwsample-ppm-4k.ppm");
@@ -138,4 +140,8 @@ fn main() {
         "test/ppm_write.ppm",
     )
     .unwrap();
+
+    */
+
+    dct_constant_calculator::write_dct_constants_file();
 }

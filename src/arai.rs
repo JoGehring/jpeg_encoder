@@ -1,7 +1,6 @@
-use std::f32::consts::{PI, SQRT_2};
-
-use lazy_static::lazy_static;
 use nalgebra::{RowSVector, SVector};
+
+use crate::dct_constants::{ARAI_A, ARAI_S};
 
 /// Wrapper trait so we can use the same logic on both SVector and RowSVector
 trait Vector8 {
@@ -55,39 +54,6 @@ impl Vector8 for RowSVector<i32, 8> {
     fn zeros() -> Self {
         RowSVector::zeros()
     }
-}
-
-// use lazy_static rather than consts because cos() isn't a const fn
-// see https://github.com/rust-lang/rust/issues/57241
-lazy_static! {
-    static ref ARAI_C: [f32; 8] = [
-        (0f32 * PI / 16f32).cos(),
-        (1f32 * PI / 16f32).cos(),
-        (2f32 * PI / 16f32).cos(),
-        (3f32 * PI / 16f32).cos(),
-        (4f32 * PI / 16f32).cos(),
-        (5f32 * PI / 16f32).cos(),
-        (6f32 * PI / 16f32).cos(),
-        (7f32 * PI / 16f32).cos(),
-    ];
-    static ref ARAI_A: [f32; 6] = [
-        0f32,
-        ARAI_C[4],
-        ARAI_C[2] - ARAI_C[6],
-        ARAI_C[4],
-        ARAI_C[6] + ARAI_C[2],
-        ARAI_C[6],
-    ];
-    static ref ARAI_S: [f32; 8] = [
-        1f32 / (2f32 * SQRT_2),
-        1f32 / (4f32 * ARAI_C[1]),
-        1f32 / (4f32 * ARAI_C[2]),
-        1f32 / (4f32 * ARAI_C[3]),
-        1f32 / (4f32 * ARAI_C[4]),
-        1f32 / (4f32 * ARAI_C[5]),
-        1f32 / (4f32 * ARAI_C[6]),
-        1f32 / (4f32 * ARAI_C[7]),
-    ];
 }
 
 /// Perform the DCT using Arai's algorithm on a row Vector of size 8.
@@ -191,20 +157,20 @@ fn additions_before_second_multiplication(vector: &mut SVector<f32, 8>) {
 #[inline(always)]
 fn second_multiplications<T: Vector8>(vector: &SVector<f32, 8>) -> T {
     let mut result: T = T::zeros();
-    result.set(0, multiply_and_cast(vector[0], 0));
-    result.set(1, multiply_and_cast(vector[5], 1));
-    result.set(2, multiply_and_cast(vector[2], 2));
-    result.set(3, multiply_and_cast(vector[7], 3));
-    result.set(4, multiply_and_cast(vector[1], 4));
-    result.set(5, multiply_and_cast(vector[4], 5));
-    result.set(6, multiply_and_cast(vector[3], 6));
-    result.set(7, multiply_and_cast(vector[6], 7));
+    result.set(0, multiply_and_cast::<0>(vector[0]));
+    result.set(1, multiply_and_cast::<1>(vector[5]));
+    result.set(2, multiply_and_cast::<2>(vector[2]));
+    result.set(3, multiply_and_cast::<3>(vector[7]));
+    result.set(4, multiply_and_cast::<4>(vector[1]));
+    result.set(5, multiply_and_cast::<5>(vector[4]));
+    result.set(6, multiply_and_cast::<6>(vector[3]));
+    result.set(7, multiply_and_cast::<7>(vector[6]));
     result
 }
 
 #[inline(always)]
-fn multiply_and_cast(value: f32, index: usize) -> i32 {
-    (value * ARAI_S[index]).round() as i32
+fn multiply_and_cast<const I: usize>(value: f32) -> i32 {
+    (value * ARAI_S[I]).round() as i32
 }
 
 #[cfg(test)]
