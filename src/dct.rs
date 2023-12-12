@@ -65,9 +65,10 @@ pub fn matrix_dct(input: &SMatrix<u16, 8, 8>) -> SMatrix<f32, 8, 8> {
 /// * `input`: The matrix to perform the DCT on.
 pub fn arai_dct(input: &SMatrix<u16, 8, 8>) -> SMatrix<f32, 8, 8> {
     // first, do all rows
+    let input_float = input.cast::<f32>();
     let mut after_row_dct: SMatrix<f32, 8, 8> = SMatrix::zeros();
-    for (i, input_row) in input.row_iter().enumerate() {
-        after_row_dct.set_row(i, &arai_1d_row(&input_row.clone_owned().cast::<f32>()))
+    for (i, input_row) in input_float.row_iter().enumerate() {
+        after_row_dct.set_row(i, &arai_1d_row(&input_row.clone_owned()))
     }
 
     // then, do all columns
@@ -111,7 +112,7 @@ pub fn inverse_dct(input: &SMatrix<f32, 8, 8>) -> SMatrix<u16, 8, 8> {
 
 #[cfg(test)]
 mod tests {
-    use approx::{assert_abs_diff_eq};
+    use approx::assert_abs_diff_eq;
     use nalgebra::SMatrix;
 
     use super::{arai_dct, direct_dct, inverse_dct, matrix_dct};
