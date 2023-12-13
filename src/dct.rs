@@ -30,7 +30,7 @@ impl std::fmt::Display for DCTMode {
 /// formula with O(n^4) complexity. Returns a 8x8 i32 matrix.
 /// # Arguments
 /// * `input`: The matrix to perform the DCT on.
-pub fn direct_dct(input: &SMatrix<u16, 8, 8>) -> SMatrix<f32, 8, 8> {
+pub fn direct_dct(input: &SMatrix<f32, 8, 8>) -> SMatrix<f32, 8, 8> {
     let mut output = SMatrix::from_element(0.0);
     for i in 0..8 {
         for j in 0..8 {
@@ -38,7 +38,7 @@ pub fn direct_dct(input: &SMatrix<u16, 8, 8>) -> SMatrix<f32, 8, 8> {
             for x in 0..8 {
                 for y in 0..8 {
                     // all logic for new_y is in DIRECT_LOOKUP_TABLE
-                    new_y += input[(x, y)] as f32 * DIRECT_LOOKUP_TABLE[i][j][x][y];
+                    new_y += input[(x, y)] * DIRECT_LOOKUP_TABLE[i][j][x][y];
                 }
             }
             output[(i, j)] = new_y;
@@ -51,9 +51,8 @@ pub fn direct_dct(input: &SMatrix<u16, 8, 8>) -> SMatrix<f32, 8, 8> {
 /// with O(n^3) complexity. Returns a 8x8 i32 matrix.
 /// # Arguments
 /// * `input`: The matrix to perform the DCT on.
-pub fn matrix_dct(input: &SMatrix<u16, 8, 8>) -> SMatrix<f32, 8, 8> {
-    let x_matrix = input.cast::<f32>();
-    let y = MATRIX_A_MATRIX.mul(x_matrix).mul(MATRIX_A_MATRIX_TRANS);
+pub fn matrix_dct(input: &SMatrix<f32, 8, 8>) -> SMatrix<f32, 8, 8> {
+    let y = MATRIX_A_MATRIX.mul(input).mul(MATRIX_A_MATRIX_TRANS);
     y
 }
 
@@ -63,11 +62,10 @@ pub fn matrix_dct(input: &SMatrix<u16, 8, 8>) -> SMatrix<f32, 8, 8> {
 ///
 /// # Arguments
 /// * `input`: The matrix to perform the DCT on.
-pub fn arai_dct(input: &SMatrix<u16, 8, 8>) -> SMatrix<f32, 8, 8> {
+pub fn arai_dct(input: &SMatrix<f32, 8, 8>) -> SMatrix<f32, 8, 8> {
     // first, do all rows
-    let input_float = input.cast::<f32>();
     let mut after_row_dct: SMatrix<f32, 8, 8> = SMatrix::zeros();
-    for (i, input_row) in input_float.row_iter().enumerate() {
+    for (i, input_row) in input.row_iter().enumerate() {
         after_row_dct.set_row(i, &arai_1d_row(&input_row.clone_owned()))
     }
 
@@ -84,8 +82,8 @@ pub fn arai_dct(input: &SMatrix<u16, 8, 8>) -> SMatrix<f32, 8, 8> {
 /// formula with O(n^4) complexity. Returns a 8x8 u16 matrix.
 /// # Arguments
 /// * `input`: The matrix to perform the IDCT on.
-pub fn inverse_dct(input: &SMatrix<f32, 8, 8>) -> SMatrix<u16, 8, 8> {
-    let mut output = SMatrix::from_element(0);
+pub fn inverse_dct(input: &SMatrix<f32, 8, 8>) -> SMatrix<f32, 8, 8> {
+    let mut output = SMatrix::from_element(0.0);
     for x in 0..8 {
         for y in 0..8 {
             let mut new_x: f32 = 0.0;
@@ -104,7 +102,7 @@ pub fn inverse_dct(input: &SMatrix<f32, 8, 8>) -> SMatrix<u16, 8, 8> {
                     new_x += product;
                 }
             }
-            output[(x, y)] = new_x.round() as u16;
+            output[(x, y)] = new_x;
         }
     }
     output
@@ -138,12 +136,12 @@ mod tests {
         // different approach would be the usage of a testing crate (e.g. 'approx'), which checks for
         // given deltas
         let x_vec = vec![
-            47, 18, 13, 16, 41, 90, 47, 27, 62, 42, 35, 39, 66, 90, 41, 26, 71, 55, 56, 67, 55, 40,
-            23, 39, 53, 59, 64, 50, 48, 25, 37, 87, 31, 27, 33, 27, 37, 50, 81, 148, 54, 31, 33,
-            46, 58, 104, 144, 179, 76, 70, 71, 91, 118, 151, 176, 184, 101, 105, 115, 124, 135,
-            168, 173, 181,
+            47.0, 18.0, 13.0, 16.0, 41.0, 90.0, 47.0, 27.0, 62.0, 42.0, 35.0, 39.0, 66.0, 90.0, 41.0, 26.0, 71.0, 55.0, 56.0, 67.0, 55.0, 40.0,
+            23.0, 39.0, 53.0, 59.0, 64.0, 50.0, 48.0, 25.0, 37.0, 87.0, 31.0, 27.0, 33.0, 27.0, 37.0, 50.0, 81.0, 148.0, 54.0, 31.0, 33.0,
+            46.0, 58.0, 104.0, 144.0, 179.0, 76.0, 70.0, 71.0, 91.0, 118.0, 151.0, 176.0, 184.0, 101.0, 105.0, 115.0, 124.0, 135.0,
+            168.0, 173.0, 181.0,
         ];
-        let x_expected: SMatrix<u16, 8, 8> = SMatrix::from_row_iterator(x_vec.into_iter());
+        let x_expected: SMatrix<f32, 8, 8> = SMatrix::from_row_iterator(x_vec.into_iter());
         let y_vec = vec![
             581.25,
             -143.59541,
@@ -215,17 +213,18 @@ mod tests {
         let x = inverse_dct(&y);
         for i in 0..8 {
             for j in 0..8 {
-                assert_abs_diff_eq!(x_expected[(i, j)], x[(i, j)], epsilon = 1);
+                assert_abs_diff_eq!(x_expected[(i, j)], x[(i, j)], epsilon = 1.0);
             }
         }
     }
 
-    fn test_dct_slides_vals_generic(dct_type: &dyn Fn(&SMatrix<u16, 8, 8>) -> SMatrix<f32, 8, 8>) {
+    fn test_dct_slides_vals_generic(dct_type: &dyn Fn(&SMatrix<f32, 8, 8>) -> SMatrix<f32, 8, 8>) {
         let x_vec = vec![
-            47, 18, 13, 16, 41, 90, 47, 27, 62, 42, 35, 39, 66, 90, 41, 26, 71, 55, 56, 67, 55, 40,
-            22, 39, 53, 60, 63, 50, 48, 25, 37, 87, 31, 27, 33, 27, 37, 50, 81, 147, 54, 31, 33,
-            46, 58, 104, 144, 179, 76, 70, 71, 91, 118, 151, 176, 184, 102, 105, 115, 124, 135,
-            168, 173, 181,
+            47.0, 18.0, 13.0, 16.0, 41.0, 90.0, 47.0, 27.0, 62.0, 42.0, 35.0, 39.0, 66.0, 90.0,
+            41.0, 26.0, 71.0, 55.0, 56.0, 67.0, 55.0, 40.0, 22.0, 39.0, 53.0, 60.0, 63.0, 50.0,
+            48.0, 25.0, 37.0, 87.0, 31.0, 27.0, 33.0, 27.0, 37.0, 50.0, 81.0, 147.0, 54.0, 31.0,
+            33.0, 46.0, 58.0, 104.0, 144.0, 179.0, 76.0, 70.0, 71.0, 91.0, 118.0, 151.0, 176.0,
+            184.0, 102.0, 105.0, 115.0, 124.0, 135.0, 168.0, 173.0, 181.0,
         ];
         let x = SMatrix::from_row_iterator(x_vec.into_iter());
         let y = dct_type(&x);

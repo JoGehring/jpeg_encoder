@@ -104,14 +104,14 @@ pub fn create_image(
 ///
 /// # Panics
 /// * If `channel`'s dimensions aren't divisible by 8.
-fn channel_to_matrices(channel: &Vec<Vec<u16>>) -> Vec<SMatrix<u16, 8, 8>> {
+fn channel_to_matrices(channel: &Vec<Vec<u16>>) -> Vec<SMatrix<f32, 8, 8>> {
     let available_threads = thread::available_parallelism().unwrap().get();
     let mut chunk_size = channel.len() / available_threads;
     // always ensure that chunk size is divisible by 8 - otherwise threads don't get proper number of rows
     chunk_size += 8 - chunk_size % 8;
     let chunks: std::slice::Chunks<'_, Vec<u16>> = channel.chunks(chunk_size);
     let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(available_threads);
-    let mut receivers: Vec<Receiver<Vec<SMatrix<u16, 8, 8>>>> =
+    let mut receivers: Vec<Receiver<Vec<SMatrix<f32, 8, 8>>>> =
         Vec::with_capacity(available_threads);
 
     for chunk in chunks {
@@ -119,7 +119,7 @@ fn channel_to_matrices(channel: &Vec<Vec<u16>>) -> Vec<SMatrix<u16, 8, 8>> {
         // slow copy because directly using `chunk` leads to borrow issues. maybe fixable with lifetimes?
         let chunk_owned = chunk.to_owned();
         let handle = thread::spawn(move || {
-            let mut result_vec: Vec<SMatrix<u16, 8, 8>> =
+            let mut result_vec: Vec<SMatrix<f32, 8, 8>> =
                 Vec::with_capacity((chunk_owned.len() / 8) * (chunk_owned[0].len() / 8));
             for y in (0..chunk_owned.len()).step_by(8) {
                 append_row_matrices_to_channel_matrix(&chunk_owned, y, &mut result_vec);
@@ -131,7 +131,7 @@ fn channel_to_matrices(channel: &Vec<Vec<u16>>) -> Vec<SMatrix<u16, 8, 8>> {
         receivers.push(rx);
     }
 
-    let mut result: Vec<SMatrix<u16, 8, 8>> =
+    let mut result: Vec<SMatrix<f32, 8, 8>> =
         Vec::with_capacity((channel.len() / 8) * (channel[0].len() / 8));
     for handle in handles {
         handle.join().unwrap();
@@ -158,7 +158,7 @@ fn channel_to_matrices(channel: &Vec<Vec<u16>>) -> Vec<SMatrix<u16, 8, 8>> {
 fn append_row_matrices_to_channel_matrix(
     channel: &[Vec<u16>],
     y: usize,
-    result_vec: &mut Vec<SMatrix<u16, 8, 8>>,
+    result_vec: &mut Vec<SMatrix<f32, 8, 8>>,
 ) {
     let row_vectors = &channel[y..y + 8];
     for x in (0..channel[0].len()).step_by(8) {
@@ -182,14 +182,14 @@ fn append_row_matrices_to_channel_matrix(
 fn append_matrix_at_coordinates_to_channel_matrix(
     x: usize,
     row_vectors: &[Vec<u16>],
-    result_vec: &mut Vec<SMatrix<u16, 8, 8>>,
+    result_vec: &mut Vec<SMatrix<f32, 8, 8>>,
 ) {
     let mut iter_vector: Vec<u16> = Vec::with_capacity(64);
     for vector in row_vectors {
         let row_vec = &vector[x..x + 8];
         iter_vector.extend_from_slice(row_vec);
     }
-    result_vec.push(SMatrix::from_row_iterator(iter_vector));
+    result_vec.push(SMatrix::<u16, 8, 8>::from_row_iterator(iter_vector).cast::<f32>());
 }
 
 impl Image {
@@ -334,9 +334,9 @@ impl Image {
     pub fn to_matrices(
         &self,
     ) -> (
-        Vec<SMatrix<u16, 8, 8>>,
-        Vec<SMatrix<u16, 8, 8>>,
-        Vec<SMatrix<u16, 8, 8>>,
+        Vec<SMatrix<f32, 8, 8>>,
+        Vec<SMatrix<f32, 8, 8>>,
+        Vec<SMatrix<f32, 8, 8>>,
     ) {
         if self.channel1.len() % 8 != 0
             || (self.channel1[0].len()) % 8 != 0
@@ -360,7 +360,7 @@ impl Image {
     /// 
     /// # Panics
     /// * If the image's height or width cannot be divided by 8.
-    pub fn single_channel_to_matrices<const C: usize>(&self) -> Vec<SMatrix<u16, 8, 8>> {
+    pub fn single_channel_to_matrices<const C: usize>(&self) -> Vec<SMatrix<f32, 8, 8>> {
         if self.channel1.len() % 8 != 0 || (self.channel1[0].len()) % 8 != 0 {
             panic!("attempted to convert image to matrices, but image dimensions are not divisible by 8 for at least one channel!");
         }
@@ -734,42 +734,42 @@ mod tests {
         let (r, g, b) = image.to_matrices();
 
         let r_expected_vec = vec![
-            0, 0, 0, 65535, 0, 0, 0, 65535, // row 1
-            0, 0, 0, 0, 0, 0, 0, 0, // row 2
-            0, 0, 0, 0, 0, 0, 0, 0, // row 3
-            65535, 0, 0, 0, 65535, 0, 0, 0, // row 4
-            0, 0, 0, 65535, 0, 0, 0, 65535, // row 5
-            0, 0, 0, 0, 0, 0, 0, 0, // row 6
-            0, 0, 0, 0, 0, 0, 0, 0, // row 7
-            65535, 0, 0, 0, 65535, 0, 0, 0, // row 8
+            0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, 65535.0, // row 1
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 2
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 3
+            65535.0, 0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, // row 4
+            0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, 65535.0, // row 5
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 6
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 7
+            65535.0, 0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, // row 8
         ];
-        let r_expected: Vec<SMatrix<u16, 8, 8>> = vec![SMatrix::from_iterator(r_expected_vec)];
+        let r_expected: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_iterator(r_expected_vec)];
         assert_eq!(r_expected, r);
 
         let g_expected_vec = vec![
-            0, 0, 0, 0, 0, 0, 0, 0, // row 1
-            0, 65535, 0, 0, 0, 65535, 0, 0, // row 2
-            0, 0, 65535, 0, 0, 0, 65535, 0, // row 3
-            0, 0, 0, 0, 0, 0, 0, 0, // row 4
-            0, 0, 0, 0, 0, 0, 0, 0, // row 5
-            0, 65535, 0, 0, 0, 65535, 0, 0, // row 6
-            0, 0, 65535, 0, 0, 0, 65535, 0, // row 7
-            0, 0, 0, 0, 0, 0, 0, 0, // row 8
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 1
+            0.0, 65535.0, 0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, // row 2
+            0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, 65535.0, 0.0, // row 3
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 4
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 5
+            0.0, 65535.0, 0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, // row 6
+            0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, 65535.0, 0.0, // row 7
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 8
         ];
-        let g_expected: Vec<SMatrix<u16, 8, 8>> = vec![SMatrix::from_iterator(g_expected_vec)];
+        let g_expected: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_iterator(g_expected_vec)];
         assert_eq!(g_expected, g);
 
         let b_expected_vec = vec![
-            0, 0, 0, 65535, 0, 0, 0, 65535, // row 1
-            0, 30583, 0, 0, 0, 30583, 0, 0, // row 2
-            0, 0, 30583, 0, 0, 0, 30583, 0, // row 3
-            65535, 0, 0, 0, 65535, 0, 0, 0, // row 4
-            0, 0, 0, 65535, 0, 0, 0, 65535, // row 5
-            0, 30583, 0, 0, 0, 30583, 0, 0, // row 6
-            0, 0, 30583, 0, 0, 0, 30583, 0, // row 7
-            65535, 0, 0, 0, 65535, 0, 0, 0, // row 8
+            0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, 65535.0, // row 1
+            0.0, 30583.0, 0.0, 0.0, 0.0, 30583.0, 0.0, 0.0, // row 2
+            0.0, 0.0, 30583.0, 0.0, 0.0, 0.0, 30583.0, 0.0, // row 3
+            65535.0, 0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, // row 4
+            0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, 65535.0, // row 5
+            0.0, 30583.0, 0.0, 0.0, 0.0, 30583.0, 0.0, 0.0, // row 6
+            0.0, 0.0, 30583.0, 0.0, 0.0, 0.0, 30583.0, 0.0, // row 7
+            65535.0, 0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, // row 8
         ];
-        let b_expected: Vec<SMatrix<u16, 8, 8>> = vec![SMatrix::from_iterator(b_expected_vec)];
+        let b_expected: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_iterator(b_expected_vec)];
         assert_eq!(b_expected, b);
     }
 
@@ -781,16 +781,16 @@ mod tests {
 
         let (y, cb, cr) = image.to_matrices();
         let y_expected_vec = vec![
-            0, 0, 0, 27066, 0, 0, 0, 27066, // row 1
-            0, 41956, 0, 0, 0, 41956, 0, 0, // row 2
-            0, 0, 41956, 0, 0, 0, 41956, 0, // row 3
-            27066, 0, 0, 0, 27066, 0, 0, 0, // row 4
-            0, 0, 0, 27066, 0, 0, 0, 27066, // row 5
-            0, 41956, 0, 0, 0, 41956, 0, 0, // row 6
-            0, 0, 41956, 0, 0, 0, 41956, 0, // row 7
-            27066, 0, 0, 0, 27066, 0, 0, 0, // row 8
+            0.0, 0.0, 0.0, 27066.0, 0.0, 0.0, 0.0, 27066.0, // row 1
+            0.0, 41956.0, 0.0, 0.0, 0.0, 41956.0, 0.0, 0.0, // row 2
+            0.0, 0.0, 41956.0, 0.0, 0.0, 0.0, 41956.0, 0.0, // row 3
+            27066.0, 0.0, 0.0, 0.0, 27066.0, 0.0, 0.0, 0.0, // row 4
+            0.0, 0.0, 0.0, 27066.0, 0.0, 0.0, 0.0, 27066.0, // row 5
+            0.0, 41956.0, 0.0, 0.0, 0.0, 41956.0, 0.0, 0.0, // row 6
+            0.0, 0.0, 41956.0, 0.0, 0.0, 0.0, 41956.0, 0.0, // row 7
+            27066.0, 0.0, 0.0, 0.0, 27066.0, 0.0, 0.0, 0.0, // row 8
         ];
-        let y_expected: Vec<SMatrix<u16, 8, 8>> = vec![
+        let y_expected: Vec<SMatrix<f32, 8, 8>> = vec![
             SMatrix::from_iterator(y_expected_vec.clone()),
             SMatrix::from_iterator(y_expected_vec.clone()),
             SMatrix::from_iterator(y_expected_vec.clone()),
@@ -799,29 +799,29 @@ mod tests {
         assert_eq!(y_expected, y);
 
         let cb_expected_vec = vec![
-            31163, 38195, 31163, 38195, 31163, 38195, 31163, 38195, // row 1
-            38195, 31163, 38195, 31163, 38195, 31163, 38195, 31163, // row 3
-            31163, 38195, 31163, 38195, 31163, 38195, 31163, 38195, // row 2
-            38195, 31163, 38195, 31163, 38195, 31163, 38195, 31163, // row 4
-            31163, 38195, 31163, 38195, 31163, 38195, 31163, 38195, // row 5
-            38195, 31163, 38195, 31163, 38195, 31163, 38195, 31163, // row 6
-            31163, 38195, 31163, 38195, 31163, 38195, 31163, 38195, // row 7
-            38195, 31163, 38195, 31163, 38195, 31163, 38195, 31163, // row 8
+            31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, // row 1
+            38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, // row 3
+            31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, // row 2
+            38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, // row 4
+            31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, // row 5
+            38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, // row 6
+            31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, // row 7
+            38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, // row 8
         ];
-        let cb_expected: Vec<SMatrix<u16, 8, 8>> = vec![SMatrix::from_iterator(cb_expected_vec)];
+        let cb_expected: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_iterator(cb_expected_vec)];
         assert_eq!(cb_expected, cb);
 
         let cr_expected_vec = vec![
-            25287, 39627, 25287, 39627, 25287, 39627, 25287, 39627, // row 1
-            39627, 25287, 39627, 25287, 39627, 25287, 39627, 25287, // row 2
-            25287, 39627, 25287, 39627, 25287, 39627, 25287, 39627, // row 3
-            39627, 25287, 39627, 25287, 39627, 25287, 39627, 25287, // row 4
-            25287, 39627, 25287, 39627, 25287, 39627, 25287, 39627, // row 5
-            39627, 25287, 39627, 25287, 39627, 25287, 39627, 25287, // row 6
-            25287, 39627, 25287, 39627, 25287, 39627, 25287, 39627, // row 7
-            39627, 25287, 39627, 25287, 39627, 25287, 39627, 25287, // row 8
+            25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, // row 1
+            39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, // row 2
+            25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, // row 3
+            39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, // row 4
+            25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, // row 5
+            39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, // row 6
+            25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, // row 7
+            39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, // row 8
         ];
-        let cr_expected: Vec<SMatrix<u16, 8, 8>> = vec![SMatrix::from_iterator(cr_expected_vec)];
+        let cr_expected: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_iterator(cr_expected_vec)];
         assert_eq!(cr_expected, cr);
     }
 

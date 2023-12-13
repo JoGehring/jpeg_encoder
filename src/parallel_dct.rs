@@ -55,7 +55,7 @@ pub fn dct_single_channel(image: &Image, mode: &DCTMode) -> Vec<SMatrix<f32, 8, 
 /// # Arguments
 /// * `image`: The image to calculate the DCT for.
 pub fn dct_matrix_vector(
-    matrices: &Vec<SMatrix<u16, 8, 8>>,
+    matrices: &Vec<SMatrix<f32, 8, 8>>,
     mode: &DCTMode,
 ) -> Vec<SMatrix<f32, 8, 8>> {
     let function = match mode {
@@ -76,12 +76,12 @@ pub fn dct_matrix_vector(
 /// * `channel`: The channel of data to calculate the DCT on.
 /// * `function`: The DCT function to use.
 fn dct_channel(
-    channel: &Vec<SMatrix<u16, 8, 8>>,
-    function: &fn(&SMatrix<u16, 8, 8>) -> SMatrix<f32, 8, 8>,
+    channel: &Vec<SMatrix<f32, 8, 8>>,
+    function: &fn(&SMatrix<f32, 8, 8>) -> SMatrix<f32, 8, 8>,
 ) -> Vec<SMatrix<f32, 8, 8>> {
     let thread_count = thread::available_parallelism().unwrap().get();
     let chunk_size = (channel.len() / thread_count) + 1;
-    let chunks: std::slice::Chunks<'_, SMatrix<u16, 8, 8>> = channel.chunks(chunk_size);
+    let chunks: std::slice::Chunks<'_, SMatrix<f32, 8, 8>> = channel.chunks(chunk_size);
     thread::scope(|s| {
         let mut result = Vec::with_capacity(channel.len());
         let mut handles = Vec::with_capacity(chunks.len());

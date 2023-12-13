@@ -14,9 +14,9 @@ pub fn idct(
     cb_matrices: &Vec<SMatrix<f32, 8, 8>>,
     cr_matrices: &Vec<SMatrix<f32, 8, 8>>,
 ) -> (
-    Vec<SMatrix<u16, 8, 8>>,
-    Vec<SMatrix<u16, 8, 8>>,
-    Vec<SMatrix<u16, 8, 8>>,
+    Vec<SMatrix<f32, 8, 8>>,
+    Vec<SMatrix<f32, 8, 8>>,
+    Vec<SMatrix<f32, 8, 8>>,
 ) {
     //each matrix holds 64 values
     let y_capacity = y_matrices.len();
@@ -44,13 +44,13 @@ pub fn idct(
 /// * `thread_count`: The number of threads this channel gets.
 fn spawn_threads_for_channel(
     channel: &Vec<SMatrix<f32, 8, 8>>,
-) -> (Vec<JoinHandle<()>>, Vec<Receiver<Vec<SMatrix<u16, 8, 8>>>>) {
+) -> (Vec<JoinHandle<()>>, Vec<Receiver<Vec<SMatrix<f32, 8, 8>>>>) {
     let thread_count = std::thread::available_parallelism().unwrap().get();
     // + 1 to avoid creating a new chunk with just the last element
     let chunk_size = (channel.len() / thread_count) + 1;
     let data_vecs: std::slice::Chunks<'_, SMatrix<f32, 8, 8>> = channel.chunks(chunk_size);
     let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(thread_count);
-    let mut receivers: Vec<Receiver<Vec<SMatrix<u16, 8, 8>>>> = Vec::with_capacity(thread_count);
+    let mut receivers: Vec<Receiver<Vec<SMatrix<f32, 8, 8>>>> = Vec::with_capacity(thread_count);
 
     for data in data_vecs {
         let (tx, rx) = mpsc::channel();
@@ -58,7 +58,7 @@ fn spawn_threads_for_channel(
         let data_vec = data.to_vec();
 
         let handle = thread::spawn(move || {
-            let mut result: Vec<SMatrix<u16, 8, 8>> = Vec::with_capacity(data_vec.len());
+            let mut result: Vec<SMatrix<f32, 8, 8>> = Vec::with_capacity(data_vec.len());
             for matrix in data_vec {
                 result.push(inverse_dct(&matrix))
             }
@@ -81,10 +81,10 @@ fn spawn_threads_for_channel(
 /// * `capacity`: The amount of matrices in the result. Used to avoid having to reallocate.
 fn join_and_receive_threads_for_channel(
     handles: Vec<JoinHandle<()>>,
-    receivers: Vec<Receiver<Vec<SMatrix<u16, 8, 8>>>>,
+    receivers: Vec<Receiver<Vec<SMatrix<f32, 8, 8>>>>,
     capacity: usize,
-) -> Vec<SMatrix<u16, 8, 8>> {
-    let mut result: Vec<SMatrix<u16, 8, 8>> = Vec::with_capacity(capacity);
+) -> Vec<SMatrix<f32, 8, 8>> {
+    let mut result: Vec<SMatrix<f32, 8, 8>> = Vec::with_capacity(capacity);
     for handle in handles {
         handle.join().unwrap();
     }
@@ -202,9 +202,9 @@ mod tests {
         for index in 0..cb_dct.len() {
             for i in 0..8 {
                 for j in 0..8 {
-                    assert_abs_diff_eq!(y_expected[index][(i, j)], y[index][(i, j)], epsilon = 1);
-                    assert_abs_diff_eq!(cb_expected[index][(i, j)], cb[index][(i, j)], epsilon = 1);
-                    assert_abs_diff_eq!(cr_expected[index][(i, j)], cr[index][(i, j)], epsilon = 1);
+                    assert_abs_diff_eq!(y_expected[index][(i, j)], y[index][(i, j)], epsilon = 1.0);
+                    assert_abs_diff_eq!(cb_expected[index][(i, j)], cb[index][(i, j)], epsilon = 1.0);
+                    assert_abs_diff_eq!(cr_expected[index][(i, j)], cr[index][(i, j)], epsilon = 1.0);
                 }
             }
         }
