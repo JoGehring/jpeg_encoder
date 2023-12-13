@@ -95,21 +95,21 @@ fn arai_1d_internal<T: Vector8>(input: &T) -> T {
 fn additions_before_first_multiplication<T: Vector8>(input: &T) -> SVector<f32, 8> {
     let mut result_vector: SVector<f32, 8> = SVector::zeros();
 
-    result_vector[0] = (input.sum()) as f32;
-    result_vector[1] = (input.at(0) + input.at(7) + input.at(3) + input.at(4)
+    result_vector[0] = input.sum();
+    result_vector[1] = input.at(0) + input.at(7) + input.at(3) + input.at(4)
         - input.at(1)
         - input.at(6)
         - input.at(2)
-        - input.at(5)) as f32;
+        - input.at(5);
     result_vector[2] =
-        (input.at(1) + input.at(6) - input.at(2) - input.at(5) + input.at(0) + input.at(7)
+        input.at(1) + input.at(6) - input.at(2) - input.at(5) + input.at(0) + input.at(7)
             - input.at(3)
-            - input.at(4)) as f32;
-    result_vector[3] = (input.at(0) + input.at(7) - input.at(3) - input.at(4)) as f32;
-    result_vector[4] = (input.at(4) - input.at(3) + input.at(5) - input.at(2)) as f32;
-    result_vector[5] = (input.at(2) - input.at(5) + input.at(1) - input.at(6)) as f32;
-    result_vector[6] = (input.at(1) - input.at(6) + input.at(0) - input.at(7)) as f32;
-    result_vector[7] = (input.at(0) - input.at(7)) as f32;
+            - input.at(4);
+    result_vector[3] = input.at(0) + input.at(7) - input.at(3) - input.at(4);
+    result_vector[4] = input.at(4) - input.at(3) + input.at(5) - input.at(2);
+    result_vector[5] = input.at(2) - input.at(5) + input.at(1) - input.at(6);
+    result_vector[6] = input.at(1) - input.at(6) + input.at(0) - input.at(7);
+    result_vector[7] = input.at(0) - input.at(7);
 
     result_vector
 }
