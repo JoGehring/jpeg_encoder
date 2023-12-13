@@ -170,7 +170,7 @@ fn second_multiplications<T: Vector8>(vector: &SVector<f32, 8>) -> T {
 
 #[inline(always)]
 fn multiply<const I: usize>(value: f32) -> f32 {
-    (value * ARAI_S[I])
+    value * ARAI_S[I]
 }
 
 #[cfg(test)]
@@ -184,57 +184,69 @@ mod tests {
 
     #[test]
     fn test_arai_1d_column() {
-        let expected_vector: Vec<i32> = vec![12728, -6442, 0, -673, 0, -201, 0, -51];
-        let expected: SVector<i32, 8> = SVector::from_row_iterator(expected_vector.into_iter());
+        let expected_vector: Vec<f32> = vec![
+            12727.922, -6442.3228, 0.0, -673.4549, 0.0, -200.90302, 0.0, -50.702698,
+        ];
+        let expected: SVector<f32, 8> = SVector::from_row_iterator(expected_vector.into_iter());
 
-        let values: Vec<i32> = vec![1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000];
-        // let result = arai_1d_column(&SVector::from_row_iterator(values.into_iter()));
+        let values: Vec<f32> = vec![
+            1000.0, 2000.0, 3000.0, 4000.0, 5000.0, 6000.0, 7000.0, 8000.0,
+        ];
+        let result = arai_1d_column(&SVector::from_row_iterator(values.into_iter()));
 
-        // assert_eq!(expected, result);
+        assert_eq!(expected, result);
     }
 
     #[test]
     fn test_arai_1d_column_small_values() {
-        let expected_vector: Vec<i32> = vec![106, -26, 1, 56, -13, 2, 21, -10];
-        let expected: SVector<i32, 8> = SVector::from_row_iterator(expected_vector.into_iter());
+        let expected_vector: Vec<f32> = vec![
+            105.71246, -26.07654, 0.5819909, 55.848366, -13.081475, 1.8727386, 20.806522, -9.745093,
+        ];
+        let expected: SVector<f32, 8> = SVector::from_row_iterator(expected_vector.into_iter());
 
-        let values: Vec<i32> = vec![47, 18, 13, 16, 41, 90, 47, 27];
-        // let result = arai_1d_column(&SVector::from_row_iterator(values.into_iter()));
-//TODO fix tests 
-        // assert_eq!(expected, result);
+        let values: Vec<f32> = vec![47.0, 18.0, 13.0, 16.0, 41.0, 90.0, 47.0, 27.0];
+        let result = arai_1d_column(&SVector::from_row_iterator(values.into_iter()));
+        assert_eq!(expected, result);
     }
 
     #[test]
     fn test_arai_1d_row() {
-        let expected_vector: Vec<i32> = vec![12728, -6442, 0, -673, 0, -201, 0, -51];
-        let expected: RowSVector<i32, 8> =
+        let expected_vector: Vec<f32> = vec![
+            12727.922, -6442.3228, 0.0, -673.4549, 0.0, -200.90302, 0.0, -50.702698,
+        ];
+        let expected: RowSVector<f32, 8> =
             RowSVector::from_row_iterator(expected_vector.into_iter());
 
-        let values: Vec<i32> = vec![1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000];
-        // let result = arai_1d_row(&RowSVector::from_row_iterator(values.into_iter()));
+        let values: Vec<f32> = vec![
+            1000.0, 2000.0, 3000.0, 4000.0, 5000.0, 6000.0, 7000.0, 8000.0,
+        ];
+        let result = arai_1d_row(&RowSVector::from_row_iterator(values.into_iter()));
 
-        // assert_eq!(expected, result);
+        assert_eq!(expected, result);
     }
 
     #[test]
     fn test_arai_1d_row_small_values() {
-        let expected_vector: Vec<i32> = vec![106, -26, 1, 56, -13, 2, 21, -10];
-        let expected: RowSVector<i32, 8> = RowSVector::from_row_iterator(expected_vector.into_iter());
+        let expected_vector: Vec<f32> = vec![
+            105.71246, -26.07654, 0.5819909, 55.848366, -13.081475, 1.8727386, 20.806522, -9.745093,
+        ];
+        let expected: RowSVector<f32, 8> =
+            RowSVector::from_row_iterator(expected_vector.into_iter());
 
-        // let values: Vec<i32> = vec![47, 18, 13, 16, 41, 90, 47, 27];
-        // let result = arai_1d_row(&RowSVector::from_row_iterator(values.into_iter()));
+        let values: Vec<f32> = vec![47.0, 18.0, 13.0, 16.0, 41.0, 90.0, 47.0, 27.0];
+        let result = arai_1d_row(&RowSVector::from_row_iterator(values.into_iter()));
 
-        // assert_eq!(expected, result);
+        assert_eq!(expected, result);
     }
     #[test]
     fn test_first_additions() {
-        let values_vector: Vec<i32> = vec![47, 18, 13, 16, 41, 90, 47, 27];
-        let values: SVector<i32, 8> = SVector::from_row_iterator(values_vector.into_iter());
+        let values_vector: Vec<f32> = vec![47.0, 18.0, 13.0, 16.0, 41.0, 90.0, 47.0, 27.0];
+        let values: SVector<f32, 8> = SVector::from_row_iterator(values_vector.into_iter());
 
-        // let actual = additions_before_first_multiplication(&values);
-        // let expected_vector: Vec<f32> = vec![299.0, -37.0, -21.0, 17.0, 102.0, -106.0, -9.0, 20.0];
-        // let expected: SVector<f32, 8> = SVector::from_row_iterator(expected_vector.into_iter());
-        // assert_eq!(expected, actual);
+        let actual = additions_before_first_multiplication(&values);
+        let expected_vector: Vec<f32> = vec![299.0, -37.0, -21.0, 17.0, 102.0, -106.0, -9.0, 20.0];
+        let expected: SVector<f32, 8> = SVector::from_row_iterator(expected_vector.into_iter());
+        assert_eq!(expected, actual);
     }
 
     #[test]
@@ -272,10 +284,12 @@ mod tests {
         ];
         let values: SVector<f32, 8> = SVector::from_row_iterator(values_vector.into_iter());
 
-        // let result = second_multiplications::<SVector<i32, 8>>(&values);
-        // let expected_vector: Vec<i32> = vec![106, -26, 1, 56, -13, 2, 21, -10];
-        // let expected: SVector<i32, 8> = SVector::from_row_iterator(expected_vector.into_iter());
+        let result = second_multiplications::<SVector<f32, 8>>(&values);
+        let expected_vector: Vec<f32> = vec![
+            105.71246, -26.07654, 0.5819909, 55.848366, -13.081475, 1.8727386, 20.806522, -9.745093,
+        ];
+        let expected: SVector<f32, 8> = SVector::from_row_iterator(expected_vector.into_iter());
 
-        // assert_eq!(expected, result);
+        assert_eq!(expected, result);
     }
 }

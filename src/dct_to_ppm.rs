@@ -5,15 +5,15 @@ use std::fs::File;
 use std::io::{Error, Write};
 use std::usize;
 
-/// This regex checks correct paths given to the to_ppm function
-/// - We start at the beginning of the path string
-/// - The first group checks for (back-)slashes, in case of unixoid systems zero or forward,
-/// in case of Windows zero to two backslashes
-/// - Then we check for dots, there are zero to two allowed
-/// - then we allow every char which is not forbidden by the OS as part of a file/directory
-/// - This whole block has to appear at least once
-/// - Then we check for the right file suffix and the ending of the string
 lazy_static! {
+    /// This regex checks correct paths given to the to_ppm function
+    /// - We start at the beginning of the path string
+    /// - The first group checks for (back-)slashes, in case of unixoid systems zero or forward,
+    /// in case of Windows zero to two backslashes
+    /// - Then we check for dots, there are zero to two allowed
+    /// - then we allow every char which is not forbidden by the OS as part of a file/directory
+    /// - This whole block has to appear at least once
+    /// - Then we check for the right file suffix and the ending of the string
     static ref PPM_FILEPATH_REGEX: Regex =
         Regex::new(r#"^(([/]{0,1} | [\\]{0,2}){0,1}[.]{0,2}[^,;<>:"|\?\*]+)+(.ppm)$"#).unwrap();
 }
@@ -55,9 +55,9 @@ pub fn to_ppm(
             for j in 0..width as usize {
                 let x = j / 8;
                 let x_index = j % 8;
-                let r_val = (r_values[y][x][(i, x_index)] as f32 /65535.0 * 255.0) as u16;
-                let g_val = (g_values[y][x][(i, x_index)] as f32 /65535.0 * 255.0) as u16;
-                let b_val = (b_values[y][x][(i, x_index)] as f32 /65535.0 * 255.0) as u16;
+                let r_val = (r_values[y][x][(i, x_index)] as f32 / 65535.0 * 255.0) as u16;
+                let g_val = (g_values[y][x][(i, x_index)] as f32 / 65535.0 * 255.0) as u16;
+                let b_val = (b_values[y][x][(i, x_index)] as f32 / 65535.0 * 255.0) as u16;
                 write!(file, "{} {} {} ", r_val, g_val, b_val)?;
             }
             writeln!(file)?;
