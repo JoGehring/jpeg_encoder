@@ -51,7 +51,7 @@ pub fn direct_dct(input: &mut SMatrix<f32, 8, 8>) {
 /// # Arguments
 /// * `input`: The matrix to perform the DCT on.
 pub fn matrix_dct(input: &mut SMatrix<f32, 8, 8>){ 
-    *input = MATRIX_A_MATRIX.mul(*input).mul(MATRIX_A_MATRIX_TRANS);
+    MATRIX_A_MATRIX.mul(*input).mul_to(&MATRIX_A_MATRIX_TRANS, input);
 }
 
 /// Perform the DCT using Arai's algorihtm.
