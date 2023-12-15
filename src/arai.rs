@@ -220,19 +220,14 @@ fn second_multiplications<T: Vector8>(vector: &mut T) {
     let third_before = vector.at(3);
     let fourth_before = vector.at(4);
     let sixth_before = vector.at(6);
-    vector.set(0, multiply::<0>(vector.at(0)));
-    vector.set(1, multiply::<1>(vector.at(5)));
-    vector.set(2, multiply::<2>(vector.at(2)));
-    vector.set(3, multiply::<3>(vector.at(7)));
-    vector.set(4, multiply::<4>(first_before));
-    vector.set(5, multiply::<5>(fourth_before));
-    vector.set(6, multiply::<6>(third_before));
-    vector.set(7, multiply::<7>(sixth_before));
-}
-
-#[inline(always)]
-fn multiply<const I: usize>(value: f32) -> f32 {
-    value * ARAI_S[I]
+    vector.set(0, ARAI_S[0] * vector.at(0));
+    vector.set(1, ARAI_S[1] * vector.at(5));
+    vector.set(2, ARAI_S[2] * vector.at(2));
+    vector.set(3, ARAI_S[3] * vector.at(7));
+    vector.set(4, ARAI_S[4] * first_before);
+    vector.set(5, ARAI_S[5] * fourth_before);
+    vector.set(6, ARAI_S[6] * third_before);
+    vector.set(7, ARAI_S[7] * sixth_before);
 }
 
 #[cfg(test)]
