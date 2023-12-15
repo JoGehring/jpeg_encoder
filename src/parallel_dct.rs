@@ -90,8 +90,8 @@ fn dct_channel(
     pool.scoped(|s| {
         for chunk in chunks {
             s.execute(move || {
-                for mut matrix in chunk {
-                    function(&mut matrix);
+                for matrix in chunk {
+                    function(matrix);
                 }
             });
         }
