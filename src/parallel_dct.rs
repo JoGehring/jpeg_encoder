@@ -1,7 +1,9 @@
-use nalgebra::SMatrix;
+use std::slice::ChunksMut;
 use std::thread;
 
-use crate::dct::{arai_dct, direct_dct, matrix_dct, DCTMode};
+use nalgebra::SMatrix;
+
+use crate::dct::{arai_dct, DCTMode, direct_dct, matrix_dct};
 use crate::image::Image;
 
 /// Perform the DCT on an image.
@@ -24,13 +26,12 @@ pub fn dct(
         DCTMode::Arai => arai_dct,
     };
 
-    let (y_matrices, cb_matrices, cr_matrices) = image.to_matrices();
+    let (mut y_matrices, mut cb_matrices, mut cr_matrices) = image.to_matrices();
 
-    let y_result = dct_channel(&y_matrices, &function);
-    let cb_result = dct_channel(&cb_matrices, &function);
-    let cr_result = dct_channel(&cr_matrices, &function);
-
-    (y_result, cb_result, cr_result)
+    dct_channel(&mut y_matrices, &function);
+    dct_channel(&mut cb_matrices, &function);
+    dct_channel(&mut cr_matrices, &function);
+    (y_matrices, cb_matrices, cr_matrices)
 }
 
 /// Perform the DCT on only the image's 'Y' channel.
@@ -44,9 +45,10 @@ pub fn dct_single_channel(image: &Image, mode: &DCTMode) -> Vec<SMatrix<f32, 8, 
         DCTMode::Matrix => crate::dct::matrix_dct,
         DCTMode::Arai => crate::dct::arai_dct,
     };
-    let y_matrices = image.single_channel_to_matrices::<1>();
+    let mut y_matrices = image.single_channel_to_matrices::<1>();
 
-    dct_channel(&y_matrices, &function)
+    dct_channel(&mut y_matrices, &function);
+    y_matrices
 }
 
 /// Perform the DCT on a matrix vector representation of an image.
@@ -55,16 +57,16 @@ pub fn dct_single_channel(image: &Image, mode: &DCTMode) -> Vec<SMatrix<f32, 8, 
 /// # Arguments
 /// * `image`: The image to calculate the DCT for.
 pub fn dct_matrix_vector(
-    matrices: &Vec<SMatrix<f32, 8, 8>>,
+    matrices: &mut Vec<SMatrix<f32, 8, 8>>,
     mode: &DCTMode,
-) -> Vec<SMatrix<f32, 8, 8>> {
+) {
     let function = match mode {
-        DCTMode::Direct => crate::dct::direct_dct,
-        DCTMode::Matrix => crate::dct::matrix_dct,
-        DCTMode::Arai => crate::dct::arai_dct,
+        DCTMode::Direct => direct_dct,
+        DCTMode::Matrix => matrix_dct,
+        DCTMode::Arai => arai_dct,
     };
 
-    dct_channel(matrices, &function)
+    dct_channel(matrices, &function);
 }
 
 /// process the channel.
@@ -76,29 +78,25 @@ pub fn dct_matrix_vector(
 /// * `channel`: The channel of data to calculate the DCT on.
 /// * `function`: The DCT function to use.
 fn dct_channel(
-    channel: &Vec<SMatrix<f32, 8, 8>>,
-    function: &fn(&SMatrix<f32, 8, 8>) -> SMatrix<f32, 8, 8>,
-) -> Vec<SMatrix<f32, 8, 8>> {
+    channel: &mut Vec<SMatrix<f32, 8, 8>>,
+    function: &fn(&mut SMatrix<f32, 8, 8>),
+) {
     let thread_count = thread::available_parallelism().unwrap().get();
     let chunk_size = (channel.len() / thread_count) + 1;
-    let chunks: std::slice::Chunks<'_, SMatrix<f32, 8, 8>> = channel.chunks(chunk_size);
+    let mut chunks: ChunksMut<SMatrix<f32, 8, 8>> = channel.chunks_mut(chunk_size);
     thread::scope(|s| {
-        let mut result = Vec::with_capacity(channel.len());
         let mut handles = Vec::with_capacity(chunks.len());
         for chunk in chunks {
             handles.push(s.spawn(move || {
-                let mut result: Vec<SMatrix<f32, 8, 8>> = Vec::with_capacity(chunk.len());
-                for matrix in chunk {
-                    result.push(function(matrix))
+                for mut matrix in chunk {
+                    function(&mut matrix);
                 }
-                result
             }));
         }
         for handle in handles {
-            result.extend(handle.join().unwrap());
+            handle.join().unwrap();
         }
-        result
-    })
+    });
 }
 
 #[cfg(test)]
@@ -107,6 +105,7 @@ mod tests {
     use nalgebra::SMatrix;
 
     use crate::ppm_parser::read_ppm_from_file;
+
     #[test]
     fn test_dct_parallel_simple_image() {
         let image = read_ppm_from_file("test/valid_test_8x8.ppm");

@@ -109,12 +109,13 @@ fn main() {
         let mut times = Vec::with_capacity(4000);
         // do this for about 10 seconds
         while timer_start.elapsed().as_millis() < 10000 {
+            let mut y_clone = y_matrix.clone();
             let timer_single_run = std::time::Instant::now();
-            let result = parallel_dct::dct_matrix_vector(&y_matrix, &mode);
+            parallel_dct::dct_matrix_vector(&mut y_clone, &mode);
             times.push(timer_single_run.elapsed().as_micros());
             // accessing result here means it isn't dropped before the timer is stopped
             // obviously the time taken to drop the result doesn't need to be part of the dct benchmark
-            let __ = result[0];
+            let __ = y_clone[0];
         }
         times.sort();
         let min = times.first().unwrap();

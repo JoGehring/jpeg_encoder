@@ -30,30 +30,28 @@ impl std::fmt::Display for DCTMode {
 /// formula with O(n^4) complexity. Returns a 8x8 i32 matrix.
 /// # Arguments
 /// * `input`: The matrix to perform the DCT on.
-pub fn direct_dct(input: &SMatrix<f32, 8, 8>) -> SMatrix<f32, 8, 8> {
-    let mut output = SMatrix::from_element(0.0);
+pub fn direct_dct(input: &mut SMatrix<f32, 8, 8>) {
+    let input_before = input.clone();
     for i in 0..8 {
         for j in 0..8 {
             let mut new_y: f32 = 0.0;
             for x in 0..8 {
                 for y in 0..8 {
                     // all logic for new_y is in DIRECT_LOOKUP_TABLE
-                    new_y += input[(x, y)] * DIRECT_LOOKUP_TABLE[i][j][x][y];
+                    new_y += input_before[(x, y)] * DIRECT_LOOKUP_TABLE[i][j][x][y];
                 }
             }
-            output[(i, j)] = new_y;
+            input[(i, j)] = new_y;
         }
     }
-    output
 }
 
 /// Discrete Cosine Transform on a 8x8 u16 matrix, implemented using matrix multiplication AXA^T
 /// with O(n^3) complexity. Returns a 8x8 i32 matrix.
 /// # Arguments
 /// * `input`: The matrix to perform the DCT on.
-pub fn matrix_dct(input: &SMatrix<f32, 8, 8>) -> SMatrix<f32, 8, 8> {
-    let y = MATRIX_A_MATRIX.mul(input).mul(MATRIX_A_MATRIX_TRANS);
-    y
+pub fn matrix_dct(input: &mut SMatrix<f32, 8, 8>){ 
+    *input = MATRIX_A_MATRIX.mul(*input).mul(MATRIX_A_MATRIX_TRANS);
 }
 
 /// Perform the DCT using Arai's algorihtm.
@@ -62,20 +60,16 @@ pub fn matrix_dct(input: &SMatrix<f32, 8, 8>) -> SMatrix<f32, 8, 8> {
 ///
 /// # Arguments
 /// * `input`: The matrix to perform the DCT on.
-pub fn arai_dct(input: &SMatrix<f32, 8, 8>) -> SMatrix<f32, 8, 8> {
+pub fn arai_dct(input: &mut SMatrix<f32, 8, 8>) {
     // first, do all rows
-    let mut after_row_dct: SMatrix<f32, 8, 8> = SMatrix::zeros();
-    for (i, input_row) in input.row_iter().enumerate() {
-        after_row_dct.set_row(i, &arai_1d_row(&input_row.clone_owned()))
+    for mut input_row in input.row_iter_mut() {
+        arai_1d_row(&mut input_row);
     }
 
     // then, do all columns
-    let mut result: SMatrix<f32, 8, 8> = SMatrix::zeros();
-    for (i, input_column) in after_row_dct.column_iter().enumerate() {
-        result.set_column(i, &arai_1d_column(&input_column.clone_owned()))
+    for mut input_column in input.column_iter_mut() {
+        arai_1d_column(&mut input_column);
     }
-
-    result
 }
 
 /// Inverse Discrete Cosine Transform on a 8x8 i32 matrix, implemented directly using the standard
@@ -218,7 +212,7 @@ mod tests {
         }
     }
 
-    fn test_dct_slides_vals_generic(dct_type: &dyn Fn(&SMatrix<f32, 8, 8>) -> SMatrix<f32, 8, 8>) {
+    fn test_dct_slides_vals_generic(dct_type: &dyn Fn(&mut SMatrix<f32, 8, 8>)) {
         let x_vec = vec![
             47.0, 18.0, 13.0, 16.0, 41.0, 90.0, 47.0, 27.0, 62.0, 42.0, 35.0, 39.0, 66.0, 90.0,
             41.0, 26.0, 71.0, 55.0, 56.0, 67.0, 55.0, 40.0, 22.0, 39.0, 53.0, 60.0, 63.0, 50.0,
@@ -226,8 +220,8 @@ mod tests {
             33.0, 46.0, 58.0, 104.0, 144.0, 179.0, 76.0, 70.0, 71.0, 91.0, 118.0, 151.0, 176.0,
             184.0, 102.0, 105.0, 115.0, 124.0, 135.0, 168.0, 173.0, 181.0,
         ];
-        let x = SMatrix::from_row_iterator(x_vec.into_iter());
-        let y = dct_type(&x);
+        let mut x = SMatrix::from_row_iterator(x_vec.into_iter());
+        dct_type(&mut x);
         let y_expected_vec = vec![
             581.25,
             -143.59541,
@@ -298,7 +292,7 @@ mod tests {
 
         for i in 0..8 {
             for j in 0..8 {
-                assert_abs_diff_eq!(y_expected[(i, j)], y[(i, j)], epsilon = 0.01);
+                assert_abs_diff_eq!(y_expected[(i, j)], x[(i, j)], epsilon = 0.01);
             }
         }
     }
