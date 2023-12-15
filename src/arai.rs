@@ -58,7 +58,14 @@ impl Vector8 for RowSVector<f32, 8> {
     }
 }
 
-impl Vector8 for Matrix<f32, Const<1>, Const<8>, ViewStorageMut<'_, f32, Const<1>, Const<8>, Const<1>, Const<8>>> {
+impl Vector8
+    for Matrix<
+        f32,
+        Const<1>,
+        Const<8>,
+        ViewStorageMut<'_, f32, Const<1>, Const<8>, Const<1>, Const<8>>,
+    >
+{
     #[inline(always)]
     fn at(&self, index: usize) -> f32 {
         self[index]
@@ -77,7 +84,14 @@ impl Vector8 for Matrix<f32, Const<1>, Const<8>, ViewStorageMut<'_, f32, Const<1
     }
 }
 
-impl Vector8 for Matrix<f32, Const<8>, Const<1>, ViewStorageMut<'_, f32, Const<8>, Const<1>, Const<1>, Const<8>>> {
+impl Vector8
+    for Matrix<
+        f32,
+        Const<8>,
+        Const<1>,
+        ViewStorageMut<'_, f32, Const<8>, Const<1>, Const<1>, Const<8>>,
+    >
+{
     #[inline(always)]
     fn at(&self, index: usize) -> f32 {
         self[index]
@@ -138,15 +152,20 @@ fn additions_before_first_multiplication<T: Vector8>(input: &mut T) {
     let second_before = input.at(2);
     let third_before = input.at(3);
     input.set(0, input.sum());
-    input.set(1, zeroth_before + input.at(7) + input.at(3) + input.at(4)
-        - input.at(1)
-        - input.at(6)
-        - input.at(2)
-        - input.at(5));
-    input.set(2,
-              first_before + input.at(6) - input.at(2) - input.at(5) + zeroth_before + input.at(7)
-                  - input.at(3)
-                  - input.at(4));
+    input.set(
+        1,
+        zeroth_before + input.at(7) + input.at(3) + input.at(4)
+            - input.at(1)
+            - input.at(6)
+            - input.at(2)
+            - input.at(5),
+    );
+    input.set(
+        2,
+        first_before + input.at(6) - input.at(2) - input.at(5) + zeroth_before + input.at(7)
+            - input.at(3)
+            - input.at(4),
+    );
     input.set(3, zeroth_before + input.at(7) - input.at(3) - input.at(4));
     input.set(4, input.at(4) - third_before + input.at(5) - second_before);
     input.set(5, second_before - input.at(5) + first_before - input.at(6));
@@ -220,7 +239,10 @@ fn multiply<const I: usize>(value: f32) -> f32 {
 mod tests {
     use nalgebra::{RowSVector, SVector};
 
-    use super::{additions_before_first_multiplication, additions_before_second_multiplication, arai_1d_column, arai_1d_row, first_multiplications, second_multiplications};
+    use super::{
+        additions_before_first_multiplication, additions_before_second_multiplication,
+        arai_1d_column, arai_1d_row, first_multiplications, second_multiplications,
+    };
 
     #[test]
     fn test_arai_1d_column() {
@@ -278,7 +300,7 @@ mod tests {
 
         let values: Vec<f32> = vec![47.0, 18.0, 13.0, 16.0, 41.0, 90.0, 47.0, 27.0];
         let mut values_vec: RowSVector<f32, 8> = RowSVector::from_row_iterator(values.into_iter());
-        let result = arai_1d_row(&mut values_vec);
+        arai_1d_row(&mut values_vec);
 
         assert_eq!(expected, values_vec);
     }

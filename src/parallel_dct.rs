@@ -3,7 +3,7 @@ use std::thread;
 
 use nalgebra::SMatrix;
 
-use crate::dct::{arai_dct, DCTMode, direct_dct, matrix_dct};
+use crate::dct::{arai_dct, direct_dct, matrix_dct, DCTMode};
 use crate::image::Image;
 
 /// Perform the DCT on an image.
@@ -56,10 +56,7 @@ pub fn dct_single_channel(image: &Image, mode: &DCTMode) -> Vec<SMatrix<f32, 8, 
 ///
 /// # Arguments
 /// * `image`: The image to calculate the DCT for.
-pub fn dct_matrix_vector(
-    matrices: &mut Vec<SMatrix<f32, 8, 8>>,
-    mode: &DCTMode,
-) {
+pub fn dct_matrix_vector(matrices: &mut Vec<SMatrix<f32, 8, 8>>, mode: &DCTMode) {
     let function = match mode {
         DCTMode::Direct => direct_dct,
         DCTMode::Matrix => matrix_dct,
@@ -77,13 +74,10 @@ pub fn dct_matrix_vector(
 /// # Arguments
 /// * `channel`: The channel of data to calculate the DCT on.
 /// * `function`: The DCT function to use.
-fn dct_channel(
-    channel: &mut Vec<SMatrix<f32, 8, 8>>,
-    function: &fn(&mut SMatrix<f32, 8, 8>),
-) {
+fn dct_channel(channel: &mut Vec<SMatrix<f32, 8, 8>>, function: &fn(&mut SMatrix<f32, 8, 8>)) {
     let thread_count = thread::available_parallelism().unwrap().get();
     let chunk_size = (channel.len() / thread_count) + 1;
-    let mut chunks: ChunksMut<SMatrix<f32, 8, 8>> = channel.chunks_mut(chunk_size);
+    let chunks: ChunksMut<SMatrix<f32, 8, 8>> = channel.chunks_mut(chunk_size);
     thread::scope(|s| {
         let mut handles = Vec::with_capacity(chunks.len());
         for chunk in chunks {
