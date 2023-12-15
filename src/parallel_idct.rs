@@ -3,6 +3,7 @@ use std::sync::mpsc::{self, Receiver};
 use std::thread::{self, JoinHandle};
 
 use crate::dct::inverse_dct;
+use crate::utils::THREAD_COUNT;
 
 /// Perform the inverse DCT on an image.
 /// The inverse DCT is performed for each channel in sequence.
@@ -45,12 +46,11 @@ pub fn idct(
 fn spawn_threads_for_channel(
     channel: &Vec<SMatrix<f32, 8, 8>>,
 ) -> (Vec<JoinHandle<()>>, Vec<Receiver<Vec<SMatrix<f32, 8, 8>>>>) {
-    let thread_count = std::thread::available_parallelism().unwrap().get();
     // + 1 to avoid creating a new chunk with just the last element
-    let chunk_size = (channel.len() / thread_count) + 1;
+    let chunk_size = (channel.len() / *THREAD_COUNT) + 1;
     let data_vecs: std::slice::Chunks<'_, SMatrix<f32, 8, 8>> = channel.chunks(chunk_size);
-    let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(thread_count);
-    let mut receivers: Vec<Receiver<Vec<SMatrix<f32, 8, 8>>>> = Vec::with_capacity(thread_count);
+    let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(*THREAD_COUNT);
+    let mut receivers: Vec<Receiver<Vec<SMatrix<f32, 8, 8>>>> = Vec::with_capacity(*THREAD_COUNT);
 
     for data in data_vecs {
         let (tx, rx) = mpsc::channel();

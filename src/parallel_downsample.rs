@@ -2,6 +2,7 @@ use std::slice::Chunks;
 use std::thread;
 
 use crate::downsample::downsample_rows;
+use crate::utils::THREAD_COUNT;
 
 /// Down-sample a color channel of an image.
 /// `a` and `b` are expected to fit the first two parts of standard subsampling notation: https://en.wikipedia.org/wiki/Chroma_subsampling
@@ -32,8 +33,7 @@ pub fn downsample_channel(
 }
 
 fn downsample_internal(channel: &Vec<Vec<u16>>, a: usize, b: usize, downsample_vertical: bool, len: usize) -> Vec<Vec<u16>> {
-    let thread_count = thread::available_parallelism().unwrap().get();
-    let mut chunk_size = channel.len() / thread_count + 1;
+    let mut chunk_size = channel.len() / *THREAD_COUNT + 1;
     // ensure that chunk_size is divisible by two - otherwise, vertical downsampling breaks
     if chunk_size % 2 == 1 {
         chunk_size += 1

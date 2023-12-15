@@ -7,6 +7,7 @@ use na::{Matrix3, SMatrix, Vector3};
 
 use crate::downsample::downsample_channel;
 use crate::parallel_downsample;
+use crate::utils::THREAD_COUNT;
 
 /// Image data structure for parsed image files
 ///
@@ -105,14 +106,13 @@ pub fn create_image(
 /// # Panics
 /// * If `channel`'s dimensions aren't divisible by 8.
 fn channel_to_matrices(channel: &Vec<Vec<u16>>) -> Vec<SMatrix<f32, 8, 8>> {
-    let available_threads = thread::available_parallelism().unwrap().get();
-    let mut chunk_size = channel.len() / available_threads;
+    let mut chunk_size = channel.len() / *THREAD_COUNT;
     // always ensure that chunk size is divisible by 8 - otherwise threads don't get proper number of rows
     chunk_size += 8 - chunk_size % 8;
     let chunks: std::slice::Chunks<'_, Vec<u16>> = channel.chunks(chunk_size);
-    let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(available_threads);
+    let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(*THREAD_COUNT);
     let mut receivers: Vec<Receiver<Vec<SMatrix<f32, 8, 8>>>> =
-        Vec::with_capacity(available_threads);
+        Vec::with_capacity(*THREAD_COUNT);
 
     for chunk in chunks {
         let (tx, rx) = mpsc::channel();
