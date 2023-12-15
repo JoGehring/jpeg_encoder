@@ -1,10 +1,11 @@
 use std::slice::ChunksMut;
-use std::thread;
 
 use nalgebra::SMatrix;
+use scoped_threadpool::Pool;
 
 use crate::dct::{arai_dct, direct_dct, matrix_dct, DCTMode};
 use crate::image::Image;
+use crate::utils::THREAD_COUNT;
 
 /// Perform the DCT on an image.
 /// The DCT is performed for each channel in sequence.
@@ -15,6 +16,7 @@ use crate::image::Image;
 pub fn dct(
     image: &Image,
     mode: &DCTMode, // perhaps make this a generic? does that help at compile time?
+    pool: &mut Pool,
 ) -> (
     Vec<SMatrix<f32, 8, 8>>,
     Vec<SMatrix<f32, 8, 8>>,
@@ -28,9 +30,9 @@ pub fn dct(
 
     let (mut y_matrices, mut cb_matrices, mut cr_matrices) = image.to_matrices();
 
-    dct_channel(&mut y_matrices, &function);
-    dct_channel(&mut cb_matrices, &function);
-    dct_channel(&mut cr_matrices, &function);
+    dct_channel(&mut y_matrices, &function, pool);
+    dct_channel(&mut cb_matrices, &function, pool);
+    dct_channel(&mut cr_matrices, &function, pool);
     (y_matrices, cb_matrices, cr_matrices)
 }
 
@@ -39,7 +41,11 @@ pub fn dct(
 ///
 /// # Arguments
 /// * `image`: The image to calculate the DCT for.
-pub fn dct_single_channel(image: &Image, mode: &DCTMode) -> Vec<SMatrix<f32, 8, 8>> {
+pub fn dct_single_channel(
+    image: &Image,
+    mode: &DCTMode,
+    pool: &mut Pool,
+) -> Vec<SMatrix<f32, 8, 8>> {
     let function = match mode {
         DCTMode::Direct => crate::dct::direct_dct,
         DCTMode::Matrix => crate::dct::matrix_dct,
@@ -47,7 +53,7 @@ pub fn dct_single_channel(image: &Image, mode: &DCTMode) -> Vec<SMatrix<f32, 8, 
     };
     let mut y_matrices = image.single_channel_to_matrices::<1>();
 
-    dct_channel(&mut y_matrices, &function);
+    dct_channel(&mut y_matrices, &function, pool);
     y_matrices
 }
 
@@ -56,14 +62,14 @@ pub fn dct_single_channel(image: &Image, mode: &DCTMode) -> Vec<SMatrix<f32, 8, 
 ///
 /// # Arguments
 /// * `image`: The image to calculate the DCT for.
-pub fn dct_matrix_vector(matrices: &mut Vec<SMatrix<f32, 8, 8>>, mode: &DCTMode) {
+pub fn dct_matrix_vector(matrices: &mut Vec<SMatrix<f32, 8, 8>>, mode: &DCTMode, pool: &mut Pool) {
     let function = match mode {
         DCTMode::Direct => direct_dct,
         DCTMode::Matrix => matrix_dct,
         DCTMode::Arai => arai_dct,
     };
 
-    dct_channel(matrices, &function);
+    dct_channel(matrices, &function, pool);
 }
 
 /// process the channel.
@@ -74,21 +80,20 @@ pub fn dct_matrix_vector(matrices: &mut Vec<SMatrix<f32, 8, 8>>, mode: &DCTMode)
 /// # Arguments
 /// * `channel`: The channel of data to calculate the DCT on.
 /// * `function`: The DCT function to use.
-fn dct_channel(channel: &mut Vec<SMatrix<f32, 8, 8>>, function: &fn(&mut SMatrix<f32, 8, 8>)) {
-    let thread_count = thread::available_parallelism().unwrap().get();
-    let chunk_size = (channel.len() / thread_count) + 1;
+fn dct_channel(
+    channel: &mut Vec<SMatrix<f32, 8, 8>>,
+    function: &fn(&mut SMatrix<f32, 8, 8>),
+    pool: &mut Pool,
+) {
+    let chunk_size = (channel.len() / *THREAD_COUNT) + 1;
     let chunks: ChunksMut<SMatrix<f32, 8, 8>> = channel.chunks_mut(chunk_size);
-    thread::scope(|s| {
-        let mut handles = Vec::with_capacity(chunks.len());
+    pool.scoped(|s| {
         for chunk in chunks {
-            handles.push(s.spawn(move || {
+            s.execute(move || {
                 for mut matrix in chunk {
                     function(&mut matrix);
                 }
-            }));
-        }
-        for handle in handles {
-            handle.join().unwrap();
+            });
         }
     });
 }
@@ -97,14 +102,24 @@ fn dct_channel(channel: &mut Vec<SMatrix<f32, 8, 8>>, function: &fn(&mut SMatrix
 mod tests {
     use approx::assert_abs_diff_eq;
     use nalgebra::SMatrix;
+    use scoped_threadpool::Pool;
+    use std::thread::available_parallelism;
 
+    use super::dct;
     use crate::ppm_parser::read_ppm_from_file;
+
+    fn get_pool() -> Pool {
+        let thread_count = available_parallelism().unwrap().get();
+        return Pool::new(thread_count as u32);
+    }
 
     #[test]
     fn test_dct_parallel_simple_image() {
+        let mut pool = get_pool();
+
         let image = read_ppm_from_file("test/valid_test_8x8.ppm");
 
-        let (y, cb, cr) = crate::parallel_dct::dct(&image, &crate::dct::DCTMode::Arai);
+        let (y, cb, cr) = dct(&image, &crate::dct::DCTMode::Arai, &mut pool);
 
         let y_expected_vec: Vec<f32> = vec![
             65534.996, 0.0, 0.0, 0.0, 65534.996, 0.0, 0.0, 0.0, // row 1
@@ -223,9 +238,12 @@ mod tests {
 
     #[test]
     fn test_single_channel_simple_image() {
+        let mut pool = get_pool();
+
         let image = read_ppm_from_file("test/valid_test_8x8.ppm");
 
-        let y = crate::parallel_dct::dct_single_channel(&image, &crate::dct::DCTMode::Arai);
+        let y =
+            crate::parallel_dct::dct_single_channel(&image, &crate::dct::DCTMode::Arai, &mut pool);
 
         let y_expected_vec: Vec<f32> = vec![
             65534.996, 0.0, 0.0, 0.0, 65534.996, 0.0, 0.0, 0.0, // row 1

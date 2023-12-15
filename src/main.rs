@@ -1,9 +1,11 @@
 #![allow(dead_code)]
 // remove this once integrating - this is to avoid exessive and useless warnings for the time being
 
+use scoped_threadpool::Pool;
 use dct::DCTMode;
 
 use crate::image::create_image;
+use crate::utils::THREAD_COUNT;
 
 /*
 use crate::bit_stream::BitStream;
@@ -30,6 +32,8 @@ mod dct_constant_calculator;
 mod dct_constants;
 
 fn main() {
+    let thread_count = *THREAD_COUNT;
+    let mut pool = Pool::new(thread_count as u32);
     /*
     let mut image = read_ppm_from_file("test/dwsample-ppm-640.ppm");
     image.rgb_to_ycbcr();
@@ -111,7 +115,7 @@ fn main() {
         while timer_start.elapsed().as_millis() < 10000 {
             let mut y_clone = y_matrix.clone();
             let timer_single_run = std::time::Instant::now();
-            parallel_dct::dct_matrix_vector(&mut y_clone, &mode);
+            parallel_dct::dct_matrix_vector(&mut y_clone, &mode, &mut pool);
             times.push(timer_single_run.elapsed().as_micros());
             // accessing result here means it isn't dropped before the timer is stopped
             // obviously the time taken to drop the result doesn't need to be part of the dct benchmark
