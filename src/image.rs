@@ -37,7 +37,7 @@ const TRANSFORM_RGB_YCBCR_MATRIX: Matrix3<f32> = Matrix3::new(
 );
 
 const RGB_TO_YCBCR_OFFSET: Vector3<f32> = Vector3::new(0.0, 32767.0, 32767.0);
-
+const RGB_HALF_OFFSET: Vector3<f32> = Vector3::new(32767.0, 32767.0, 32767.0);
 /// Convert an RGB value to a YCbCr value.
 ///
 /// # Arguments
@@ -60,7 +60,7 @@ fn convert_rgb_values_to_ycbcr(r: u16, g: u16, b: u16) -> (u16, u16, u16) {
     let mut result = TRANSFORM_RGB_YCBCR_MATRIX * Vector3::new(r as f32, g as f32, b as f32);
 
     result += RGB_TO_YCBCR_OFFSET;
-
+    result -= RGB_HALF_OFFSET;
     let result_as_int = result.map(|value| value.round()).try_cast::<u16>();
 
     match result_as_int {
@@ -583,38 +583,38 @@ mod tests {
         assert_eq!((0, 16383, 7645), pixel);
     }
 
-    fn test_convert_rgb_values_to_rcbcr_internal(start: (u16, u16, u16), target: (u16, u16, u16)) {
+    fn test_convert_rgb_values_to_ycbcr_internal(start: (u16, u16, u16), target: (u16, u16, u16)) {
         let result = convert_rgb_values_to_ycbcr(start.0, start.1, start.2);
         assert_eq!(result, target);
     }
 
     #[test]
-    fn test_convert_rgb_values_to_rcbcr_black() {
-        test_convert_rgb_values_to_rcbcr_internal((0, 0, 0), (0, 32767, 32767));
+    fn test_convert_rgb_values_to_ycbcr_black() {
+        test_convert_rgb_values_to_ycbcr_internal((0, 0, 0), (0, 0, 0));
     }
 
     #[test]
-    fn test_convert_rgb_values_to_rcbcr_red() {
-        test_convert_rgb_values_to_rcbcr_internal((65535, 0, 0), (19595, 21711, 65535))
+    fn test_convert_rgb_values_to_ycbcr_red() {
+        test_convert_rgb_values_to_ycbcr_internal((65535, 0, 0), (0, 0, 32768))
     }
 
     #[test]
-    fn test_convert_rgb_values_to_rcbcr_green() {
-        test_convert_rgb_values_to_rcbcr_internal((0, 65535, 0), (38469, 11062, 5334))
+    fn test_convert_rgb_values_to_ycbcr_green() {
+        test_convert_rgb_values_to_ycbcr_internal((0, 65535, 0), (5702, 0, 0))
     }
 
     #[test]
-    fn test_convert_rgb_values_to_rcbcr_blue() {
-        test_convert_rgb_values_to_rcbcr_internal((0, 0, 65535), (7471, 65535, 27439))
+    fn test_convert_rgb_values_to_ycbcr_blue() {
+        test_convert_rgb_values_to_ycbcr_internal((0, 0, 65535), (0, 32768, 0))
     }
 
     #[test]
-    fn test_convert_rgb_values_to_rcbcr_white() {
-        test_convert_rgb_values_to_rcbcr_internal((65535, 65535, 65535), (65535, 32774, 32774))
+    fn test_convert_rgb_values_to_ycbcr_white() {
+        test_convert_rgb_values_to_ycbcr_internal((65535, 65535, 65535), (32768, 7, 7))
     }
 
     #[test]
-    fn test_convert_rgb_to_rcbcr() {
+    fn test_convert_rgb_to_ycbcr() {
         let mut image = Image {
             height: 1,
             width: 5,
@@ -624,17 +624,15 @@ mod tests {
             ..Default::default()
         };
         image.rgb_to_ycbcr();
-        assert_eq!(
-            image,
-            Image {
+            let expected = Image {
                 height: 1,
                 width: 5,
-                channel1: Vec::from([Vec::from([0, 19595, 38469, 7471, 65535])]),
-                channel2: Vec::from([Vec::from([32767, 21711, 11062, 65535, 32774])]),
-                channel3: Vec::from([Vec::from([32767, 65535, 5334, 27439, 32774])]),
+                channel1: Vec::from([Vec::from([0, 0, 5702, 0, 32768])]),
+                channel2: Vec::from([Vec::from([0, 0, 0, 32768, 7])]),
+                channel3: Vec::from([Vec::from([0, 32768, 0, 0, 7])]),
                 ..Default::default()
-            }
-        )
+            };
+        assert_eq!(image, expected);
     }
 
     #[test]
@@ -781,14 +779,14 @@ mod tests {
 
         let (y, cb, cr) = image.to_matrices();
         let y_expected_vec = vec![
-            0.0, 0.0, 0.0, 27066.0, 0.0, 0.0, 0.0, 27066.0, // row 1
-            0.0, 41956.0, 0.0, 0.0, 0.0, 41956.0, 0.0, 0.0, // row 2
-            0.0, 0.0, 41956.0, 0.0, 0.0, 0.0, 41956.0, 0.0, // row 3
-            27066.0, 0.0, 0.0, 0.0, 27066.0, 0.0, 0.0, 0.0, // row 4
-            0.0, 0.0, 0.0, 27066.0, 0.0, 0.0, 0.0, 27066.0, // row 5
-            0.0, 41956.0, 0.0, 0.0, 0.0, 41956.0, 0.0, 0.0, // row 6
-            0.0, 0.0, 41956.0, 0.0, 0.0, 0.0, 41956.0, 0.0, // row 7
-            27066.0, 0.0, 0.0, 0.0, 27066.0, 0.0, 0.0, 0.0, // row 8
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 1
+            0.0, 9189.0, 0.0, 0.0, 0.0, 9189.0, 0.0, 0.0, // row 2
+            0.0, 0.0, 9189.0, 0.0, 0.0, 0.0, 9189.0, 0.0, // row 3
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 4
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 5
+            0.0, 9189.0, 0.0, 0.0, 0.0, 9189.0, 0.0, 0.0, // row 6
+            0.0, 0.0, 9189.0, 0.0, 0.0, 0.0, 9189.0, 0.0, // row 7
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 8
         ];
         let y_expected: Vec<SMatrix<f32, 8, 8>> = vec![
             SMatrix::from_iterator(y_expected_vec.clone()),
@@ -799,27 +797,27 @@ mod tests {
         assert_eq!(y_expected, y);
 
         let cb_expected_vec = vec![
-            31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, // row 1
-            38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, // row 3
-            31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, // row 2
-            38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, // row 4
-            31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, // row 5
-            38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, // row 6
-            31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, // row 7
-            38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, 38195.0, 31163.0, // row 8
+            0.0, 5428.0, 0.0, 5428.0, 0.0, 5428.0, 0.0, 5428.0, // row 1
+            5428.0, 0.0, 5428.0, 0.0, 5428.0, 0.0, 5428.0, 0.0, // row 2
+            0.0, 5428.0, 0.0, 5428.0, 0.0, 5428.0, 0.0, 5428.0, // row 3
+            5428.0, 0.0, 5428.0, 0.0, 5428.0, 0.0, 5428.0, 0.0, // row 4
+            0.0, 5428.0, 0.0, 5428.0, 0.0, 5428.0, 0.0, 5428.0, // row 5
+            5428.0, 0.0, 5428.0, 0.0, 5428.0, 0.0, 5428.0, 0.0, // row 6
+            0.0, 5428.0, 0.0, 5428.0, 0.0, 5428.0, 0.0, 5428.0, // row 7
+            5428.0, 0.0, 5428.0, 0.0, 5428.0, 0.0, 5428.0, 0.0, // row 8
         ];
         let cb_expected: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_iterator(cb_expected_vec)];
         assert_eq!(cb_expected, cb);
 
         let cr_expected_vec = vec![
-            25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, // row 1
-            39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, // row 2
-            25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, // row 3
-            39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, // row 4
-            25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, // row 5
-            39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, // row 6
-            25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, // row 7
-            39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, 39627.0, 25287.0, // row 8
+            0.0, 6860.0, 0.0, 6860.0, 0.0, 6860.0, 0.0, 6860.0, // row 1
+            6860.0, 0.0, 6860.0, 0.0, 6860.0, 0.0, 6860.0, 0.0, // row 2
+            0.0, 6860.0, 0.0, 6860.0, 0.0, 6860.0, 0.0, 6860.0, // row 3
+            6860.0, 0.0, 6860.0, 0.0, 6860.0, 0.0, 6860.0, 0.0, // row 4
+            0.0, 6860.0, 0.0, 6860.0, 0.0, 6860.0, 0.0, 6860.0, // row 5
+            6860.0, 0.0, 6860.0, 0.0, 6860.0, 0.0, 6860.0, 0.0, // row 6
+            0.0, 6860.0, 0.0, 6860.0, 0.0, 6860.0, 0.0, 6860.0, // row 7
+            6860.0, 0.0, 6860.0, 0.0, 6860.0, 0.0, 6860.0, 0.0, // row 8
         ];
         let cr_expected: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_iterator(cr_expected_vec)];
         assert_eq!(cr_expected, cr);
