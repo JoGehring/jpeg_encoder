@@ -12,6 +12,7 @@ use crate::bit_stream::BitStream;
 use crate::huffman::encode;
 use crate::jpg_writer::write_dht_segment;
  */
+mod quantization;
 mod appendable_to_bit_stream;
 mod arai;
 mod bit_stream;
@@ -93,7 +94,7 @@ fn main() {
     //non-parallel not-optimized/optimized: 1115/182ms
     */
 
-    let mut image_data: Vec<Vec<u16>> = Vec::with_capacity(2160);
+    let mut image_data: Vec<Vec<i32>> = Vec::with_capacity(2160);
     for y in 0..2160 {
         image_data.push(Vec::with_capacity(3840));
         let index = image_data.len() - 1;
