@@ -1,6 +1,26 @@
 use core::f32;
+use std::usize;
 
 use nalgebra::SMatrix;
+
+const category_offset: [i32; 15] = [
+    0b1,
+    0b11,
+    0b111,
+    0b1111,
+    0b1111_1,
+    0b1111_11,
+    0b1111_111,
+    0b1111_1111,
+    0b1111_1111_1,
+    0b1111_1111_11,
+    0b1111_1111_111,
+    0b1111_1111_1111,
+    0b1111_1111_1111_1,
+    0b1111_1111_1111_11,
+    0b1111_1111_1111_111,
+];
+
 /// Create an uniform quantization matrix from factor x in format 1/x
 /// # Arguments
 /// * `factor`: The quantization factor
@@ -92,11 +112,24 @@ fn sample_zigzag(data: &SMatrix<i32, 8, 8>) -> [i32; 64] {
     result
 }
 
+fn categorize(value: i32) -> (u8, u16) {
+    if value == 0 {
+        return (0, u16::MAX);
+    }
+    let cat = 32 - value.abs().leading_zeros() as u8;
+    if value.signum() == -1 {
+        let offset = category_offset[(cat - 1) as usize];
+        (cat, (value + offset) as u16)
+    } else {
+        (cat, value as u16)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use nalgebra::SMatrix;
 
-    use super::{create_uniform_q_table, quantize, sample_zigzag};
+    use super::{categorize, create_uniform_q_table, quantize, sample_zigzag};
 
     #[test]
     fn test_quatization_from_slides() {
@@ -152,5 +185,32 @@ mod test {
         ];
         let result = sample_zigzag(&expected_matrix);
         assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn test_categorize() {
+        let max_val = categorize(32767);
+        assert_eq!((15, 0b1111_1111_1111_111), max_val);
+        let min_val = categorize(-32767);
+        assert_eq!((15, 0b0), min_val);
+        let zero = categorize(0);
+        assert_eq!((0, 0b1111_1111_1111_1111), zero);
+        let minus_one = categorize(-1);
+        assert_eq!((1, 0b0), minus_one);
+        let one = categorize(1);
+        assert_eq!((1, 0b1), one);
+        let border_u8_neg = categorize(-255);
+        assert_eq!((8, 0b0), border_u8_neg);
+        let border_u8_pos = categorize(255);
+        assert_eq!((8, 0b1111_1111), border_u8_pos);
+        let border_8_neg = categorize(-128);
+        assert_eq!((8, 0b0111_1111), border_8_neg);
+        let border_8_pos = categorize(128);
+        assert_eq!((8, 0b1000_0000), border_8_pos);
+        let anywhere_neg = categorize(-3153);
+        assert_eq!((12, 942), anywhere_neg);
+        let anywhere_pos = categorize(3153);
+        assert_eq!((12, 3153), anywhere_pos);
+
     }
 }
