@@ -21,3 +21,5 @@ Cargo.lock
 .vscode/
 .DS_Store
 *.rustfmt
+
+output.jpg

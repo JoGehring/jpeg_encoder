@@ -61,5 +61,5 @@ fn main() {
 
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::EOI);
 
-    target_stream.flush_to_file("test/test_result.jpg");
+    target_stream.flush_to_file("output.jpg");
 }
