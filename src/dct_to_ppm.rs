@@ -55,9 +55,9 @@ pub fn to_ppm(
             for j in 0..width as usize {
                 let x = j / 8;
                 let x_index = j % 8;
-                let r_val = (r_values[y][x][(i, x_index)] / 65535.0 * 255.0) as u16;
-                let g_val = (g_values[y][x][(i, x_index)] / 65535.0 * 255.0) as u16;
-                let b_val = (b_values[y][x][(i, x_index)] / 65535.0 * 255.0) as u16;
+                let r_val = (r_values[y][x][(i, x_index)]) as u16;
+                let g_val = (g_values[y][x][(i, x_index)]) as u16;
+                let b_val = (b_values[y][x][(i, x_index)]) as u16;
                 write!(file, "{} {} {} ", r_val, g_val, b_val)?;
             }
             writeln!(file)?;

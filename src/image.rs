@@ -23,9 +23,9 @@ use crate::utils::THREAD_COUNT;
 pub struct Image {
     height: u16,
     width: u16,
-    channel1: Vec<Vec<i32>>,
-    channel2: Vec<Vec<i32>>,
-    channel3: Vec<Vec<i32>>,
+    channel1: Vec<Vec<i16>>,
+    channel2: Vec<Vec<i16>>,
+    channel3: Vec<Vec<i16>>,
     y_downsample_factor: usize,
     cb_downsample_factor: usize,
     cr_downsample_factor: usize,
@@ -36,8 +36,8 @@ const TRANSFORM_RGB_YCBCR_MATRIX: Matrix3<f32> = Matrix3::new(
     0.299, 0.587, 0.114, -0.1687, -0.3312, 0.5, 0.5, -0.4186, -0.0813,
 );
 
-const RGB_TO_YCBCR_OFFSET: Vector3<f32> = Vector3::new(0.0, 32767.0, 32767.0);
-const RGB_HALF_OFFSET: Vector3<f32> = Vector3::new(32767.0, 32767.0, 32767.0);
+const RGB_TO_YCBCR_OFFSET: Vector3<f32> = Vector3::new(0.0, 127.0, 127.0);
+const RGB_HALF_OFFSET: Vector3<f32> = Vector3::new(127.0, 127.0, 127.0);
 /// Convert an RGB value to a YCbCr value.
 ///
 /// # Arguments
@@ -50,18 +50,18 @@ const RGB_HALF_OFFSET: Vector3<f32> = Vector3::new(32767.0, 32767.0, 32767.0);
 ///
 /// ```
 /// let color = convert_rgb_values_to_ycbcr(0, 0, 0);
-/// assert_eq!(color, (0, 32767, 32767))
+/// assert_eq!(color, (0, 127, 127))
 /// ```
 ///
 /// # Panics
 ///
 /// * Error casting back from floating point to integer numbers.
-fn convert_rgb_values_to_ycbcr(r: i32, g: i32, b: i32) -> (i32, i32, i32) {
+fn convert_rgb_values_to_ycbcr(r: i16, g: i16, b: i16) -> (i16, i16, i16) {
     let mut result = TRANSFORM_RGB_YCBCR_MATRIX * Vector3::new(r as f32, g as f32, b as f32);
 
     result += RGB_TO_YCBCR_OFFSET;
     result -= RGB_HALF_OFFSET;
-    let result_as_int = result.map(|value| value.round()).try_cast::<i32>();
+    let result_as_int = result.map(|value| value.round()).try_cast::<i16>();
 
     match result_as_int {
         Some(value) => (value[0], value[1], value[2]),
@@ -81,9 +81,9 @@ fn convert_rgb_values_to_ycbcr(r: i32, g: i32, b: i32) -> (i32, i32, i32) {
 pub fn create_image(
     height: u16,
     width: u16,
-    channel1: Vec<Vec<i32>>,
-    channel2: Vec<Vec<i32>>,
-    channel3: Vec<Vec<i32>>,
+    channel1: Vec<Vec<i16>>,
+    channel2: Vec<Vec<i16>>,
+    channel3: Vec<Vec<i16>>,
 ) -> Image {
     Image {
         height,
@@ -105,14 +105,13 @@ pub fn create_image(
 ///
 /// # Panics
 /// * If `channel`'s dimensions aren't divisible by 8.
-fn channel_to_matrices(channel: &Vec<Vec<i32>>) -> Vec<SMatrix<f32, 8, 8>> {
+fn channel_to_matrices(channel: &Vec<Vec<i16>>) -> Vec<SMatrix<f32, 8, 8>> {
     let mut chunk_size = channel.len() / *THREAD_COUNT;
     // always ensure that chunk size is divisible by 8 - otherwise threads don't get proper number of rows
     chunk_size += 8 - chunk_size % 8;
-    let chunks: std::slice::Chunks<'_, Vec<i32>> = channel.chunks(chunk_size);
+    let chunks: std::slice::Chunks<'_, Vec<i16>> = channel.chunks(chunk_size);
     let mut handles: Vec<JoinHandle<()>> = Vec::with_capacity(*THREAD_COUNT);
-    let mut receivers: Vec<Receiver<Vec<SMatrix<f32, 8, 8>>>> =
-        Vec::with_capacity(*THREAD_COUNT);
+    let mut receivers: Vec<Receiver<Vec<SMatrix<f32, 8, 8>>>> = Vec::with_capacity(*THREAD_COUNT);
 
     for chunk in chunks {
         let (tx, rx) = mpsc::channel();
@@ -156,7 +155,7 @@ fn channel_to_matrices(channel: &Vec<Vec<i32>>) -> Vec<SMatrix<f32, 8, 8>> {
 /// * If `channel`'s width is't divisible by 8.
 #[inline(always)]
 fn append_row_matrices_to_channel_matrix(
-    channel: &[Vec<i32>],
+    channel: &[Vec<i16>],
     y: usize,
     result_vec: &mut Vec<SMatrix<f32, 8, 8>>,
 ) {
@@ -181,15 +180,15 @@ fn append_row_matrices_to_channel_matrix(
 #[inline(always)]
 fn append_matrix_at_coordinates_to_channel_matrix(
     x: usize,
-    row_vectors: &[Vec<i32>],
+    row_vectors: &[Vec<i16>],
     result_vec: &mut Vec<SMatrix<f32, 8, 8>>,
 ) {
-    let mut iter_vector: Vec<i32> = Vec::with_capacity(64);
+    let mut iter_vector: Vec<i16> = Vec::with_capacity(64);
     for vector in row_vectors {
         let row_vec = &vector[x..x + 8];
         iter_vector.extend_from_slice(row_vec);
     }
-    result_vec.push(SMatrix::<i32, 8, 8>::from_row_iterator(iter_vector).cast::<f32>());
+    result_vec.push(SMatrix::<i16, 8, 8>::from_row_iterator(iter_vector).cast::<f32>());
 }
 
 impl Image {
@@ -207,7 +206,7 @@ impl Image {
     /// let image = read_ppm_from_file("../path/to/image.ppm");
     /// println!('{}', image.pixel_at(4, 19));
     /// ```
-    pub fn pixel_at(&self, x: u16, y: u16) -> (i32, i32, i32) {
+    pub fn pixel_at(&self, x: u16, y: u16) -> (i16, i16, i16) {
         let mut actual_y = std::cmp::max(y, 0) as usize;
         actual_y = std::cmp::min(actual_y, self.channel1.len() - 1);
         let actual_y_downsampled = if self.downsampled_vertically {
@@ -357,7 +356,7 @@ impl Image {
 
     /// Get the data of this image's first channel (Y) as a vector of 8x8 matrices.
     /// The matrices are ordered top to bottom, then in each row left to right.
-    /// 
+    ///
     /// # Panics
     /// * If the image's height or width cannot be divided by 8.
     pub fn single_channel_to_matrices<const C: usize>(&self) -> Vec<SMatrix<f32, 8, 8>> {
@@ -367,18 +366,18 @@ impl Image {
         let channel = match C {
             2 => &self.channel2,
             3 => &self.channel3,
-            _ => &self.channel1
+            _ => &self.channel1,
         };
         channel_to_matrices(channel)
     }
 
-    pub fn channel1(&self) -> &Vec<Vec<i32>> {
+    pub fn channel1(&self) -> &Vec<Vec<i16>> {
         &self.channel1
     }
-    pub fn channel2(&self) -> &Vec<Vec<i32>> {
+    pub fn channel2(&self) -> &Vec<Vec<i16>> {
         &self.channel2
     }
-    pub fn channel3(&self) -> &Vec<Vec<i32>> {
+    pub fn channel3(&self) -> &Vec<Vec<i16>> {
         &self.channel3
     }
     pub fn height(&self) -> u16 {
@@ -434,18 +433,13 @@ mod tests {
                 width: 4,
                 height: 4,
                 channel1: vec![
-                    vec![0, 0, 0, 65535],
+                    vec![0, 0, 0, 255],
                     vec![0, 0, 0, 0],
                     vec![0, 0, 0, 0],
-                    vec![65535, 0, 0, 0],
+                    vec![255, 0, 0, 0],
                 ],
-                channel2: vec![vec![0, 0], vec![32767, 0], vec![0, 32767], vec![0, 0]],
-                channel3: vec![
-                    vec![0, 32767],
-                    vec![15291, 0],
-                    vec![0, 15291],
-                    vec![32767, 0],
-                ],
+                channel2: vec![vec![0, 0], vec![127, 0], vec![0, 127], vec![0, 0]],
+                channel3: vec![vec![0, 127], vec![59, 0], vec![0, 59], vec![127, 0],],
                 y_downsample_factor: 1,
                 cb_downsample_factor: 2,
                 cr_downsample_factor: 2,
@@ -464,22 +458,22 @@ mod tests {
                 width: 4,
                 height: 4,
                 channel1: vec![
-                    vec![0, 0, 0, 65535],
+                    vec![0, 0, 0, 255],
                     vec![0, 0, 0, 0],
                     vec![0, 0, 0, 0],
-                    vec![65535, 0, 0, 0],
+                    vec![255, 0, 0, 0],
                 ],
                 channel2: vec![
                     vec![0, 0, 0, 0],
-                    vec![0, 65535, 0, 0],
-                    vec![0, 0, 65535, 0],
+                    vec![0, 255, 0, 0],
+                    vec![0, 0, 255, 0],
                     vec![0, 0, 0, 0],
                 ],
                 channel3: vec![
-                    vec![0, 0, 0, 65535],
-                    vec![0, 30583, 0, 0],
-                    vec![0, 0, 30583, 0],
-                    vec![65535, 0, 0, 0],
+                    vec![0, 0, 0, 255],
+                    vec![0, 119, 0, 0],
+                    vec![0, 0, 119, 0],
+                    vec![255, 0, 0, 0],
                 ],
                 y_downsample_factor: 1,
                 cb_downsample_factor: 1,
@@ -499,13 +493,13 @@ mod tests {
                 width: 4,
                 height: 4,
                 channel1: vec![
-                    vec![0, 0, 0, 65535],
+                    vec![0, 0, 0, 255],
                     vec![0, 0, 0, 0],
                     vec![0, 0, 0, 0],
-                    vec![65535, 0, 0, 0],
+                    vec![255, 0, 0, 0],
                 ],
-                channel2: vec![vec![8191], vec![8191]],
-                channel3: vec![vec![12014], vec![12014]],
+                channel2: vec![vec![31], vec![31]],
+                channel3: vec![vec![46], vec![46]],
                 y_downsample_factor: 1,
                 cb_downsample_factor: 4,
                 cr_downsample_factor: 4,
@@ -519,21 +513,21 @@ mod tests {
     fn test_pixel_at_in_bounds() {
         let read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         let pixel = read_image.pixel_at(3, 0);
-        assert_eq!((65535, 0, 65535), pixel);
+        assert_eq!((255, 0, 255), pixel);
     }
 
     #[test]
     fn test_pixel_at_x_out_of_bounds() {
         let read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         let pixel = read_image.pixel_at(4, 0);
-        assert_eq!((65535, 0, 65535), pixel);
+        assert_eq!((255, 0, 255), pixel);
     }
 
     #[test]
     fn test_pixel_at_y_out_of_bounds() {
         let read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         let pixel = read_image.pixel_at(0, 4);
-        assert_eq!((65535, 0, 65535), pixel);
+        assert_eq!((255, 0, 255), pixel);
     }
 
     #[test]
@@ -548,7 +542,7 @@ mod tests {
         let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         read_image.downsample(4, 2, 2);
         let pixel = read_image.pixel_at(3, 0);
-        assert_eq!((65535, 0, 32767), pixel);
+        assert_eq!((255, 0, 127), pixel);
     }
 
     #[test]
@@ -556,7 +550,7 @@ mod tests {
         let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         read_image.downsample(4, 2, 2);
         let pixel = read_image.pixel_at(4, 0);
-        assert_eq!((65535, 0, 32767), pixel);
+        assert_eq!((255, 0, 127), pixel);
     }
 
     #[test]
@@ -564,7 +558,7 @@ mod tests {
         let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         read_image.downsample(4, 2, 0);
         let pixel = read_image.pixel_at(0, 4);
-        assert_eq!((65535, 0, 16383), pixel);
+        assert_eq!((255, 0, 63), pixel);
     }
 
     #[test]
@@ -580,37 +574,37 @@ mod tests {
         let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         read_image.downsample(4, 2, 0);
         let pixel = read_image.pixel_at(4, 4);
-        assert_eq!((0, 16383, 7645), pixel);
+        assert_eq!((0, 63, 29), pixel);
     }
 
-    fn test_convert_rgb_values_to_ycbcr_internal(start: (i32, i32, i32), target: (i32, i32, i32)) {
+    fn test_convert_rgb_values_to_ycbcr_internal(start: (i16, i16, i16), target: (i16, i16, i16)) {
         let result = convert_rgb_values_to_ycbcr(start.0, start.1, start.2);
-        assert_eq!(result, target);
+        assert_eq!(target, result);
     }
 
     #[test]
     fn test_convert_rgb_values_to_ycbcr_black() {
-        test_convert_rgb_values_to_ycbcr_internal((0, 0, 0), (-32767, 0, 0));
+        test_convert_rgb_values_to_ycbcr_internal((0, 0, 0), (-127, 0, 0));
     }
 
     #[test]
     fn test_convert_rgb_values_to_ycbcr_red() {
-        test_convert_rgb_values_to_ycbcr_internal((65535, 0, 0), (-13172, -11056, 32768))
+        test_convert_rgb_values_to_ycbcr_internal((255, 0, 0), (-51, -43, 128))
     }
 
     #[test]
     fn test_convert_rgb_values_to_ycbcr_green() {
-        test_convert_rgb_values_to_ycbcr_internal((0, 65535, 0), (5702, -21705, -27433))
+        test_convert_rgb_values_to_ycbcr_internal((0, 255, 0), (23, -84, -107))
     }
 
     #[test]
     fn test_convert_rgb_values_to_ycbcr_blue() {
-        test_convert_rgb_values_to_ycbcr_internal((0, 0, 65535), (-25296, 32768, -5328))
+        test_convert_rgb_values_to_ycbcr_internal((0, 0, 255), (-98, 128, -21))
     }
 
     #[test]
     fn test_convert_rgb_values_to_ycbcr_white() {
-        test_convert_rgb_values_to_ycbcr_internal((65535, 65535, 65535), (32768, 7, 7))
+        test_convert_rgb_values_to_ycbcr_internal((255, 255, 255), (128, 0, 0))
     }
 
     #[test]
@@ -618,21 +612,21 @@ mod tests {
         let mut image = Image {
             height: 1,
             width: 5,
-            channel1: Vec::from([Vec::from([0, 65535, 0, 0, 65535])]),
-            channel2: Vec::from([Vec::from([0, 0, 65535, 0, 65535])]),
-            channel3: Vec::from([Vec::from([0, 0, 0, 65535, 65535])]),
+            channel1: Vec::from([Vec::from([0, 255, 0, 0, 255])]),
+            channel2: Vec::from([Vec::from([0, 0, 255, 0, 255])]),
+            channel3: Vec::from([Vec::from([0, 0, 0, 255, 255])]),
             ..Default::default()
         };
         image.rgb_to_ycbcr();
-            let expected_image = Image {
-                height: 1,
-                width: 5,
-                channel1: Vec::from([Vec::from([-32767, -13172, 5702, -25296, 32768])]),
-                channel2: Vec::from([Vec::from([0, -11056, -21705, 32768, 7])]),
-                channel3: Vec::from([Vec::from([0, 32768, -27433, -5328, 7])]),
-                ..Default::default()
-            };
-        assert_eq!(image, expected_image);
+        let expected_image = Image {
+            height: 1,
+            width: 5,
+            channel1: Vec::from([Vec::from([-127, -51, 23, -98, 128])]),
+            channel2: Vec::from([Vec::from([0, -43, -84, 128, 0])]),
+            channel3: Vec::from([Vec::from([0, 128, -107, -21, 0])]),
+            ..Default::default()
+        };
+        assert_eq!(expected_image, image);
     }
 
     #[test]
@@ -648,22 +642,22 @@ mod tests {
             width: 4,
             height: 4,
             channel1: vec![
-                vec![0, 0, 0, 65535],
+                vec![0, 0, 0, 255],
                 vec![0, 0, 0, 0],
                 vec![0, 0, 0, 0],
-                vec![65535, 0, 0, 0],
+                vec![255, 0, 0, 0],
             ],
             channel2: vec![
                 vec![0, 0, 0, 0],
-                vec![0, 65535, 0, 0],
-                vec![0, 0, 65535, 0],
+                vec![0, 255, 0, 0],
+                vec![0, 0, 255, 0],
                 vec![0, 0, 0, 0],
             ],
             channel3: vec![
-                vec![0, 0, 0, 65535],
-                vec![0, 30583, 0, 0],
-                vec![0, 0, 30583, 0],
-                vec![65535, 0, 0, 0],
+                vec![0, 0, 0, 255],
+                vec![0, 119, 0, 0],
+                vec![0, 0, 119, 0],
+                vec![255, 0, 0, 0],
             ],
             y_downsample_factor: 1,
             cb_downsample_factor: 1,
@@ -680,22 +674,22 @@ mod tests {
             width: 4,
             height: 4,
             channel1: vec![
-                vec![0, 0, 0, 65535],
+                vec![0, 0, 0, 255],
                 vec![0, 0, 0, 0],
                 vec![0, 0, 0, 0],
-                vec![65535, 0, 0, 0],
+                vec![255, 0, 0, 0],
             ],
             channel2: vec![
                 vec![0, 0, 0, 0],
-                vec![0, 65535, 0, 0],
-                vec![0, 0, 65535, 0],
+                vec![0, 255, 0, 0],
+                vec![0, 0, 255, 0],
                 vec![0, 0, 0, 0],
             ],
             channel3: vec![
-                vec![0, 0, 0, 65535],
-                vec![0, 7, 0, 0],
-                vec![0, 0, 7, 0],
-                vec![65535, 0, 0, 0],
+                vec![0, 0, 0, 255],
+                vec![0, 0, 0, 0], // 7 here gets lost in downscaling
+                vec![0, 0, 0, 0],
+                vec![255, 0, 0, 0],
             ],
             y_downsample_factor: 1,
             cb_downsample_factor: 1,
@@ -732,40 +726,40 @@ mod tests {
         let (r, g, b) = image.to_matrices();
 
         let r_expected_vec = vec![
-            0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, 65535.0, // row 1
+            0.0, 0.0, 0.0, 255.0, 0.0, 0.0, 0.0, 255.0, // row 1
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 2
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 3
-            65535.0, 0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, // row 4
-            0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, 65535.0, // row 5
+            255.0, 0.0, 0.0, 0.0, 255.0, 0.0, 0.0, 0.0, // row 4
+            0.0, 0.0, 0.0, 255.0, 0.0, 0.0, 0.0, 255.0, // row 5
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 6
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 7
-            65535.0, 0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, // row 8
+            255.0, 0.0, 0.0, 0.0, 255.0, 0.0, 0.0, 0.0, // row 8
         ];
         let r_expected: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_iterator(r_expected_vec)];
         assert_eq!(r_expected, r);
 
         let g_expected_vec = vec![
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 1
-            0.0, 65535.0, 0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, // row 2
-            0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, 65535.0, 0.0, // row 3
+            0.0, 255.0, 0.0, 0.0, 0.0, 255.0, 0.0, 0.0, // row 2
+            0.0, 0.0, 255.0, 0.0, 0.0, 0.0, 255.0, 0.0, // row 3
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 4
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 5
-            0.0, 65535.0, 0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, // row 6
-            0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, 65535.0, 0.0, // row 7
+            0.0, 255.0, 0.0, 0.0, 0.0, 255.0, 0.0, 0.0, // row 6
+            0.0, 0.0, 255.0, 0.0, 0.0, 0.0, 255.0, 0.0, // row 7
             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 8
         ];
         let g_expected: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_iterator(g_expected_vec)];
         assert_eq!(g_expected, g);
 
         let b_expected_vec = vec![
-            0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, 65535.0, // row 1
-            0.0, 30583.0, 0.0, 0.0, 0.0, 30583.0, 0.0, 0.0, // row 2
-            0.0, 0.0, 30583.0, 0.0, 0.0, 0.0, 30583.0, 0.0, // row 3
-            65535.0, 0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, // row 4
-            0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, 65535.0, // row 5
-            0.0, 30583.0, 0.0, 0.0, 0.0, 30583.0, 0.0, 0.0, // row 6
-            0.0, 0.0, 30583.0, 0.0, 0.0, 0.0, 30583.0, 0.0, // row 7
-            65535.0, 0.0, 0.0, 0.0, 65535.0, 0.0, 0.0, 0.0, // row 8
+            0.0, 0.0, 0.0, 255.0, 0.0, 0.0, 0.0, 255.0, // row 1
+            0.0, 119.0, 0.0, 0.0, 0.0, 119.0, 0.0, 0.0, // row 2
+            0.0, 0.0, 119.0, 0.0, 0.0, 0.0, 119.0, 0.0, // row 3
+            255.0, 0.0, 0.0, 0.0, 255.0, 0.0, 0.0, 0.0, // row 4
+            0.0, 0.0, 0.0, 255.0, 0.0, 0.0, 0.0, 255.0, // row 5
+            0.0, 119.0, 0.0, 0.0, 0.0, 119.0, 0.0, 0.0, // row 6
+            0.0, 0.0, 119.0, 0.0, 0.0, 0.0, 119.0, 0.0, // row 7
+            255.0, 0.0, 0.0, 0.0, 255.0, 0.0, 0.0, 0.0, // row 8
         ];
         let b_expected: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_iterator(b_expected_vec)];
         assert_eq!(b_expected, b);
@@ -778,16 +772,16 @@ mod tests {
         image.downsample(4, 2, 0);
 
         let (y, cb, cr) = image.to_matrices();
-            
+
         let y_expected_vec = vec![
-            -32767.0, -32767.0, -32767.0, -5701.0, -32767.0, -32767.0, -32767.0, -5701.0, // row 1
-            -32767.0, 9189.0, -32767.0, -32767.0, -32767.0, 9189.0, -32767.0, -32767.0, // row 2
-            -32767.0, -32767.0, 9189.0, -32767.0, -32767.0, -32767.0, 9189.0, -32767.0, // row 3
-            -5701.0, -32767.0, -32767.0, -32767.0, -5701.0, -32767.0, -32767.0, -32767.0, // row 4
-            -32767.0, -32767.0, -32767.0, -5701.0, -32767.0, -32767.0, -32767.0, -5701.0, // row 5
-            -32767.0, 9189.0, -32767.0, -32767.0, -32767.0, 9189.0, -32767.0, -32767.0, // row 6
-            -32767.0, -32767.0, 9189.0, -32767.0, -32767.0, -32767.0, 9189.0, -32767.0, // row 7
-            -5701.0, -32767.0, -32767.0, -32767.0, -5701.0, -32767.0, -32767.0, -32767.0 // row 8
+            -127.0, -127.0, -127.0, -22.0, -127.0, -127.0, -127.0, -22.0, //row 1
+            -127.0, 36.0, -127.0, -127.0, -127.0, 36.0, -127.0, -127.0, //row 2
+            -127.0, -127.0, 36.0, -127.0, -127.0, -127.0, 36.0, -127.0, //row 3
+            -22.0, -127.0, -127.0, -127.0, -22.0, -127.0, -127.0, -127.0, //row 4
+            -127.0, -127.0, -127.0, -22.0, -127.0, -127.0, -127.0, -22.0, //row 5
+            -127.0, 36.0, -127.0, -127.0, -127.0, 36.0, -127.0, -127.0, //row 6
+            -127.0, -127.0, 36.0, -127.0, -127.0, -127.0, 36.0, -127.0, //row 7
+            -22.0, -127.0, -127.0, -127.0, -22.0, -127.0, -127.0, -127.0, // row 8
         ];
         let y_expected: Vec<SMatrix<f32, 8, 8>> = vec![
             SMatrix::from_iterator(y_expected_vec.clone()),
@@ -798,27 +792,27 @@ mod tests {
         assert_eq!(y_expected, y);
 
         let cb_expected_vec = vec![
-            -1603.0, 5428.0, -1603.0, 5428.0, -1603.0, 5428.0, -1603.0, 5428.0, // row 1
-            5428.0, -1603.0, 5428.0, -1603.0, 5428.0, -1603.0, 5428.0, -1603.0, // row 2
-            -1603.0, 5428.0, -1603.0, 5428.0, -1603.0, 5428.0, -1603.0, 5428.0, // row 3
-            5428.0, -1603.0, 5428.0, -1603.0, 5428.0, -1603.0, 5428.0, -1603.0, // row 4
-            -1603.0, 5428.0, -1603.0, 5428.0, -1603.0, 5428.0, -1603.0, 5428.0, // row 5
-            5428.0, -1603.0, 5428.0, -1603.0, 5428.0, -1603.0, 5428.0, -1603.0, // row 6
-            -1603.0, 5428.0, -1603.0, 5428.0, -1603.0, 5428.0, -1603.0, 5428.0, // row 7
-            5428.0, -1603.0, 5428.0, -1603.0, 5428.0, -1603.0, 5428.0, -1603.0, // row 8
+            -6.0, 21.0, -6.0, 21.0, -6.0, 21.0, -6.0, 21.0, //row 1
+            21.0, -6.0, 21.0, -6.0, 21.0, -6.0, 21.0, -6.0, //row 2
+            -6.0, 21.0, -6.0, 21.0, -6.0, 21.0, -6.0, 21.0, //row 3
+            21.0, -6.0, 21.0, -6.0, 21.0, -6.0, 21.0, -6.0, //row 4
+            -6.0, 21.0, -6.0, 21.0, -6.0, 21.0, -6.0, 21.0, //row 5
+            21.0, -6.0, 21.0, -6.0, 21.0, -6.0, 21.0, -6.0, //row 6
+            -6.0, 21.0, -6.0, 21.0, -6.0, 21.0, -6.0, 21.0, //row 7
+            21.0, -6.0, 21.0, -6.0, 21.0, -6.0, 21.0, -6.0, // row 8
         ];
         let cb_expected: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_iterator(cb_expected_vec)];
         assert_eq!(cb_expected, cb);
-       
+
         let cr_expected_vec = vec![
-            -7479.0, 6860.0, -7479.0, 6860.0, -7479.0, 6860.0, -7479.0, 6860.0, // row 1
-            6860.0, -7479.0, 6860.0, -7479.0, 6860.0, -7479.0, 6860.0, -7479.0, // row 2
-            -7479.0, 6860.0, -7479.0, 6860.0, -7479.0, 6860.0, -7479.0, 6860.0, // row 3
-            6860.0, -7479.0, 6860.0, -7479.0, 6860.0, -7479.0, 6860.0, -7479.0, // row 4
-            -7479.0, 6860.0, -7479.0, 6860.0, -7479.0, 6860.0, -7479.0, 6860.0, // row 5
-            6860.0, -7479.0, 6860.0, -7479.0, 6860.0, -7479.0, 6860.0, -7479.0, // row 6
-            -7479.0, 6860.0, -7479.0, 6860.0, -7479.0, 6860.0, -7479.0, 6860.0, // row 7
-            6860.0, -7479.0, 6860.0, -7479.0, 6860.0, -7479.0, 6860.0, -7479.0, // row 8
+            -29.0, 26.0, -29.0, 26.0, -29.0, 26.0, -29.0, 26.0, //row 1
+            26.0, -29.0, 26.0, -29.0, 26.0, -29.0, 26.0, -29.0, //row 2
+            -29.0, 26.0, -29.0, 26.0, -29.0, 26.0, -29.0, 26.0, //row 3
+            26.0, -29.0, 26.0, -29.0, 26.0, -29.0, 26.0, -29.0, //row 4
+            -29.0, 26.0, -29.0, 26.0, -29.0, 26.0, -29.0, 26.0, //row 5
+            26.0, -29.0, 26.0, -29.0, 26.0, -29.0, 26.0, -29.0, //row 6
+            -29.0, 26.0, -29.0, 26.0, -29.0, 26.0, -29.0, 26.0, //row 7
+            26.0, -29.0, 26.0, -29.0, 26.0, -29.0, 26.0, -29.0, // row 8
         ];
         let cr_expected: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_iterator(cr_expected_vec)];
         assert_eq!(cr_expected, cr);
@@ -842,17 +836,17 @@ mod tests {
                 width: 4,
                 height: 4,
                 channel1: vec![
-                    vec![0, 0, 0, 65535],
+                    vec![0, 0, 0, 255],
                     vec![0, 0, 0, 0],
                     vec![0, 0, 0, 0],
-                    vec![65535, 0, 0, 0],
+                    vec![255, 0, 0, 0],
                 ],
-                channel2: vec![vec![0, 0], vec![32767, 0], vec![0, 32767], vec![0, 0]],
+                channel2: vec![vec![0, 0], vec![127, 0], vec![0, 127], vec![0, 0]],
                 channel3: vec![
-                    vec![0, 32767],
-                    vec![15291, 0],
-                    vec![0, 15291],
-                    vec![32767, 0],
+                    vec![0, 127],
+                    vec![59, 0],
+                    vec![0, 59],
+                    vec![127, 0],
                 ],
                 y_downsample_factor: 1,
                 cb_downsample_factor: 2,
@@ -872,22 +866,22 @@ mod tests {
                 width: 4,
                 height: 4,
                 channel1: vec![
-                    vec![0, 0, 0, 65535],
+                    vec![0, 0, 0, 255],
                     vec![0, 0, 0, 0],
                     vec![0, 0, 0, 0],
-                    vec![65535, 0, 0, 0],
+                    vec![255, 0, 0, 0],
                 ],
                 channel2: vec![
                     vec![0, 0, 0, 0],
-                    vec![0, 65535, 0, 0],
-                    vec![0, 0, 65535, 0],
+                    vec![0, 255, 0, 0],
+                    vec![0, 0, 255, 0],
                     vec![0, 0, 0, 0],
                 ],
                 channel3: vec![
-                    vec![0, 0, 0, 65535],
-                    vec![0, 30583, 0, 0],
-                    vec![0, 0, 30583, 0],
-                    vec![65535, 0, 0, 0],
+                    vec![0, 0, 0, 255],
+                    vec![0, 119, 0, 0],
+                    vec![0, 0, 119, 0],
+                    vec![255, 0, 0, 0],
                 ],
                 y_downsample_factor: 1,
                 cb_downsample_factor: 1,
@@ -907,13 +901,13 @@ mod tests {
                 width: 4,
                 height: 4,
                 channel1: vec![
-                    vec![0, 0, 0, 65535],
+                    vec![0, 0, 0, 255],
                     vec![0, 0, 0, 0],
                     vec![0, 0, 0, 0],
-                    vec![65535, 0, 0, 0],
+                    vec![255, 0, 0, 0],
                 ],
-                channel2: vec![vec![8191], vec![8191]],
-                channel3: vec![vec![12014], vec![12014]],
+                channel2: vec![vec![31], vec![31]],
+                channel3: vec![vec![46], vec![46]],
                 y_downsample_factor: 1,
                 cb_downsample_factor: 4,
                 cr_downsample_factor: 4,

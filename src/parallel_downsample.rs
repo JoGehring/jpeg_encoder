@@ -19,11 +19,11 @@ use crate::utils::THREAD_COUNT;
 /// let result_cb = downsample_channel(&self.data2, a, b, c != 0);
 /// ```
 pub fn downsample_channel(
-    channel: &Vec<Vec<i32>>,
+    channel: &Vec<Vec<i16>>,
     a: usize,
     b: usize,
     downsample_vertical: bool,
-) -> Vec<Vec<i32>> {
+) -> Vec<Vec<i16>> {
     let len = if downsample_vertical {
         channel.len() / 2
     } else {
@@ -32,19 +32,19 @@ pub fn downsample_channel(
     downsample_internal(channel, a, b, downsample_vertical, len)
 }
 
-fn downsample_internal(channel: &Vec<Vec<i32>>, a: usize, b: usize, downsample_vertical: bool, len: usize) -> Vec<Vec<i32>> {
+fn downsample_internal(channel: &Vec<Vec<i16>>, a: usize, b: usize, downsample_vertical: bool, len: usize) -> Vec<Vec<i16>> {
     let mut chunk_size = channel.len() / *THREAD_COUNT + 1;
     // ensure that chunk_size is divisible by two - otherwise, vertical downsampling breaks
     if chunk_size % 2 == 1 {
         chunk_size += 1
     };
-    let chunks: Chunks<'_, Vec<i32>> = channel.chunks(chunk_size);
+    let chunks: Chunks<'_, Vec<i16>> = channel.chunks(chunk_size);
     thread::scope(|s| {
         let mut result = Vec::with_capacity(len);
         let mut handles = Vec::with_capacity(chunks.len());
         for chunk in chunks {
             handles.push(s.spawn(move || {
-                let mut result: Vec<Vec<i32>> = Vec::with_capacity(chunk.len());
+                let mut result: Vec<Vec<i16>> = Vec::with_capacity(chunk.len());
                 for (index, upper_row) in chunk.iter().enumerate().step_by(2) {
                     let lower_row = if index + 1 < chunk.len() {
                         &chunk[index + 1]
@@ -89,7 +89,7 @@ mod tests {
             vec![13, 14, 15, 16],
         ];
 
-        let expected_output: Vec<Vec<i32>> = vec![vec![3, 5], vec![11, 13]];
+        let expected_output: Vec<Vec<i16>> = vec![vec![3, 5], vec![11, 13]];
 
         let result = downsample_channel(&input_channel, 4, 2, true);
 
@@ -105,7 +105,7 @@ mod tests {
             vec![13, 14, 15, 16],
         ];
 
-        let expected_output: Vec<Vec<i32>> =
+        let expected_output: Vec<Vec<i16>> =
             vec![vec![1, 3], vec![5, 7], vec![9, 11], vec![13, 15]];
 
         let result = downsample_channel(&input_channel, 4, 2, false);

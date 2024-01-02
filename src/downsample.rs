@@ -13,13 +13,13 @@
 /// let result_cb = downsample_channel(&self.data2, a, b, c != 0);
 /// ```
 pub fn downsample_channel(
-    channel: &Vec<Vec<i32>>,
+    channel: &Vec<Vec<i16>>,
     a: usize,
     b: usize,
     downsample_vertical: bool,
-) -> Vec<Vec<i32>> {
+) -> Vec<Vec<i16>> {
     let len = if downsample_vertical { channel.len() / 2 } else {channel.len()};
-    let mut final_channel: Vec<Vec<i32>> = Vec::with_capacity(len);
+    let mut final_channel: Vec<Vec<i16>> = Vec::with_capacity(len);
     for y in (0..channel.len()).step_by(2) {
         let lower_row = if y + 1 < channel.len() {
             &channel[y + 1]
@@ -59,15 +59,15 @@ pub fn downsample_channel(
 /// let (upper_row, lower_row) = downsample_rows(row1, row2, 4, 1, false);
 ///```
 pub fn downsample_rows(
-    row: &Vec<i32>,
-    row2: &Vec<i32>,
+    row: &Vec<i16>,
+    row2: &Vec<i16>,
     a: usize,
     b: usize,
     downsample_vertical: bool,
-) -> (Vec<i32>, Vec<i32>) {
+) -> (Vec<i16>, Vec<i16>) {
     let len = row.len() / (a / b);
-    let mut final_row: Vec<i32> = Vec::with_capacity(len);
-    let mut final_lower_row: Vec<i32> = Vec::with_capacity(len);
+    let mut final_row: Vec<i16> = Vec::with_capacity(len);
+    let mut final_lower_row: Vec<i16> = Vec::with_capacity(len);
 
     for x in (0..(row.len())).step_by(a) {
         let upper_row_vec = copy_and_pad(row, x, a);
@@ -108,14 +108,14 @@ pub fn downsample_rows(
 /// let segment = copy_and_pad(&my_vec, 2, 3);
 /// assert_eq!(vec![30, 40, 40], segment);
 /// ```
-fn copy_and_pad(row: &Vec<i32>, offset: usize, length: usize) -> Vec<i32> {
+fn copy_and_pad(row: &Vec<i16>, offset: usize, length: usize) -> Vec<i16> {
     let bound = if offset + length < row.len() {
         offset + length
     } else {
         offset + (row.len() - offset)
     };
     let row = &row[offset..bound];
-    let mut row_vec: Vec<i32> = vec![0; row.len()];
+    let mut row_vec: Vec<i16> = vec![0; row.len()];
     row_vec.copy_from_slice(row);
     while row_vec.len() < length {
         row_vec.push(row_vec[row_vec.len() - 1]);
@@ -140,8 +140,8 @@ fn copy_and_pad(row: &Vec<i32>, offset: usize, length: usize) -> Vec<i32> {
 /// let value = downsample_segment_of_row(vec![60, 40, 30, 20], 4, 4);
 /// assert_eq!(vec![60, 40, 30, 20], value);
 /// ```
-fn downsample_segment_of_row(row_segment: &[i32], a: usize, b: usize) -> Vec<i32> {
-    let mut subresult: Vec<i32> = vec![0; row_segment.len()];
+fn downsample_segment_of_row(row_segment: &[i16], a: usize, b: usize) -> Vec<i16> {
+    let mut subresult: Vec<i16> = vec![0; row_segment.len()];
     subresult.copy_from_slice(row_segment);
     let mut factor = b;
     while factor != a {
@@ -163,8 +163,8 @@ fn downsample_segment_of_row(row_segment: &[i32], a: usize, b: usize) -> Vec<i32
 /// let value = downsample_vec_by_two(vec![60, 40, 30, 20]);
 /// assert_eq!(vec![50, 25], value);
 /// ```
-fn downsample_vec_by_two(original_vec: &Vec<i32>) -> Vec<i32> {
-    let mut new_vec: Vec<i32> = Vec::with_capacity(original_vec.len()/2);
+fn downsample_vec_by_two(original_vec: &Vec<i16>) -> Vec<i16> {
+    let mut new_vec: Vec<i16> = Vec::with_capacity(original_vec.len()/2);
     for i in 0..(original_vec.len() / 2 + original_vec.len() % 2) {
         let key = if 2 * i + 1 < original_vec.len() {
             2 * i + 1
@@ -194,8 +194,8 @@ fn downsample_vec_by_two(original_vec: &Vec<i32>) -> Vec<i32> {
 /// let result = overflow_safe_avg(65535, 65533);
 /// assert_eq!(65534, result);
 /// ```
-fn overflow_safe_avg(value1: i32, value2: i32) -> i32{
-    let carry = i32::from(value1 % 2 == 1 && (value2 % 2 == 1));
+fn overflow_safe_avg(value1: i16, value2: i16) -> i16{
+    let carry = i16::from(value1 % 2 == 1 && (value2 % 2 == 1));
     let value = value1 / 2 + value2 / 2;
     carry + value
 }
@@ -216,7 +216,7 @@ mod tests {
             vec![13, 14, 15, 16],
         ];
 
-        let expected_output: Vec<Vec<i32>> = vec![vec![3, 5], vec![11, 13]];
+        let expected_output: Vec<Vec<i16>> = vec![vec![3, 5], vec![11, 13]];
 
         let result = downsample_channel(&input_channel, 4, 2, true);
 
@@ -232,7 +232,7 @@ mod tests {
             vec![13, 14, 15, 16],
         ];
 
-        let expected_output: Vec<Vec<i32>> =
+        let expected_output: Vec<Vec<i16>> =
             vec![vec![1, 3], vec![5, 7], vec![9, 11], vec![13, 15]];
 
         let result = downsample_channel(&input_channel, 4, 2, false);
@@ -409,14 +409,14 @@ mod tests {
     #[test]
     fn test_downsample_empty_vec_by_two() {
         let value = downsample_vec_by_two(&vec![]);
-        let to_compare: Vec<i32> = vec![];
+        let to_compare: Vec<i16> = vec![];
         assert_eq!(to_compare, value);
     }
 
     #[test]
     fn test_overflow_safe_avg() {
-        assert_eq!(65534, overflow_safe_avg(65535, 65533));
-        assert_eq!(50000, overflow_safe_avg(49998, 50002));
+        assert_eq!(253, overflow_safe_avg(252, 254));
+        assert_eq!(201, overflow_safe_avg(199, 203));
         assert_eq!(3, overflow_safe_avg(1, 5));
     }
 }

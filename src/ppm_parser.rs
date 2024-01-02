@@ -40,8 +40,8 @@ pub fn read_ppm_from_file(filename: &str) -> Image {
     let width: usize = result[1].parse().unwrap();
     let height: usize = result[2].parse().unwrap();
 
-    let max_value_in_ppm: i32= result[3].parse().unwrap();
-    let scaling_factor = u16::MAX as f32 / max_value_in_ppm as f32;
+    let max_value_in_ppm: i32 = result[3].parse().unwrap();
+    let scaling_factor = u8::MAX as f32 / max_value_in_ppm as f32;
 
     let (image_values1, image_values2, image_values3) = extract_pixel_values(&result, height, width, scaling_factor);
 
@@ -56,17 +56,17 @@ pub fn read_ppm_from_file(filename: &str) -> Image {
 /// * `raw_data`: The raw image data as row strings
 /// * `height`: The image height given in the PPM file
 /// * `width`: The image width given in the PPM file
-/// * `scaling_factor`: The factor used to scale the image data to 65535
+/// * `scaling_factor`: The factor used to scale the image data to 255
 ///
 /// # Examples
 ///
 /// ```
 /// let (image_values1, image_values2, image_values3) = extract_pixel_values(&data, 1920, 1080, 3.14);
 /// ```
-fn extract_pixel_values(raw_data: &[String], height: usize, width: usize, scaling_factor: f32) -> (Vec<Vec<i32>>, Vec<Vec<i32>>, Vec<Vec<i32>>) {
-    let mut image_values1: Vec<Vec<i32>> = vec![vec![0; width]; height];
-    let mut image_values2: Vec<Vec<i32>> = vec![vec![0; width]; height];
-    let mut image_values3: Vec<Vec<i32>> = vec![vec![0; width]; height];
+fn extract_pixel_values(raw_data: &[String], height: usize, width: usize, scaling_factor: f32) -> (Vec<Vec<i16>>, Vec<Vec<i16>>, Vec<Vec<i16>>) {
+    let mut image_values1: Vec<Vec<i16>> = vec![vec![0; width]; height];
+    let mut image_values2: Vec<Vec<i16>> = vec![vec![0; width]; height];
+    let mut image_values3: Vec<Vec<i16>> = vec![vec![0; width]; height];
 
     for i in 0..height {
         for j in 0..width {
@@ -132,8 +132,8 @@ fn parse_file_to_string(filename: &str) -> String {
 /// # Panics
 ///
 /// * If the value cannot be parsed into a float.
-fn unwrap_and_scale(value: &str, scaling_factor: f32) -> i32{
-    (value.parse::<f32>().unwrap() * scaling_factor) as i32
+fn unwrap_and_scale(value: &str, scaling_factor: f32) -> i16{
+    (value.parse::<f32>().unwrap() * scaling_factor) as i16
 }
 
 #[cfg(test)]
@@ -149,22 +149,22 @@ mod tests {
             4,
             4,
             vec![
-                vec![0, 0, 0, 65535],
+                vec![0, 0, 0, 255],
                 vec![0, 0, 0, 0],
                 vec![0, 0, 0, 0],
-                vec![65535, 0, 0, 0],
+                vec![255, 0, 0, 0],
             ],
             vec![
                 vec![0, 0, 0, 0],
-                vec![0, 65535, 0, 0],
-                vec![0, 0, 65535, 0],
+                vec![0, 255, 0, 0],
+                vec![0, 0, 255, 0],
                 vec![0, 0, 0, 0],
             ],
             vec![
-                vec![0, 0, 0, 65535],
-                vec![0, 30583, 0, 0],
-                vec![0, 0, 30583, 0],
-                vec![65535, 0, 0, 0],
+                vec![0, 0, 0, 255],
+                vec![0, 119, 0, 0],
+                vec![0, 0, 119, 0],
+                vec![255, 0, 0, 0],
             ],
         );
 
