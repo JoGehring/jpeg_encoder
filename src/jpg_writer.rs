@@ -114,7 +114,7 @@ fn write_sof0_segment(stream: &mut BitStream, image: &Image) {
         2, // id of the Cb component.
         image.cb_downsample_factor() as u8,
         image.downsampled_vertically(),
-        0,
+        1,
         max_downsample_factor,
     );
     write_sof0_segment_component(
@@ -122,7 +122,7 @@ fn write_sof0_segment(stream: &mut BitStream, image: &Image) {
         3, // id of the Cr component
         image.cr_downsample_factor() as u8,
         image.downsampled_vertically(),
-        0,
+        1,
         max_downsample_factor,
     );
 }
@@ -281,7 +281,7 @@ mod tests {
         let mut stream = BitStream::open();
         let image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         write_sof0_segment(&mut stream, &image);
-        let data: Vec<u8> = vec![0, 17, 8, 0, 4, 0, 4, 3, 1, 0x11, 0, 2, 0x11, 0, 3, 0x11, 0];
+        let data: Vec<u8> = vec![0, 17, 8, 0, 4, 0, 4, 3, 1, 0x11, 0, 2, 0x11, 1, 3, 0x11, 1];
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
     }
@@ -292,7 +292,7 @@ mod tests {
         let mut image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
         image.downsample(4, 2, 0);
         write_sof0_segment(&mut stream, &image);
-        let data: Vec<u8> = vec![0, 17, 8, 0, 4, 0, 4, 3, 1, 0x22, 0, 2, 0x11, 0, 3, 0x11, 0];
+        let data: Vec<u8> = vec![0, 17, 8, 0, 4, 0, 4, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1];
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
     }
@@ -308,7 +308,7 @@ mod tests {
         write_segment_to_stream(&mut stream, &image, SegmentType::EOI);
         let data: Vec<u8> = vec![
             0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 1, 0, 1,
-            0, 0, 0xff, 0xc0, 0, 17, 8, 0, 4, 0, 4, 3, 1, 0x22, 0, 2, 0x11, 0, 3, 0x11, 0, 0xff,
+            0, 0, 0xff, 0xc0, 0, 17, 8, 0, 4, 0, 4, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1, 0xff,
             0xd9,
         ];
         assert_eq!(data, *stream.data());
@@ -325,7 +325,7 @@ mod tests {
         write_segment_to_stream(&mut stream, &image, SegmentType::EOI);
         let data: Vec<u8> = vec![
             0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0, 0, 1, 0, 1,
-            0, 0, 0xff, 0xc0, 0, 17, 8, 0, 4, 0, 4, 3, 1, 0x11, 0, 2, 0x11, 0, 3, 0x11, 0, 0xff,
+            0, 0, 0xff, 0xc0, 0, 17, 8, 0, 4, 0, 4, 3, 1, 0x11, 0, 2, 0x11, 1, 3, 0x11, 1, 0xff,
             0xd9,
         ];
         assert_eq!(data, *stream.data());
