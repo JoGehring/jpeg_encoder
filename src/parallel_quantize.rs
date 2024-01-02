@@ -3,19 +3,17 @@ use std::slice::ChunksMut;
 use nalgebra::SMatrix;
 use scoped_threadpool::Pool;
 
-use crate::utils::THREAD_COUNT;
+use crate::{utils::THREAD_COUNT, quantization};
 
-/// Perform the DCT on an image.
-/// The DCT is performed for each channel in sequence.
-/// DCT on a channel is parallelised with as many threads as the system has logical CPUs.
-///
+/// Quantize the given vector of value matrices, then return a zigzag sampled
+/// array of the results.
+/// 
 /// # Arguments
-/// * `image`: The image to calculate the DCT for.
-pub fn quantize(
+pub fn quantize_zigzag(
     values: &mut Vec<SMatrix<f32, 8, 8>>,
     q_table: SMatrix<f32, 8, 8>,
     pool: &mut Pool,
-) -> Vec<SMatrix<i32, 8, 8>> {
+) -> Vec<[i32; 64]> {
     let chunk_size = (values.len() / *THREAD_COUNT) + 1;
     let chunks: ChunksMut<SMatrix<f32, 8, 8>> = values.chunks_mut(chunk_size);
     pool.scoped(|s| {
@@ -27,9 +25,11 @@ pub fn quantize(
             });
         }
     });
+    // TODO: could parallelize this too?
     values
         .iter()
         .map(|mat| mat.try_cast::<i32>().unwrap())
+        .map(|mat| quantization::sample_zigzag(&mat))
         .collect()
 }
 
@@ -39,7 +39,7 @@ mod tests {
     use scoped_threadpool::Pool;
     use std::thread::available_parallelism;
 
-    use crate::parallel_quantize::quantize;
+    use crate::parallel_quantize::quantize_zigzag;
 
     fn get_pool() -> Pool {
         let thread_count = available_parallelism().unwrap().get();
@@ -58,15 +58,14 @@ mod tests {
             -4.0, -2.0, -3.0, 6.0, 1.0, -1.0, -1.0,
         ];
         let mut input: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_row_iterator(x_vec.into_iter())];
-        let y_vec = vec![
+        let expected = [
             12, -3, 1, 0, 0, 0, 0, 0, -5, 3, -1, 1, 0, 0, 0, 0,
             2, 0, -1, 1, -1, 0, 0, 0, -1, -2, 1, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ];
-        let expected: SMatrix<i32, 8, 8> = SMatrix::from_row_iterator(y_vec.into_iter());
         let q_table = crate::quantization::uniform_q_table(50.0);
-        let result = quantize(&mut input, q_table, &mut pool);
+        let result = quantize_zigzag(&mut input, q_table, &mut pool);
 
         assert_eq!(1, result.len());
         assert_eq!(expected, result[0]);

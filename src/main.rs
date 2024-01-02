@@ -1,20 +1,21 @@
 #![allow(dead_code)]
 // remove this once integrating - this is to avoid exessive and useless warnings for the time being
 
+use dct::DCTMode;
 use ppm_parser::read_ppm_from_file;
 use scoped_threadpool::Pool;
-use dct::DCTMode;
 
 use crate::image::create_image;
 use crate::utils::THREAD_COUNT;
 
 use crate::bit_stream::BitStream;
 use crate::huffman::encode;
-mod quantization;
 mod appendable_to_bit_stream;
 mod arai;
 mod bit_stream;
 mod dct;
+mod dct_constant_calculator;
+mod dct_constants;
 mod dct_to_ppm;
 mod downsample;
 mod huffman;
@@ -27,9 +28,8 @@ mod parallel_downsample;
 mod parallel_idct;
 mod parallel_quantize;
 mod ppm_parser;
+mod quantization;
 mod utils;
-mod dct_constant_calculator;
-mod dct_constants;
 
 fn main() {
     let mut pool = Pool::new(*THREAD_COUNT as u32);
@@ -38,13 +38,14 @@ fn main() {
     image.rgb_to_ycbcr();
     image.downsample(4, 2, 0);
 
-    let (y_dct, cb_dct, cr_dct) = parallel_dct::dct(&image, &DCTMode::Arai, &mut pool);
+    let (mut y_dct, mut cb_dct, mut cr_dct) = parallel_dct::dct(&image, &DCTMode::Arai, &mut pool);
     // TODO: different q_tables?
     let luminance_q_table = quantization::uniform_q_table(1f32);
     let chrominance_q_table = quantization::uniform_q_table(2f32);
+    let y_quant = parallel_quantize::quantize_zigzag(&mut y_dct, luminance_q_table, &mut pool);
+    let cb_quant = parallel_quantize::quantize_zigzag(&mut cb_dct, chrominance_q_table, &mut pool);
+    let cr_quant = parallel_quantize::quantize_zigzag(&mut cr_dct, chrominance_q_table, &mut pool);
 
-    // TODO: Quantize
-    // TODO: Zigzag
     // TODO: RLE/Category encoding
     // TODO: Huffman
     /*
