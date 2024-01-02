@@ -25,6 +25,7 @@ mod package_merge;
 mod parallel_dct;
 mod parallel_downsample;
 mod parallel_idct;
+mod parallel_quantize;
 mod ppm_parser;
 mod utils;
 mod dct_constant_calculator;
@@ -33,11 +34,14 @@ mod dct_constants;
 fn main() {
     let mut pool = Pool::new(*THREAD_COUNT as u32);
 
-    let mut image = read_ppm_from_file("test/dwsample-ppm-640.ppm");
+    let mut image = read_ppm_from_file("test/dwsample-ppm-1920.ppm");
     image.rgb_to_ycbcr();
     image.downsample(4, 2, 0);
 
-    // let (y_dct, cb_dct, cr_dct) = parallel_dct::dct(&image, &DCTMode::Arai, &mut pool);
+    let (y_dct, cb_dct, cr_dct) = parallel_dct::dct(&image, &DCTMode::Arai, &mut pool);
+    // TODO: different q_tables?
+    let luminance_q_table = quantization::uniform_q_table(1f32);
+    let chrominance_q_table = quantization::uniform_q_table(2f32);
 
     // TODO: Quantize
     // TODO: Zigzag
@@ -51,9 +55,8 @@ fn main() {
     let mut target_stream = BitStream::open();
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOI);
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::APP0);
-    jpg_writer::write_dqt_segment(&mut target_stream, &quantization::uniform_q_table(1f32), 0);
-    jpg_writer::write_dqt_segment(&mut target_stream, &quantization::uniform_q_table(2f32), 1);
-    // TODO: DQT
+    jpg_writer::write_dqt_segment(&mut target_stream, &luminance_q_table, 0);
+    jpg_writer::write_dqt_segment(&mut target_stream, &chrominance_q_table, 1);
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOF0);
     // TODO: DHT
     // TODO: SOS
