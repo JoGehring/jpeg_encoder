@@ -3,7 +3,7 @@ use std::usize;
 
 use nalgebra::SMatrix;
 
-const category_offset: [i32; 15] = [
+const CATEGORY_OFFSET: [i32; 15] = [
     0b1,
     0b11,
     0b111,
@@ -43,82 +43,91 @@ fn quantize(data: &SMatrix<f32, 8, 8>, q_table: &SMatrix<f32, 8, 8>) -> SMatrix<
         .unwrap()
 }
 
+/// Zigzag sample the given data.
+/// The sampling is hardcoded for simplicity reasons.
+/// # Arguments
+/// * `data`: The matrix to zigzag sample.
 fn sample_zigzag(data: &SMatrix<i32, 8, 8>) -> [i32; 64] {
-    let mut result = [0; 64];
-    result[0] = data[(0, 0)];
-    result[1] = data[(0, 1)];
-    result[2] = data[(1, 0)];
-    result[3] = data[(2, 0)];
-    result[4] = data[(1, 1)];
-    result[5] = data[(0, 2)];
-    result[6] = data[(0, 3)];
-    result[7] = data[(1, 2)];
-    result[8] = data[(2, 1)];
-    result[9] = data[(3, 0)];
-    result[10] = data[(4, 0)];
-    result[11] = data[(3, 1)];
-    result[12] = data[(2, 2)];
-    result[13] = data[(1, 3)];
-    result[14] = data[(0, 4)];
-    result[15] = data[(0, 5)];
-    result[16] = data[(1, 4)];
-    result[17] = data[(2, 3)];
-    result[18] = data[(3, 2)];
-    result[19] = data[(4, 1)];
-    result[20] = data[(5, 0)];
-    result[21] = data[(6, 0)];
-    result[22] = data[(5, 1)];
-    result[23] = data[(4, 2)];
-    result[24] = data[(3, 3)];
-    result[25] = data[(2, 4)];
-    result[26] = data[(1, 5)];
-    result[27] = data[(0, 6)];
-    result[28] = data[(0, 7)];
-    result[29] = data[(1, 6)];
-    result[30] = data[(2, 5)];
-    result[31] = data[(3, 4)];
-    result[32] = data[(4, 3)];
-    result[33] = data[(5, 2)];
-    result[34] = data[(6, 1)];
-    result[35] = data[(7, 0)];
-    result[36] = data[(7, 1)];
-    result[37] = data[(6, 2)];
-    result[38] = data[(5, 3)];
-    result[39] = data[(4, 4)];
-    result[40] = data[(3, 5)];
-    result[41] = data[(2, 6)];
-    result[42] = data[(1, 7)];
-    result[43] = data[(2, 7)];
-    result[44] = data[(3, 6)];
-    result[45] = data[(4, 5)];
-    result[46] = data[(5, 4)];
-    result[47] = data[(6, 3)];
-    result[48] = data[(7, 2)];
-    result[49] = data[(7, 3)];
-    result[50] = data[(6, 4)];
-    result[51] = data[(5, 5)];
-    result[52] = data[(4, 6)];
-    result[53] = data[(3, 7)];
-    result[54] = data[(4, 7)];
-    result[55] = data[(5, 6)];
-    result[56] = data[(6, 5)];
-    result[57] = data[(7, 4)];
-    result[58] = data[(7, 5)];
-    result[59] = data[(6, 6)];
-    result[60] = data[(5, 7)];
-    result[61] = data[(6, 7)];
-    result[62] = data[(7, 6)];
-    result[63] = data[(7, 7)];
-    result
+    [
+        data[(0, 0)],
+        data[(0, 1)],
+        data[(1, 0)],
+        data[(2, 0)],
+        data[(1, 1)],
+        data[(0, 2)],
+        data[(0, 3)],
+        data[(1, 2)],
+        data[(2, 1)],
+        data[(3, 0)],
+        data[(4, 0)],
+        data[(3, 1)],
+        data[(2, 2)],
+        data[(1, 3)],
+        data[(0, 4)],
+        data[(0, 5)],
+        data[(1, 4)],
+        data[(2, 3)],
+        data[(3, 2)],
+        data[(4, 1)],
+        data[(5, 0)],
+        data[(6, 0)],
+        data[(5, 1)],
+        data[(4, 2)],
+        data[(3, 3)],
+        data[(2, 4)],
+        data[(1, 5)],
+        data[(0, 6)],
+        data[(0, 7)],
+        data[(1, 6)],
+        data[(2, 5)],
+        data[(3, 4)],
+        data[(4, 3)],
+        data[(5, 2)],
+        data[(6, 1)],
+        data[(7, 0)],
+        data[(7, 1)],
+        data[(6, 2)],
+        data[(5, 3)],
+        data[(4, 4)],
+        data[(3, 5)],
+        data[(2, 6)],
+        data[(1, 7)],
+        data[(2, 7)],
+        data[(3, 6)],
+        data[(4, 5)],
+        data[(5, 4)],
+        data[(6, 3)],
+        data[(7, 2)],
+        data[(7, 3)],
+        data[(6, 4)],
+        data[(5, 5)],
+        data[(4, 6)],
+        data[(3, 7)],
+        data[(4, 7)],
+        data[(5, 6)],
+        data[(6, 5)],
+        data[(7, 4)],
+        data[(7, 5)],
+        data[(6, 6)],
+        data[(5, 7)],
+        data[(6, 7)],
+        data[(7, 6)],
+        data[(7, 7)],
+    ]
 }
 
+/// Get the categorised representation of the given value.
+/// Values get a category between 0 and 15 based on the amount
+/// of bits set. For negative values, an offset is applied
+/// (so the lowest value, e.g. -31 for category 5, translates to
+/// 0* as a bit representation).
 fn categorize(value: i32) -> (u8, u16) {
     if value == 0 {
         return (0, u16::MAX);
     }
     let cat = 32 - value.abs().leading_zeros() as u8;
     if value.signum() == -1 {
-        let offset = category_offset[(cat - 1) as usize];
+        let offset = CATEGORY_OFFSET[(cat - 1) as usize];
         (cat, (value + offset) as u16)
     } else {
         (cat, value as u16)
@@ -211,6 +220,5 @@ mod test {
         assert_eq!((12, 942), anywhere_neg);
         let anywhere_pos = categorize(3153);
         assert_eq!((12, 3153), anywhere_pos);
-
     }
 }
