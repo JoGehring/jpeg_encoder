@@ -37,7 +37,7 @@ fn main() {
     image.rgb_to_ycbcr();
     image.downsample(4, 2, 0);
 
-    let (y_dct, cb_dct, cr_dct) = parallel_dct::dct(&image, &DCTMode::Arai, &mut pool);
+    // let (y_dct, cb_dct, cr_dct) = parallel_dct::dct(&image, &DCTMode::Arai, &mut pool);
 
     // TODO: Quantize
     // TODO: Zigzag
@@ -51,6 +51,8 @@ fn main() {
     let mut target_stream = BitStream::open();
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOI);
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::APP0);
+    jpg_writer::write_dqt_segment(&mut target_stream, &quantization::uniform_q_table(1f32), 0);
+    jpg_writer::write_dqt_segment(&mut target_stream, &quantization::uniform_q_table(2f32), 1);
     // TODO: DQT
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOF0);
     // TODO: DHT
