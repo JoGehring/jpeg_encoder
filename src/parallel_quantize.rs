@@ -3,11 +3,11 @@ use std::slice::ChunksMut;
 use nalgebra::SMatrix;
 use scoped_threadpool::Pool;
 
-use crate::{utils::THREAD_COUNT, quantization};
+use crate::{quantization, utils::THREAD_COUNT};
 
 /// Quantize the given vector of value matrices, then return a zigzag sampled
 /// array of the results.
-/// 
+///
 /// # Arguments
 pub fn quantize_zigzag(
     values: &mut Vec<SMatrix<f32, 8, 8>>,
@@ -57,12 +57,12 @@ mod tests {
             9.0, -4.0, -5.0, 2.0, 2.0, -7.0, 3.0, -9.0, 7.0, 8.0, -6.0, 5.0, 12.0, 2.0, -5.0, -9.0,
             -4.0, -2.0, -3.0, 6.0, 1.0, -1.0, -1.0,
         ];
-        let mut input: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_row_iterator(x_vec.into_iter())];
+        let mut input: Vec<SMatrix<f32, 8, 8>> =
+            vec![SMatrix::from_row_iterator(x_vec.into_iter())];
         let expected = [
-            12, -3, 1, 0, 0, 0, 0, 0, -5, 3, -1, 1, 0, 0, 0, 0,
-            2, 0, -1, 1, -1, 0, 0, 0, -1, -2, 1, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            12, -3, -5, 2, 3, 1, 0, -1, 0, -1, 0, -2, -1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, -1,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0,
         ];
         let q_table = crate::quantization::uniform_q_table(50.0);
         let result = quantize_zigzag(&mut input, q_table, &mut pool);
