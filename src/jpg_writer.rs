@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
 use modinverse::egcd;
+use nalgebra::SMatrix;
 
 use crate::bit_stream::BitStream;
 use crate::image::Image;
+use crate::quantization;
 
 /// Enum describing the different types of segments in a JPG file.
 pub enum SegmentType {
@@ -44,6 +46,7 @@ fn write_marker_for_segment(stream: &mut BitStream, segment_type: &SegmentType) 
         SegmentType::SOF0 => 0xffc0,
         SegmentType::EOI => 0xffd9,
         SegmentType::DHT => 0xffc4,
+        SegmentType::DQT => 0xffdb,
         _ => panic!("Not implemented yet!"),
     });
 }
@@ -185,6 +188,15 @@ pub fn write_dht_segment(
     }
 }
 
+/// Writes the DQT segment.
+pub fn write_dqt_segment(stream: &mut BitStream, q_table: &SMatrix<f32, 8, 8>, number: u8) {
+    write_marker_for_segment(stream, &SegmentType::DQT);
+    stream.append(67u16);
+    stream.append(number); // higher bits here would describe precision, but are always 0
+    let zigzag = quantization::sample_zigzag(&q_table.map(|val| (1f32 / val).round() as u8));
+    stream.append_many(&zigzag);
+}
+
 #[cfg(test)]
 mod tests {
     use crate::bit_stream::BitStream;
@@ -194,6 +206,9 @@ mod tests {
         write_sof0_segment, write_sof0_segment_component, SegmentType,
     };
     use crate::ppm_parser::read_ppm_from_file;
+    use crate::quantization;
+
+    use super::write_dqt_segment;
 
     #[test]
     fn test_write_soi_marker_successful() {
@@ -423,9 +438,24 @@ mod tests {
             27, 20, 17, 26, 19, 16, 25, 18, 15, 24, 23, 22, 21, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5,
             4, 3, 2, 1,
         ];
-        println!("{:?}", code_map);
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
+    }
+
+    #[test]
+    fn test_write_dqt_segment() {
+        let mut stream = BitStream::open();
+        let q_table = quantization::uniform_q_table(2f32);
+        write_dqt_segment(&mut stream, &q_table, 1);
+
+        let mut expected = BitStream::open();
+        expected.append(0xffdb_u16);
+        expected.append(67u16);
+        expected.append(1u8);
+        for _ in 0..64 {
+            expected.append(2u8);
+        }
+        assert_eq!(expected, stream);
     }
 
     #[test]

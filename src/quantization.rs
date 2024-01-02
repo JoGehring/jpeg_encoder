@@ -24,7 +24,7 @@ const CATEGORY_OFFSET: [i32; 15] = [
 /// Create an uniform quantization matrix from factor x in format 1/x
 /// # Arguments
 /// * `factor`: The quantization factor
-fn create_uniform_q_table(factor: f32) -> SMatrix<f32, 8, 8> {
+pub fn uniform_q_table(factor: f32) -> SMatrix<f32, 8, 8> {
     SMatrix::from_element(1.0 / factor)
 }
 
@@ -35,7 +35,7 @@ fn create_uniform_q_table(factor: f32) -> SMatrix<f32, 8, 8> {
 /// # Arguments
 /// * `data`: The matrix to perform the quantization on
 /// * `q_table`: The quantization matrix with quantization factor x in format 1/x
-fn quantize(data: &SMatrix<f32, 8, 8>, q_table: &SMatrix<f32, 8, 8>) -> SMatrix<i32, 8, 8> {
+pub fn quantize(data: &SMatrix<f32, 8, 8>, q_table: &SMatrix<f32, 8, 8>) -> SMatrix<i32, 8, 8> {
     let result = data.component_mul(q_table);
     result
         .map(|value| if value == 0.5 { 0.0 } else { value.round() })
@@ -47,7 +47,7 @@ fn quantize(data: &SMatrix<f32, 8, 8>, q_table: &SMatrix<f32, 8, 8>) -> SMatrix<
 /// The sampling is hardcoded for simplicity reasons.
 /// # Arguments
 /// * `data`: The matrix to zigzag sample.
-fn sample_zigzag(data: &SMatrix<i32, 8, 8>) -> [i32; 64] {
+pub fn sample_zigzag<T: Copy>(data: &SMatrix<T, 8, 8>) -> [T; 64] {
     [
         data[(0, 0)],
         data[(0, 1)],
@@ -121,7 +121,7 @@ fn sample_zigzag(data: &SMatrix<i32, 8, 8>) -> [i32; 64] {
 /// of bits set. For negative values, an offset is applied
 /// (so the lowest value, e.g. -31 for category 5, translates to
 /// 0* as a bit representation).
-fn categorize(value: i32) -> (u8, u16) {
+pub fn categorize(value: i32) -> (u8, u16) {
     if value == 0 {
         return (0, u16::MAX);
     }
@@ -138,7 +138,7 @@ fn categorize(value: i32) -> (u8, u16) {
 mod test {
     use nalgebra::SMatrix;
 
-    use super::{categorize, create_uniform_q_table, quantize, sample_zigzag};
+    use super::{categorize, uniform_q_table, quantize, sample_zigzag};
 
     #[test]
     fn test_quatization_from_slides() {
@@ -156,7 +156,7 @@ mod test {
             0, 0, 0, 0, 0, 0, 0, 0, 0,
         ];
         let expected: SMatrix<i32, 8, 8> = SMatrix::from_row_iterator(y_vec.into_iter());
-        let q_table = create_uniform_q_table(50.0);
+        let q_table = uniform_q_table(50.0);
         let result = quantize(&x, &q_table);
         assert_eq!(expected, result);
     }

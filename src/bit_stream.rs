@@ -420,6 +420,12 @@ impl BitStream {
         value.append(self);
     }
 
+    pub fn append_many<T: AppendableToBitStream>(&mut self, value: &[T]) {
+        for val in value {
+            val.append(self);
+        }
+    }
+
     pub fn data(&self) -> &Vec<u8> {
         &self.data
     }
