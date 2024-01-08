@@ -34,6 +34,7 @@ pub fn write_segment_to_stream(stream: &mut BitStream, image: &Image, segment_ty
         SegmentType::SOI => (),
         SegmentType::APP0 => write_app0_segment(stream, image),
         SegmentType::SOF0 => write_sof0_segment(stream, image),
+        SegmentType::SOS => write_sos_segment(stream),
         SegmentType::EOI => (),
         _ => panic!("Not implemented yet!"),
     };
@@ -47,7 +48,7 @@ fn write_marker_for_segment(stream: &mut BitStream, segment_type: &SegmentType) 
         SegmentType::EOI => 0xffd9,
         SegmentType::DHT => 0xffc4,
         SegmentType::DQT => 0xffdb,
-        _ => panic!("Not implemented yet!"),
+        SegmentType::SOS => 0xffda,
     });
 }
 
@@ -157,6 +158,34 @@ fn write_sof0_segment_component(
     stream.append(quantise_table);
 }
 
+/// Write the SOS segment of the JPG file.
+/// This denotes the start of the image data.
+///
+/// # Arguments
+///
+/// * `stream`: The BitStream to append the segment to.
+/// * `image`: The image to take the data from.
+fn write_sos_segment(stream: &mut BitStream) {
+    // length, we always do coloured so 6 + 2*3
+    stream.append::<u16>(12);
+    // number of components, we always do coloured so 3
+    stream.append::<u8>(3);
+    // Y component - we use DHT 0 for its AC/DC
+    stream.append::<u8>(1);
+    stream.append::<u8>(0);
+    // Cb component - we use DHT 1 for its AC/DC
+    stream.append::<u8>(2);
+    stream.append::<u8>(0b0001_0001);
+    // Cr component - we use DHT 1 for its AC/DC
+    stream.append::<u8>(3);
+    stream.append::<u8>(0b0001_0001);
+    // unused info for spectral/predictor selection
+    // irrelevant for us because we don't do lossless, just write defaults
+    stream.append::<u8>(0x00);
+    stream.append::<u8>(0x3f);
+    stream.append::<u8>(0x00);
+}
+
 pub fn write_dht_segment(
     stream: &mut BitStream,
     current_dht_id: u8,
@@ -208,7 +237,7 @@ mod tests {
     use crate::ppm_parser::read_ppm_from_file;
     use crate::quantization;
 
-    use super::write_dqt_segment;
+    use super::{write_dqt_segment, write_sos_segment};
 
     #[test]
     fn test_write_soi_marker_successful() {
@@ -295,6 +324,14 @@ mod tests {
         let data: Vec<u8> = vec![0, 17, 8, 0, 4, 0, 4, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1];
         assert_eq!(data, *stream.data());
         assert_eq!(8, stream.bits_in_last_byte());
+    }
+
+    #[test]
+    fn test_write_sos_segment() {
+        let mut stream = BitStream::open();
+        write_sos_segment(&mut stream);
+        let expected_data: Vec<u8> = vec![0x00, 0x0c, 0x03, 0x01, 0x00, 0x02, 0b0001_0001, 0x03, 0b0001_0001, 0x00, 0x3f, 0x00];
+        assert_eq!(&expected_data, stream.data());
     }
 
     #[test]
