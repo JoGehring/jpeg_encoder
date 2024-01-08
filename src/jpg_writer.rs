@@ -100,7 +100,6 @@ fn write_sof0_segment(stream: &mut BitStream, image: &Image) {
         std::cmp::max(image.y_downsample_factor(), image.cb_downsample_factor()),
         image.cr_downsample_factor(),
     ) as u8;
-    // TODO: quantising tables, once they're implemented
     write_sof0_segment_component(
         stream,
         1, // id of the Y component.

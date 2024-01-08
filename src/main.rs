@@ -65,9 +65,6 @@ fn main() {
     let cr_ac_encoded = &cbcr_ac_encoded[(cbcr_ac_encoded.len() / 2)..cbcr_ac_encoded.len()];
 
 
-    // TODO: AC coefficients & encoding them
-    // TODO: Huffman
-
     let mut target_stream = BitStream::open();
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOI);
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::APP0);
@@ -79,8 +76,8 @@ fn main() {
     
     jpg_writer::write_dht_segment(&mut target_stream, 2, &huffman_ac_y, true);
     jpg_writer::write_dht_segment(&mut target_stream, 3, &huffman_ac_cbcr, true);
-    // TODO: DHT
-    // TODO: SOS
+    jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOS);
+
     // TODO: Image data
 
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::EOI);
