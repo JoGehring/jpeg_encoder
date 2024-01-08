@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::bit_stream::BitStream;
-use crate::huffman::{code_len_to_tree, get_single_leaves, HuffmanNode};
+use crate::huffman::{code_len_to_tree, get_single_leaves, HuffmanNode, HuffmanCodeMap};
 
 pub fn package_merge(stream: &mut BitStream, height: u16) -> HuffmanNode<u8> {
     let mut nodes = get_single_leaves(stream);
@@ -33,7 +33,7 @@ pub fn package_merge(stream: &mut BitStream, height: u16) -> HuffmanNode<u8> {
 }
 
 //TODO: clean up
-pub fn package_merge_experimental(stream: &mut BitStream, height: u16) -> HashMap<u8, (u8, u16)> {
+pub fn package_merge_experimental(stream: &mut BitStream, height: u16) -> HuffmanCodeMap {
     let mut nodes = get_single_leaves(stream);
     if nodes.is_empty() {
         panic!("Alarm");
@@ -134,8 +134,8 @@ fn map_codes_to_code_length(
     lookup: &HashMap<u8, (u8, u64)>,
     nodes: &mut [HuffmanNode<u8>],
     height: u16,
-) -> HashMap<u8, (u8, u16)> {
-    let mut map: HashMap<u8, (u8, u16)> = HashMap::with_capacity(p.len());
+) -> HuffmanCodeMap {
+    let mut map: HuffmanCodeMap = HashMap::with_capacity(p.len());
     for (i, el) in p.iter().enumerate() {
         let code_length = l[lookup.get(&el.0).unwrap().0 as usize];
         if code_length > height as u64 {
@@ -147,7 +147,7 @@ fn map_codes_to_code_length(
     map
 }
 
-fn nodes_to_code(nodes: &Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, (u8, u16)>, height: u16) {
+fn nodes_to_code(nodes: &Vec<HuffmanNode<u8>>, map: &mut HuffmanCodeMap, height: u16) {
     if 2_i32.pow(height as u32) == nodes.len() as i32 {
         panic!("Avoiding 1* not possible")
     }
@@ -191,6 +191,7 @@ fn nodes_to_code(nodes: &Vec<HuffmanNode<u8>>, map: &mut HashMap<u8, (u8, u16)>,
 #[cfg(test)]
 mod tests {
     use crate::{bit_stream::BitStream, huffman::HuffmanNode};
+    use crate::huffman::HuffmanCode;
 
     use super::{package_merge, package_merge_experimental};
 
@@ -427,10 +428,10 @@ mod tests {
 
         let tree = package_merge(&mut stream, 5);
         let map = tree.code_map();
-        let mut expected: Vec<(u8, (u8, u16))> = map.into_iter().map(|(k, v)| (k, v)).collect();
+        let mut expected: Vec<(u8, HuffmanCode)> = map.into_iter().map(|(k, v)| (k, v)).collect();
         expected.sort_by_key(|val| val.0);
         let experimental_map = package_merge_experimental(&mut stream, 5);
-        let mut test: Vec<(u8, (u8, u16))> =
+        let mut test: Vec<(u8, HuffmanCode)> =
             experimental_map.into_iter().map(|(k, v)| (k, v)).collect();
         test.sort_by_key(|val| val.0);
         // 27 is the most likely symbol so it should have the shortest code

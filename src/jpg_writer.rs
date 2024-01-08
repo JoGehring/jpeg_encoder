@@ -1,11 +1,10 @@
-use std::collections::HashMap;
-
 use modinverse::egcd;
 use nalgebra::SMatrix;
 
 use crate::bit_stream::BitStream;
 use crate::image::Image;
 use crate::quantization;
+use crate::huffman::{HuffmanCode, HuffmanCodeMap};
 
 /// Enum describing the different types of segments in a JPG file.
 pub enum SegmentType {
@@ -189,7 +188,7 @@ fn write_sos_segment(stream: &mut BitStream) {
 pub fn write_dht_segment(
     stream: &mut BitStream,
     current_dht_id: u8,
-    code_map: &HashMap<u8, (u8, u16)>,
+    code_map: &HuffmanCodeMap,
     is_ac: bool,
 ) {
     write_marker_for_segment(stream, &SegmentType::DHT);
@@ -202,7 +201,7 @@ pub fn write_dht_segment(
         let amount: u8 = code_map.iter().filter(|val| val.1 .0 == i).count() as u8;
         stream.append(amount);
     }
-    let mut code_vec: Vec<(&u8, &(u8, u16))> = code_map.iter().collect();
+    let mut code_vec: Vec<(&u8, &HuffmanCode)> = code_map.iter().collect();
 
     code_vec.sort_by(|(_, code), (_2, code2)| {
         if code.0 == code2.0 {

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use crate::huffman::{HuffmanCode, HuffmanCodeMap};
 
 const CATEGORY_OFFSET: [i32; 15] = [
     0b1,
@@ -35,7 +35,7 @@ pub fn ac_coefficients(values: &Vec<[i32; 64]>) -> Vec<Vec<i32>> {
 /// Returns both the now encoded values and the huffman code map.
 pub fn encode_dc_coefficients(
     dc_coefficients: &Vec<i32>,
-) -> (Vec<((u8, u16), u16)>, HashMap<u8, (u8, u16)>) {
+) -> (Vec<(HuffmanCode, u16)>, HuffmanCodeMap) {
     let diffs: Vec<i32> = coefficients_to_diffs(dc_coefficients);
 
     categorize_and_encode_diffs(&diffs)
@@ -51,7 +51,7 @@ pub fn encode_dc_coefficients(
 pub fn encode_two_dc_coefficients(
     dc_coefficients_1: &Vec<i32>,
     dc_coefficients_2: &Vec<i32>,
-) -> (Vec<((u8, u16), u16)>, HashMap<u8, (u8, u16)>) {
+) -> (Vec<(HuffmanCode, u16)>, HuffmanCodeMap) {
     let mut diffs: Vec<i32> = coefficients_to_diffs(dc_coefficients_1);
     diffs.append(&mut coefficients_to_diffs(dc_coefficients_2));
 
@@ -64,7 +64,7 @@ pub fn encode_two_dc_coefficients(
 /// Returns both the now encoded values and the resulting huffman code map.
 pub fn encode_ac_coefficients(
     ac_coefficients: &Vec<Vec<i32>>,
-) -> (Vec<Vec<((u8, u16), u16)>>, HashMap<u8, (u8, u16)>) {
+) -> (Vec<Vec<((u8, u16), u16)>>, HuffmanCodeMap) {
     let runlength_encoded: Vec<Vec<(u8, u16)>> = ac_coefficients
         .iter()
         .map(|coeff| runlength_encode_single_ac_table(coeff))
@@ -80,7 +80,7 @@ pub fn encode_ac_coefficients(
 pub fn encode_two_ac_coefficients(
     ac_coefficients_1: &Vec<Vec<i32>>,
     ac_coefficients_2: &Vec<Vec<i32>>,
-) -> (Vec<Vec<((u8, u16), u16)>>, HashMap<u8, (u8, u16)>) {
+) -> (Vec<Vec<((u8, u16), u16)>>, HuffmanCodeMap) {
     let mut runlength_encoded_1: Vec<Vec<(u8, u16)>> = ac_coefficients_1
         .iter()
         .map(|coeff| runlength_encode_single_ac_table(coeff))
@@ -110,7 +110,7 @@ fn coefficients_to_diffs(coefficients: &Vec<i32>) -> Vec<i32> {
 /// huffman code map.
 fn categorize_and_encode_diffs(
     diffs: &Vec<i32>,
-) -> (Vec<((u8, u16), u16)>, HashMap<u8, (u8, u16)>) {
+) -> (Vec<(HuffmanCode, u16)>, HuffmanCodeMap) {
     let categorized: Vec<(u8, u16)> = diffs.iter().map(|diff| categorize(*diff)).collect();
 
     let mut categories = crate::BitStream::open();
@@ -155,13 +155,13 @@ fn runlength_encode_single_ac_table(table: &Vec<i32>) -> Vec<(u8, u16)> {
 /// huffman code as well as the huffman code map.
 fn huffman_encode_ac_coefficients(
     runlength_encoded: &Vec<Vec<(u8, u16)>>,
-) -> (Vec<Vec<((u8, u16), u16)>>, HashMap<u8, (u8, u16)>) {
+) -> (Vec<Vec<(HuffmanCode, u16)>>, HuffmanCodeMap) {
     let mut categories = crate::BitStream::open();
     runlength_encoded.iter().for_each(|table| table.iter().for_each(|val| categories.append(val.0)));
     let category_code = crate::huffman::parse_u8_stream(&mut categories).code_map();
-    let mut huffman_encoded: Vec<Vec<((u8, u16), u16)>> = Vec::with_capacity(runlength_encoded.len());
+    let mut huffman_encoded: Vec<Vec<(HuffmanCode, u16)>> = Vec::with_capacity(runlength_encoded.len());
     for table in runlength_encoded{
-        let new_table: Vec<((u8, u16), u16)> = table.iter()
+        let new_table: Vec<(HuffmanCode, u16)> = table.iter()
         .map(|cat| (*category_code.get(&cat.0).unwrap(), cat.1))
         .collect();
         huffman_encoded.push(new_table);

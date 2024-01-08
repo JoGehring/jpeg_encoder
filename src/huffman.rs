@@ -5,6 +5,11 @@ use debug_tree::{add_branch, add_leaf, defer_print};
 
 use crate::{bit_stream::BitStream, package_merge::package_merge};
 
+/// A huffman-encoded value, containing both the code length and code.
+pub type HuffmanCode = (u8, u16);
+/// A map mapping input values to their respective huffman encoded version
+pub type HuffmanCodeMap = HashMap<u8, HuffmanCode>;
+
 #[derive(PartialEq)]
 pub struct HuffmanNode<T: PartialEq> {
     pub chance: u64,
@@ -31,7 +36,7 @@ impl<T: PartialEq> HuffmanNode<T> {
 /// # Arguments
 ///
 /// * stream: The stream of data to read.
-pub fn encode(stream: &mut BitStream) -> (BitStream, HashMap<u8, (u8, u16)>) {
+pub fn encode(stream: &mut BitStream) -> (BitStream, HuffmanCodeMap) {
     let code_map = parse_u8_stream(stream).code_map();
     let mut result = BitStream::open();
 
@@ -178,7 +183,7 @@ fn combine_nodes(node_1: HuffmanNode<u8>, node_2: HuffmanNode<u8>) -> HuffmanNod
 /// ```
 pub fn code_len_to_tree(
     nodes: &mut Vec<HuffmanNode<u8>>,
-    map: &mut HashMap<u8, (u8, u16)>,
+    map: &mut HuffmanCodeMap,
 ) -> HuffmanNode<u8> {
     let mut root = HuffmanNode::default();
     let mut current = &mut root;
@@ -323,7 +328,7 @@ impl HuffmanNode<u8> {
 
     /// Create a code from this tree. The result is a HashMap
     /// with the values as keys and a tuple of code length and code as values.
-    pub fn code_map(&self) -> HashMap<u8, (u8, u16)> {
+    pub fn code_map(&self) -> HuffmanCodeMap {
         let mut map = HashMap::with_capacity(2_i32.pow(self.max_depth() as u32) as usize);
         self.append_to_map(&mut map, 0, 0);
         map
@@ -337,7 +342,7 @@ impl HuffmanNode<u8> {
     /// * `map`: The map to append codes to.
     /// * `code`: The code bits for this node.
     /// * `code_len`: The length of the code for this node.
-    fn append_to_map(&self, map: &mut HashMap<u8, (u8, u16)>, code: u16, code_len: u8) {
+    fn append_to_map(&self, map: &mut HuffmanCodeMap, code: u16, code_len: u8) {
         if self.content.is_some() {
             map.insert(self.content.unwrap(), (code_len, code));
         }
