@@ -2,6 +2,7 @@
 // remove this once integrating - this is to avoid exessive and useless warnings for the time being
 
 use dct::DCTMode;
+use image_data_writer::write_image_data_to_stream;
 use ppm_parser::read_ppm_from_file;
 use scoped_threadpool::Pool;
 
@@ -11,6 +12,7 @@ use crate::bit_stream::BitStream;
 mod appendable_to_bit_stream;
 mod arai;
 mod bit_stream;
+mod byte_stuffing_writer;
 mod coefficient_encoder;
 mod dct;
 mod dct_constant_calculator;
@@ -20,6 +22,7 @@ mod downsample;
 mod huffman;
 mod huffman_decoder;
 mod image;
+mod image_data_writer;
 mod jpg_writer;
 mod package_merge;
 mod parallel_dct;
@@ -33,7 +36,8 @@ mod utils;
 fn main() {
     let mut pool = Pool::new(*THREAD_COUNT as u32);
 
-    let mut image = read_ppm_from_file("test/dwsample-ppm-1920.ppm");
+    // let mut image = read_ppm_from_file("test/dwsample-ppm-1920.ppm");
+    let mut image = read_ppm_from_file("test/test_16x16_chroma.ppm");
     image.rgb_to_ycbcr();
     image.downsample(4, 2, 0);
 
@@ -53,6 +57,9 @@ fn main() {
     let y_ac = coefficient_encoder::ac_coefficients(&y_quant);
     let cb_ac = coefficient_encoder::ac_coefficients(&cb_quant);
     let cr_ac = coefficient_encoder::ac_coefficients(&cr_quant);
+    println!("{:?}", y_ac);
+    println!("{:?}", cb_ac);
+    println!("{:?}", cr_ac);
 
 
     let (y_dc_encoded, huffman_dc_y) = coefficient_encoder::encode_dc_coefficients(&y_dc);
@@ -64,6 +71,11 @@ fn main() {
     let (cbcr_ac_encoded, huffman_ac_cbcr) = coefficient_encoder::encode_two_ac_coefficients(&cb_ac, &cr_ac);
     let cb_ac_encoded = &cbcr_ac_encoded[0..cbcr_ac_encoded.len() / 2];
     let cr_ac_encoded = &cbcr_ac_encoded[(cbcr_ac_encoded.len() / 2)..cbcr_ac_encoded.len()];
+    println!("{:?}", y_ac_encoded);
+    println!("{:?}", huffman_ac_y);
+    println!("{:?}", cb_ac_encoded);
+    println!("{:?}", cr_ac_encoded);
+    println!("{:?}", huffman_ac_cbcr);
 
 
     let mut target_stream = BitStream::open();
@@ -77,11 +89,13 @@ fn main() {
     
     jpg_writer::write_dht_segment(&mut target_stream, 2, &huffman_ac_y, true);
     jpg_writer::write_dht_segment(&mut target_stream, 3, &huffman_ac_cbcr, true);
-    // jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOS);
+    jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOS);
 
-    // TODO: Image data
+    write_image_data_to_stream(&mut target_stream, &y_dc_encoded, cb_dc_encoded, cr_dc_encoded, &y_ac_encoded, cb_ac_encoded, cr_ac_encoded, image.width());
 
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::EOI);
+
+    target_stream.pad_last_byte(true);
 
     target_stream.flush_to_file("output.jpg");
 }
