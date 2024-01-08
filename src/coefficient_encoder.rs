@@ -1,4 +1,4 @@
-use std::{collections::HashMap, vec};
+use std::collections::HashMap;
 
 const CATEGORY_OFFSET: [i32; 15] = [
     0b1,
@@ -41,36 +41,6 @@ pub fn encode_dc_coefficients(
     categorize_and_encode_diffs(&diffs)
 }
 
-pub fn encode_ac_coefficients(
-    ac_coefficients: &Vec<Vec<i32>>,
-) -> (Vec<Vec<((u8, u16), u16)>>, HashMap<u8, (u8, u16)>) {
-    let mut runlength_encoded: Vec<Vec<(u8, u16)>> = ac_coefficients
-        .iter()
-        .map(|coeff| runlength_encode_single_ac_table(coeff))
-        .collect();
-    huffman_encode_ac_coefficients(&runlength_encoded)
-}
-
-/// Encode two sets of AC coefficients.
-/// Coefficients are first replaced by the zero runlength encoding and categorization,
-/// then the sets are combined and huffman encoded.
-/// Returns both the now encoded values (first the ones from ac_coefficients_1, then ac_coefficients_2)
-pub fn encode_two_ac_coefficients(
-    ac_coefficients_1: &Vec<Vec<i32>>,
-    ac_coefficients_2: &Vec<Vec<i32>>,
-) -> (Vec<Vec<((u8, u16), u16)>>, HashMap<u8, (u8, u16)>) {
-    let mut runlength_encoded_1: Vec<Vec<(u8, u16)>> = ac_coefficients_1
-        .iter()
-        .map(|coeff| runlength_encode_single_ac_table(coeff))
-        .collect();
-    let mut runlength_encoded_2: Vec<Vec<(u8, u16)>> = ac_coefficients_2
-        .iter()
-        .map(|coeff| runlength_encode_single_ac_table(coeff))
-        .collect();
-    runlength_encoded_1.append(&mut runlength_encoded_2);
-    huffman_encode_ac_coefficients(&runlength_encoded_1)
-}
-
 /// Encode two sets of DC coefficients.
 /// Coefficients are first replaced by the difference between
 /// them and the previous coefficient,
@@ -86,6 +56,41 @@ pub fn encode_two_dc_coefficients(
     diffs.append(&mut coefficients_to_diffs(dc_coefficients_2));
 
     categorize_and_encode_diffs(&diffs)
+}
+
+/// Encode a set of AC coefficients.
+/// Coefficients are first replaced by the zero runlength encoding and categorization,
+/// then huffman encoded.
+/// Returns both the now encoded values and the resulting huffman code map.
+pub fn encode_ac_coefficients(
+    ac_coefficients: &Vec<Vec<i32>>,
+) -> (Vec<Vec<((u8, u16), u16)>>, HashMap<u8, (u8, u16)>) {
+    let runlength_encoded: Vec<Vec<(u8, u16)>> = ac_coefficients
+        .iter()
+        .map(|coeff| runlength_encode_single_ac_table(coeff))
+        .collect();
+    huffman_encode_ac_coefficients(&runlength_encoded)
+}
+
+/// Encode two sets of AC coefficients.
+/// Coefficients are first replaced by the zero runlength encoding and categorization,
+/// then the sets are combined and huffman encoded.
+/// Returns both the now encoded values (first the ones from ac_coefficients_1, then ac_coefficients_2)
+/// and the resulting huffman code map.
+pub fn encode_two_ac_coefficients(
+    ac_coefficients_1: &Vec<Vec<i32>>,
+    ac_coefficients_2: &Vec<Vec<i32>>,
+) -> (Vec<Vec<((u8, u16), u16)>>, HashMap<u8, (u8, u16)>) {
+    let mut runlength_encoded_1: Vec<Vec<(u8, u16)>> = ac_coefficients_1
+        .iter()
+        .map(|coeff| runlength_encode_single_ac_table(coeff))
+        .collect();
+    let mut runlength_encoded_2: Vec<Vec<(u8, u16)>> = ac_coefficients_2
+        .iter()
+        .map(|coeff| runlength_encode_single_ac_table(coeff))
+        .collect();
+    runlength_encoded_1.append(&mut runlength_encoded_2);
+    huffman_encode_ac_coefficients(&runlength_encoded_1)
 }
 
 /// Get the differences between adjacent coefficients.
