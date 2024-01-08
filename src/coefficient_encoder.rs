@@ -51,23 +51,24 @@ pub fn encode_ac_coefficients(
     huffman_encode_ac_coefficients(&runlength_encoded)
 }
 
-fn huffman_encode_ac_coefficients(
-    runlength_encoded: &Vec<Vec<(u8, u16)>>,
+/// Encode two sets of AC coefficients.
+/// Coefficients are first replaced by the zero runlength encoding and categorization,
+/// then the sets are combined and huffman encoded.
+/// Returns both the now encoded values (first the ones from ac_coefficients_1, then ac_coefficients_2)
+pub fn encode_two_ac_coefficients(
+    ac_coefficients_1: &Vec<Vec<i32>>,
+    ac_coefficients_2: &Vec<Vec<i32>>,
 ) -> (Vec<Vec<((u8, u16), u16)>>, HashMap<u8, (u8, u16)>) {
-    let mut categories = crate::BitStream::open();
-    runlength_encoded.iter().for_each(|table| table.iter().for_each(|val| categories.append(val.0)));
-    let category_code = crate::huffman::parse_u8_stream(&mut categories).code_map();
-    let mut huffman_encoded: Vec<Vec<((u8, u16), u16)>> = Vec::with_capacity(runlength_encoded.len());
-    for table in runlength_encoded{
-        let new_table: Vec<((u8, u16), u16)> = table.iter()
-        .map(|cat| (*category_code.get(&cat.0).unwrap(), cat.1))
+    let mut runlength_encoded_1: Vec<Vec<(u8, u16)>> = ac_coefficients_1
+        .iter()
+        .map(|coeff| runlength_encode_single_ac_table(coeff))
         .collect();
-        huffman_encoded.push(new_table);
-    }
-    (
-    huffman_encoded,
-       category_code
-    )
+    let mut runlength_encoded_2: Vec<Vec<(u8, u16)>> = ac_coefficients_2
+        .iter()
+        .map(|coeff| runlength_encode_single_ac_table(coeff))
+        .collect();
+    runlength_encoded_1.append(&mut runlength_encoded_2);
+    huffman_encode_ac_coefficients(&runlength_encoded_1)
 }
 
 /// Encode two sets of DC coefficients.
@@ -98,6 +99,29 @@ fn coefficients_to_diffs(coefficients: &Vec<i32>) -> Vec<i32> {
     diffs
 }
 
+
+/// Categorize the given coefficient differences, then huffman
+/// encode the categories and return the encoded differences as well as the
+/// huffman code map.
+fn categorize_and_encode_diffs(
+    diffs: &Vec<i32>,
+) -> (Vec<((u8, u16), u16)>, HashMap<u8, (u8, u16)>) {
+    let categorized: Vec<(u8, u16)> = diffs.iter().map(|diff| categorize(*diff)).collect();
+
+    let mut categories = crate::BitStream::open();
+    categories.append(categorized.iter().map(|cat| cat.0).collect::<Vec<u8>>());
+    let category_code = crate::huffman::parse_u8_stream(&mut categories).code_map();
+
+    (
+        categorized
+            .iter()
+            .map(|cat| (*category_code.get(&cat.0).unwrap(), cat.1))
+            .collect(),
+        category_code,
+    )
+}
+
+
 ///Run-length encode AC coefficients
 fn runlength_encode_single_ac_table(table: &Vec<i32>) -> Vec<(u8, u16)> {
     let mut new_table: Vec<(u8, u16)> = Vec::with_capacity(63);
@@ -120,24 +144,26 @@ fn runlength_encode_single_ac_table(table: &Vec<i32>) -> Vec<(u8, u16)> {
     new_table
 }
 
-/// Categorize the given coefficient differences, then huffman
-/// encode the categories and return the encoded differences as well as the
-/// huffman code map.
-fn categorize_and_encode_diffs(
-    diffs: &Vec<i32>,
-) -> (Vec<((u8, u16), u16)>, HashMap<u8, (u8, u16)>) {
-    let categorized: Vec<(u8, u16)> = diffs.iter().map(|diff| categorize(*diff)).collect();
 
+/// Create BitStream with all the chunk's categories, then huffman
+/// encode the categories and return the resulting chunks with the zeros/category replaced with
+/// huffman code as well as the huffman code map.
+fn huffman_encode_ac_coefficients(
+    runlength_encoded: &Vec<Vec<(u8, u16)>>,
+) -> (Vec<Vec<((u8, u16), u16)>>, HashMap<u8, (u8, u16)>) {
     let mut categories = crate::BitStream::open();
-    categories.append(categorized.iter().map(|cat| cat.0).collect::<Vec<u8>>());
+    runlength_encoded.iter().for_each(|table| table.iter().for_each(|val| categories.append(val.0)));
     let category_code = crate::huffman::parse_u8_stream(&mut categories).code_map();
-
+    let mut huffman_encoded: Vec<Vec<((u8, u16), u16)>> = Vec::with_capacity(runlength_encoded.len());
+    for table in runlength_encoded{
+        let new_table: Vec<((u8, u16), u16)> = table.iter()
+        .map(|cat| (*category_code.get(&cat.0).unwrap(), cat.1))
+        .collect();
+        huffman_encoded.push(new_table);
+    }
     (
-        categorized
-            .iter()
-            .map(|cat| (*category_code.get(&cat.0).unwrap(), cat.1))
-            .collect(),
-        category_code,
+    huffman_encoded,
+       category_code
     )
 }
 

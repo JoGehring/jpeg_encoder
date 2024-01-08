@@ -60,8 +60,9 @@ fn main() {
     let cr_dc_encoded = &cbcr_dc_encoded[(cbcr_dc_encoded.len() / 2)..cbcr_dc_encoded.len()];
 
     let (y_ac_encoded, huffman_ac_y) = coefficient_encoder::encode_ac_coefficients(&y_ac);
-    let (cb_ac_encoded, huffman_ac_cb) = coefficient_encoder::encode_ac_coefficients(&cb_ac);
-    let (cr_ac_encoded, huffman_ac_cr) = coefficient_encoder::encode_ac_coefficients(&cr_ac);
+    let (cbcr_ac_encoded, huffman_ac_cbcr) = coefficient_encoder::encode_two_ac_coefficients(&cb_ac, &cr_ac);
+    let cb_ac_encoded = &cbcr_ac_encoded[0..cbcr_ac_encoded.len() / 2];
+    let cr_ac_encoded = &cbcr_ac_encoded[(cbcr_ac_encoded.len() / 2)..cbcr_ac_encoded.len()];
 
 
     // TODO: AC coefficients & encoding them
@@ -76,8 +77,8 @@ fn main() {
     jpg_writer::write_dht_segment(&mut target_stream, 0, &huffman_dc_y, false);
     jpg_writer::write_dht_segment(&mut target_stream, 1, &huffman_dc_cbcr, false);
     
-    jpg_writer::write_dht_segment(&mut target_stream, 2, &huffman_ac_cb, true);
-    jpg_writer::write_dht_segment(&mut target_stream, 3, &huffman_ac_cr, true);
+    jpg_writer::write_dht_segment(&mut target_stream, 2, &huffman_ac_y, true);
+    jpg_writer::write_dht_segment(&mut target_stream, 3, &huffman_ac_cbcr, true);
     // TODO: DHT
     // TODO: SOS
     // TODO: Image data
