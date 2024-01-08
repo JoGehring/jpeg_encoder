@@ -49,10 +49,20 @@ fn main() {
     let cb_dc = coefficient_encoder::dc_coefficients(&cb_quant);
     let cr_dc = coefficient_encoder::dc_coefficients(&cr_quant);
 
+    let y_ac = coefficient_encoder::ac_coefficients(&y_quant);
+    let cb_ac = coefficient_encoder::ac_coefficients(&cb_quant);
+    let cr_ac = coefficient_encoder::ac_coefficients(&cr_quant);
+
+
     let (y_dc_encoded, huffman_dc_y) = coefficient_encoder::encode_dc_coefficients(&y_dc);
     let (cbcr_dc_encoded, huffman_dc_cbcr) = coefficient_encoder::encode_two_dc_coefficients(&cb_dc, &cr_dc);
     let cb_dc_encoded = &cbcr_dc_encoded[0..cbcr_dc_encoded.len() / 2];
     let cr_dc_encoded = &cbcr_dc_encoded[(cbcr_dc_encoded.len() / 2)..cbcr_dc_encoded.len()];
+
+    let (y_ac_encoded, huffman_ac_y) = coefficient_encoder::encode_ac_coefficients(&y_ac);
+    let (cb_ac_encoded, huffman_ac_cb) = coefficient_encoder::encode_ac_coefficients(&cb_ac);
+    let (cr_ac_encoded, huffman_ac_cr) = coefficient_encoder::encode_ac_coefficients(&cr_ac);
+
 
     // TODO: AC coefficients & encoding them
     // TODO: Huffman
@@ -65,6 +75,9 @@ fn main() {
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOF0);
     jpg_writer::write_dht_segment(&mut target_stream, 0, &huffman_dc_y, false);
     jpg_writer::write_dht_segment(&mut target_stream, 1, &huffman_dc_cbcr, false);
+    
+    jpg_writer::write_dht_segment(&mut target_stream, 2, &huffman_ac_cb, true);
+    jpg_writer::write_dht_segment(&mut target_stream, 3, &huffman_ac_cr, true);
     // TODO: DHT
     // TODO: SOS
     // TODO: Image data

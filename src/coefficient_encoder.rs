@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, vec};
 
 const CATEGORY_OFFSET: [i32; 15] = [
     0b1,
@@ -41,6 +41,35 @@ pub fn encode_dc_coefficients(
     categorize_and_encode_diffs(&diffs)
 }
 
+pub fn encode_ac_coefficients(
+    ac_coefficients: &Vec<Vec<i32>>,
+) -> (Vec<Vec<((u8, u16), u16)>>, HashMap<u8, (u8, u16)>) {
+    let mut runlength_encoded: Vec<Vec<(u8, u16)>> = ac_coefficients
+        .iter()
+        .map(|coeff| runlength_encode_single_ac_table(coeff))
+        .collect();
+    huffman_encode_ac_coefficients(&runlength_encoded)
+}
+
+fn huffman_encode_ac_coefficients(
+    runlength_encoded: &Vec<Vec<(u8, u16)>>,
+) -> (Vec<Vec<((u8, u16), u16)>>, HashMap<u8, (u8, u16)>) {
+    let mut categories = crate::BitStream::open();
+    runlength_encoded.iter().for_each(|table| table.iter().for_each(|val| categories.append(val.0)));
+    let category_code = crate::huffman::parse_u8_stream(&mut categories).code_map();
+    let mut huffman_encoded: Vec<Vec<((u8, u16), u16)>> = Vec::with_capacity(runlength_encoded.len());
+    for table in runlength_encoded{
+        let new_table: Vec<((u8, u16), u16)> = table.iter()
+        .map(|cat| (*category_code.get(&cat.0).unwrap(), cat.1))
+        .collect();
+        huffman_encoded.push(new_table);
+    }
+    (
+    huffman_encoded,
+       category_code
+    )
+}
+
 /// Encode two sets of DC coefficients.
 /// Coefficients are first replaced by the difference between
 /// them and the previous coefficient,
@@ -67,6 +96,28 @@ fn coefficients_to_diffs(coefficients: &Vec<i32>) -> Vec<i32> {
         prev = *coeff;
     }
     diffs
+}
+
+///Run-length encode AC coefficients
+fn runlength_encode_single_ac_table(table: &Vec<i32>) -> Vec<(u8, u16)> {
+    let mut new_table: Vec<(u8, u16)> = Vec::with_capacity(63);
+    let mut counter: u8 = 0;
+    for (index, coefficient) in table.iter().enumerate() {
+        if *coefficient != 0 {
+            let (cat, code) = categorize(*coefficient);
+            for _ in 0..counter / 16 {
+                new_table.push((0xF0, 0u16));
+            }
+            let zeros_cat = ((counter % 16) << 4) + cat;
+            new_table.push((zeros_cat, code));
+            counter = 0;
+        } else if index == 62 {
+            new_table.push((0, 0));
+        } else {
+            counter += 1;
+        }
+    }
+    new_table
 }
 
 /// Categorize the given coefficient differences, then huffman
@@ -110,6 +161,8 @@ pub fn categorize(value: i32) -> (u8, u16) {
 
 #[cfg(test)]
 mod tests {
+    use crate::coefficient_encoder::runlength_encode_single_ac_table;
+
     use super::{ac_coefficients, categorize, coefficients_to_diffs, dc_coefficients};
 
     #[test]
@@ -184,5 +237,48 @@ mod tests {
         assert_eq!((12, 942), anywhere_neg);
         let anywhere_pos = categorize(3153);
         assert_eq!((12, 3153), anywhere_pos);
+    }
+
+    #[test]
+    fn test_runlength_encode_slides() {
+        let coefficients = vec![
+            57, 45, 0, 0, 0, 0, 23, 0, -30, -16, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0,
+        ];
+        assert_eq!(63, coefficients.len());
+        let expected = vec![
+            (0x06, 57),
+            (0x06, 45),
+            (0x45, 23),
+            (0x15, 1),
+            (0x05, 15),
+            (0x21, 1),
+            (0, 0),
+        ];
+        let runlength_encoded = runlength_encode_single_ac_table(&coefficients);
+        assert_eq!(expected, runlength_encoded);
+    }
+
+    #[test]
+    fn test_runlength_encode_slides_many_zeros() {
+        let coefficients = vec![
+            57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 2, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            895, 0, 0, 0, 0,
+        ];
+        assert_eq!(63, coefficients.len());
+        let expected = vec![
+            (0x06, 57),
+            (0xF0, 0),
+            (0x22, 3),
+            (0x42, 2),
+            (0xF0, 0),
+            (0xF0, 0),
+            (0x1A, 895),
+            (0, 0),
+        ];
+        let runlength_encoded = runlength_encode_single_ac_table(&coefficients);
+        assert_eq!(expected, runlength_encoded);
     }
 }
