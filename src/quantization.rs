@@ -27,6 +27,19 @@ pub fn linear_q_table(global_factor: f32, growth_factor: f32) -> SMatrix<f32, 8,
     matrix
 }
 
+/// Create a quantization table with increasingly higher values in "boxes".
+/// Each value gets assigned the global_factor first.
+/// Then the matrix is split up into square submatrices of size box_size and
+/// each box is applied box_growth n times, with n being the box' x/y position.
+/// (so 0 for the top left, 1 for the box below that, 2 for the box to the right of that)
+pub fn box_q_table(global_factor: f32, box_size: usize, box_growth: f32) -> SMatrix<f32, 8, 8> {
+    SMatrix::from_fn(|x, y| {
+        let mut fac = global_factor;
+        fac += (x / box_size + y / box_size) as f32 * box_growth;
+        1.0 / fac
+    })
+}
+
 /// Quantize the given matrix by multiplying it component-wise with
 /// the quantization table with format 1/x. The condition in the map only
 /// applies to exact 0.5 values, e.g. in test_quatization_from_slides, value 25.0 and
