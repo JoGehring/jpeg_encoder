@@ -169,15 +169,15 @@ fn write_sos_segment(stream: &mut BitStream) {
     stream.append::<u16>(12);
     // number of components, we always do coloured so 3
     stream.append::<u8>(3);
-    // Y component - we use DHT 0 for its AC/DC
+    // Y component - we use DC DHT 0, AC DHT 2
     stream.append::<u8>(1);
-    stream.append::<u8>(0);
-    // Cb component - we use DHT 1 for its AC/DC
+    stream.append::<u8>(0b0000_0010);
+    // Cb component - we use DC DHT 1, AC DHT 3
     stream.append::<u8>(2);
-    stream.append::<u8>(0b0001_0001);
-    // Cr component - we use DHT 1 for its AC/DC
+    stream.append::<u8>(0b0001_0011);
+    // Cr component - we use DC DHT 1, AC DHT 3
     stream.append::<u8>(3);
-    stream.append::<u8>(0b0001_0001);
+    stream.append::<u8>(0b0001_0011);
     // unused info for spectral/predictor selection
     // irrelevant for us because we don't do lossless, just write defaults
     stream.append::<u8>(0x00);
@@ -329,7 +329,7 @@ mod tests {
     fn test_write_sos_segment() {
         let mut stream = BitStream::open();
         write_sos_segment(&mut stream);
-        let expected_data: Vec<u8> = vec![0x00, 0x0c, 0x03, 0x01, 0x00, 0x02, 0b0001_0001, 0x03, 0b0001_0001, 0x00, 0x3f, 0x00];
+        let expected_data: Vec<u8> = vec![0x00, 0x0c, 0x03, 0x01, 0b0000_0010, 0x02, 0b0001_0011, 0x03, 0b0001_0011, 0x00, 0x3f, 0x00];
         assert_eq!(&expected_data, stream.data());
     }
 
