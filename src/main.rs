@@ -39,8 +39,8 @@ fn main() {
 
     let (mut y_dct, mut cb_dct, mut cr_dct) = parallel_dct::dct(&image, &DCTMode::Arai, &mut pool);
 
-    let luminance_q_table = quantization::linear_q_table(1f32);
-    let chrominance_q_table = quantization::linear_q_table(2f32);
+    let luminance_q_table = quantization::linear_q_table(1f32, 0.5f32);
+    let chrominance_q_table = quantization::linear_q_table(1f32, 0.5f32);
 
     let y_quant = parallel_quantize::quantize_zigzag(&mut y_dct, luminance_q_table, &mut pool);
     let cb_quant = parallel_quantize::quantize_zigzag(&mut cb_dct, chrominance_q_table, &mut pool);

@@ -12,12 +12,15 @@ pub fn uniform_q_table(factor: f32) -> SMatrix<f32, 8, 8> {
 
 /// Create a quantization matrix that linearly gets higher values towards the bottom right,
 /// in the format 1/x.
-pub fn linear_q_table(factor: f32) -> SMatrix<f32, 8, 8> {
-    let mut matrix = uniform_q_table(factor);
+/// All values have global_factor applied to them, then with each step towards the bottom or right
+/// growth_factor is added another time
+/// (so 1 time for the top left, 2 times for the cell below that, 3 times for the cell to the right of that)
+pub fn linear_q_table(global_factor: f32, growth_factor: f32) -> SMatrix<f32, 8, 8> {
+    let mut matrix = uniform_q_table(global_factor);
 
     for i in 0..8 {
         for j in 0..8 {
-            matrix[(i, j)] /= (i+1) as f32 * (j+1) as f32 * factor;
+            matrix[(i, j)] /= (i+1) as f32 * (j+1) as f32 * growth_factor;
         }
     }
 
