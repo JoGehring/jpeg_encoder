@@ -3,11 +3,25 @@ use core::f32;
 use nalgebra::SMatrix;
 
 
-/// Create an uniform quantization matrix from factor x in format 1/x
+/// Create a uniform quantization matrix from factor x in format 1/x
 /// # Arguments
 /// * `factor`: The quantization factor
 pub fn uniform_q_table(factor: f32) -> SMatrix<f32, 8, 8> {
     SMatrix::from_element(1.0 / factor)
+}
+
+/// Create a quantization matrix that linearly gets higher values towards the bottom right,
+/// in the format 1/x.
+pub fn linear_q_table(factor: f32) -> SMatrix<f32, 8, 8> {
+    let mut matrix = uniform_q_table(factor);
+
+    for i in 0..8 {
+        for j in 0..8 {
+            matrix[(i, j)] /= (i+1) as f32 * (j+1) as f32 * factor;
+        }
+    }
+
+    matrix
 }
 
 /// Quantize the given matrix by multiplying it component-wise with

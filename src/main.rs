@@ -38,9 +38,10 @@ fn main() {
     image.downsample(4, 2, 0);
 
     let (mut y_dct, mut cb_dct, mut cr_dct) = parallel_dct::dct(&image, &DCTMode::Arai, &mut pool);
-    // TODO: different q_tables? Using ones that have higher quantization to the lower right of the matrix would be more efficient
-    let luminance_q_table = quantization::uniform_q_table(1f32);
-    let chrominance_q_table = quantization::uniform_q_table(2f32);
+
+    let luminance_q_table = quantization::linear_q_table(1f32);
+    let chrominance_q_table = quantization::linear_q_table(2f32);
+
     let y_quant = parallel_quantize::quantize_zigzag(&mut y_dct, luminance_q_table, &mut pool);
     let cb_quant = parallel_quantize::quantize_zigzag(&mut cb_dct, chrominance_q_table, &mut pool);
     let cr_quant = parallel_quantize::quantize_zigzag(&mut cr_dct, chrominance_q_table, &mut pool);
@@ -76,7 +77,7 @@ fn main() {
     
     jpg_writer::write_dht_segment(&mut target_stream, 2, &huffman_ac_y, true);
     jpg_writer::write_dht_segment(&mut target_stream, 3, &huffman_ac_cbcr, true);
-    jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOS);
+    // jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOS);
 
     // TODO: Image data
 
