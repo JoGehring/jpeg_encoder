@@ -12,7 +12,6 @@ use crate::bit_stream::BitStream;
 mod appendable_to_bit_stream;
 mod arai;
 mod bit_stream;
-mod byte_stuffing_writer;
 mod coefficient_encoder;
 mod dct;
 mod dct_constant_calculator;
@@ -91,7 +90,9 @@ fn main() {
     jpg_writer::write_dht_segment(&mut target_stream, 3, &huffman_ac_cbcr, true);
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOS);
 
+    target_stream.byte_stuffing(true);
     write_image_data_to_stream(&mut target_stream, &y_dc_encoded, cb_dc_encoded, cr_dc_encoded, &y_ac_encoded, cb_ac_encoded, cr_ac_encoded, image.width());
+    target_stream.byte_stuffing(false);
 
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::EOI);
 

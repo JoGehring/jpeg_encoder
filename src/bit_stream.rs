@@ -7,6 +7,7 @@ pub struct BitStream {
     data: Vec<u8>,
     bits_in_last_byte: u8,
     bits_read_from_first_byte: u8,
+    byte_stuffing: bool,
 }
 
 /// Pad the first passed-in `value´ with the given `pad`, so th
@@ -50,6 +51,7 @@ impl BitStream {
             data,
             bits_in_last_byte: 0,
             bits_read_from_first_byte: 0,
+            byte_stuffing: false,
         }
     }
 
@@ -205,6 +207,13 @@ impl BitStream {
         last_byte += value;
         self.data[index] = last_byte;
         self.bits_in_last_byte += bits_to_occupy;
+
+        if self.byte_stuffing
+            && ((self.bits_in_last_byte == 8 || self.bits_in_last_byte == 0)
+                && *(self.data.last().unwrap()) == 0xFF)
+        {
+            self.data.push(0x00);
+        }
     }
 
     /// Flush the bit stream to a file.
@@ -426,6 +435,11 @@ impl BitStream {
         }
     }
 
+    /// Activate/Deactivate byte stuffing
+    pub fn byte_stuffing(&mut self, byte_stuffing: bool) {
+        self.byte_stuffing = byte_stuffing;
+    }
+
     pub fn data(&self) -> &Vec<u8> {
         &self.data
     }
@@ -440,12 +454,14 @@ impl Default for BitStream {
             data: Vec::with_capacity(4096),
             bits_in_last_byte: 0,
             bits_read_from_first_byte: 0,
+            byte_stuffing: false,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    // TODO: byte stuffing tests
     use std::fs;
 
     use rand::Rng;
@@ -542,6 +558,7 @@ mod tests {
             data: vec![0b10101010, 0b01010101],
             bits_in_last_byte: 0,
             bits_read_from_first_byte: 0,
+            byte_stuffing: false,
         };
         let filename = "test.bin";
         stream.flush_to_file(filename);
@@ -651,6 +668,7 @@ mod tests {
             data: vec![1, 2, 3, 4, 5, 6, 7, 8],
             bits_in_last_byte: 0,
             bits_read_from_first_byte: 0,
+            byte_stuffing: false,
         };
         let filename = "test/binary_stream_test_file.bin";
 
