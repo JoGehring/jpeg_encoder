@@ -36,7 +36,7 @@ fn main() {
     let mut pool = Pool::new(*THREAD_COUNT as u32);
 
     // let mut image = read_ppm_from_file("test/dwsample-ppm-1920.ppm");
-    let mut image = read_ppm_from_file("test/test_16x16_chroma.ppm");
+    let mut image = read_ppm_from_file("test/test_16x16_red.ppm");
     image.rgb_to_ycbcr();
     image.downsample(4, 2, 0);
 
