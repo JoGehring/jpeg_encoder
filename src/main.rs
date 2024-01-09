@@ -49,17 +49,16 @@ fn main() {
     let cb_quant = parallel_quantize::quantize_zigzag(&mut cb_dct, chrominance_q_table, &mut pool);
     let cr_quant = parallel_quantize::quantize_zigzag(&mut cr_dct, chrominance_q_table, &mut pool);
 
-    let y_dc = coefficient_encoder::dc_coefficients(&y_quant);
+    let mut y_dc = coefficient_encoder::dc_coefficients(&y_quant);
     let cb_dc = coefficient_encoder::dc_coefficients(&cb_quant);
     let cr_dc = coefficient_encoder::dc_coefficients(&cr_quant);
 
-    let y_ac = coefficient_encoder::ac_coefficients(&y_quant);
+    let mut y_ac = coefficient_encoder::ac_coefficients(&y_quant);
     let cb_ac = coefficient_encoder::ac_coefficients(&cb_quant);
     let cr_ac = coefficient_encoder::ac_coefficients(&cr_quant);
-    println!("{:?}", y_ac);
-    println!("{:?}", cb_ac);
-    println!("{:?}", cr_ac);
 
+    coefficient_encoder::reorder_y_coefficients(&mut y_dc, image.width());
+    coefficient_encoder::reorder_y_coefficients(&mut y_ac, image.width());
 
     let (y_dc_encoded, huffman_dc_y) = coefficient_encoder::encode_dc_coefficients(&y_dc);
     let (cbcr_dc_encoded, huffman_dc_cbcr) = coefficient_encoder::encode_two_dc_coefficients(&cb_dc, &cr_dc);
@@ -91,7 +90,7 @@ fn main() {
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOS);
 
     target_stream.byte_stuffing(true);
-    write_image_data_to_stream(&mut target_stream, &y_dc_encoded, cb_dc_encoded, cr_dc_encoded, &y_ac_encoded, cb_ac_encoded, cr_ac_encoded, image.width());
+    write_image_data_to_stream(&mut target_stream, &y_dc_encoded, cb_dc_encoded, cr_dc_encoded, &y_ac_encoded, cb_ac_encoded, cr_ac_encoded);
     target_stream.byte_stuffing(false);
 
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::EOI);

@@ -27,8 +27,15 @@ pub fn dc_coefficients(values: &Vec<[i32; 64]>) -> Vec<i32> {
 }
 
 /// Get the AC coefficients from the given values.
-pub fn ac_coefficients(values: &Vec<[i32; 64]>) -> Vec<Vec<i32>> {
-    values.iter().map(|val| (&val[1..64]).to_owned()).collect()
+pub fn ac_coefficients(values: &Vec<[i32; 64]>) -> Vec<[i32; 63]> {
+    values
+        .iter()
+        .map(|val| {
+            let mut res = [1; 63];
+            res[0..63].clone_from_slice(&val[1..64]);
+            res
+        })
+        .collect()
 }
 
 /// Encode a set of DC coefficients.
@@ -66,7 +73,7 @@ pub fn encode_two_dc_coefficients(
 /// then huffman encoded.
 /// Returns both the now encoded values and the resulting huffman code map.
 pub fn encode_ac_coefficients(
-    ac_coefficients: &Vec<Vec<i32>>,
+    ac_coefficients: &Vec<[i32; 63]>,
 ) -> (Vec<Vec<(HuffmanCode, CategoryCode)>>, HuffmanCodeMap) {
     let runlength_encoded: Vec<Vec<(u8, CategoryCode)>> = ac_coefficients
         .iter()
@@ -81,8 +88,8 @@ pub fn encode_ac_coefficients(
 /// Returns both the now encoded values (first the ones from ac_coefficients_1, then ac_coefficients_2)
 /// and the resulting huffman code map.
 pub fn encode_two_ac_coefficients(
-    ac_coefficients_1: &Vec<Vec<i32>>,
-    ac_coefficients_2: &Vec<Vec<i32>>,
+    ac_coefficients_1: &Vec<[i32; 63]>,
+    ac_coefficients_2: &Vec<[i32; 63]>,
 ) -> (Vec<Vec<(HuffmanCode, CategoryCode)>>, HuffmanCodeMap) {
     let mut runlength_encoded_1: Vec<Vec<(u8, CategoryCode)>> = ac_coefficients_1
         .iter()
@@ -129,7 +136,7 @@ fn categorize_and_encode_diffs(
 }
 
 ///Run-length encode AC coefficients.
-fn runlength_encode_single_ac_table(table: &Vec<i32>) -> Vec<(u8, CategoryCode)> {
+fn runlength_encode_single_ac_table(table: &[i32]) -> Vec<(u8, CategoryCode)> {
     let mut new_table: Vec<(u8, CategoryCode)> = Vec::with_capacity(63);
     let mut counter: u8 = 0;
     for (index, coefficient) in table.iter().enumerate() {
@@ -194,11 +201,57 @@ pub fn categorize(value: i32) -> CategoryCode {
     }
 }
 
+/// Re-order the Y coefficients to match the order they will be processed and printed out in.
+/// Y coefficients are printed out in 2x2 blocks, going from left to right, then top to
+/// bottom.
+/// To achieve this, the coefficients are sorted by four criteria:
+/// 1. The 2-row block they're in (so first rows 0-1, then rows 2-3, then 4-5, ...)
+/// 2. The 2-column block they're in (so the first two values per row first, then the next two, ...)
+/// From this sorting alone, coefficients are already sorted by the 2x2 blocks - the first four values are
+/// the first block, the four values after that the second block, ...
+/// So the second set of criteria is sorting within this block:
+/// 3. The row the coefficients are in
+/// 4. The column the coefficients are in
+/// After the sorting, the values used for those sort criteria are taken out again.
+pub fn reorder_y_coefficients<T: Copy>(coefficients: &mut Vec<T>, width: u16) {
+    let blocks_per_row = width as usize / 8;
+    let blocks_per_two_rows = blocks_per_row * 2;
+    let mut vec = coefficients
+        .iter()
+        .enumerate()
+        .map(|(idx, value)| {
+            (
+                value,
+                idx / blocks_per_two_rows,  // first sort: 2-row-blocks
+                (idx % blocks_per_row) / 2, // second sort: 2-column-blocks. Now we have each 2x2 block and just need to order within the blocks
+                idx / blocks_per_row,       // third sort: rows
+                idx,                        // fourth sort: columns
+            )
+        })
+        .collect::<Vec<(&T, usize, usize, usize, usize)>>();
+
+    vec.sort_by(|a, b| {
+        // order by the sorting criteria from above
+        if a.1 != b.1 {
+            a.1.cmp(&b.1)
+        } else if a.2 != b.2 {
+            a.2.cmp(&b.2)
+        } else if a.3 != b.3 {
+            a.3.cmp(&b.3)
+        } else {
+            a.4.cmp(&b.4)
+        }
+    });
+
+    // kinda inefficient copy here, but will work for now
+    *coefficients = vec.iter().map(|input| *input.0).collect();
+}
+
 #[cfg(test)]
 mod tests {
     use crate::coefficient_encoder::runlength_encode_single_ac_table;
 
-    use super::{ac_coefficients, categorize, coefficients_to_diffs, dc_coefficients};
+    use super::{ac_coefficients, categorize, coefficients_to_diffs, dc_coefficients, reorder_y_coefficients};
 
     #[test]
     fn test_get_dc_coefficients() {
@@ -315,5 +368,14 @@ mod tests {
         ];
         let runlength_encoded = runlength_encode_single_ac_table(&coefficients);
         assert_eq!(expected, runlength_encoded);
+    }
+
+    #[test]
+    fn test_reorder_y_coefficients() {
+        let width = 32;
+        let mut actual = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+        reorder_y_coefficients(&mut actual, width);
+        let expected = vec![1, 2, 5, 6, 3, 4, 7, 8, 9, 10, 13, 14, 11, 12, 15, 16];
+        assert_eq!(expected, actual);
     }
 }
