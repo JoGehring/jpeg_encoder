@@ -669,10 +669,10 @@ mod tests {
 
         // code lengths should be 3 for 1, 3 for 2, 3 for 3, 3 for 4, 3 for 5, 2 for 6
         let mut correct_code_len = 3 * 4 + // 4 1s with code length 3
-            4 * 4 + // 4 2s with code length 3, longer than optimal because of remove_only_ones_code()
+            4 * 4 + // 4 2s with code length 3, longer than optimal because of only ones code removal 
             3 * 6 + // 6 3s with code length 3
-            3 * 6 + // 6 4s with code length 4
-            2 * 7 + // 7 5s with code length 2
+            3 * 6 + // 6 4s with code length 3
+            3 * 7 + // 7 5s with code length 3
             2 * 9; // 9 6s with code length 2
         correct_code_len = (correct_code_len as f32 / 8 as f32).ceil() as usize;
         assert_eq!(correct_code_len, code.data().len());
