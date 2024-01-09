@@ -149,6 +149,9 @@ impl BitStream {
     /// * Not implemented for Vecs or bools because not sensible
     /// * Amount bigger than bits in value
     pub fn append_n_bits<T: AppendableToBitStream>(&mut self, value: T, amount: u8) {
+        if amount == 0 {
+            return;
+        }
         value.append_n_bits(self, amount);
     }
 
@@ -173,6 +176,7 @@ impl BitStream {
         for _ in 0..amount {
             self.append_bit(value);
         }
+        self.bits_in_last_byte = 8;
     }
 
     /// Shift the provided value to the correct position, then store it in the last byte.

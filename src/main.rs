@@ -93,9 +93,9 @@ fn main() {
     write_image_data_to_stream(&mut target_stream, &y_dc_encoded, cb_dc_encoded, cr_dc_encoded, &y_ac_encoded, cb_ac_encoded, cr_ac_encoded);
     target_stream.byte_stuffing(false);
 
-    jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::EOI);
-
     target_stream.pad_last_byte(true);
+
+    jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::EOI);
 
     target_stream.flush_to_file("output.jpg");
 }
