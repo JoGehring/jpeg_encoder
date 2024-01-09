@@ -3,7 +3,10 @@ use std::{collections::HashMap, fmt, mem};
 
 use debug_tree::{add_branch, add_leaf, defer_print};
 
-use crate::{bit_stream::BitStream, package_merge::package_merge};
+use crate::{
+    bit_stream::BitStream,
+    package_merge::{package_merge, package_merge_experimental},
+};
 
 /// A huffman-encoded value, containing both the code length and code.
 pub type HuffmanCode = (u8, u16);
@@ -38,6 +41,25 @@ impl<T: PartialEq> HuffmanNode<T> {
 /// * stream: The stream of data to read.
 pub fn encode(stream: &mut BitStream) -> (BitStream, HuffmanCodeMap) {
     let code_map = parse_u8_stream(stream).code_map();
+    let mut result = BitStream::open();
+
+    for byte in stream.data() {
+        let (len, code) = code_map.get(byte).unwrap();
+        result.append_n_bits(*code, *len);
+    }
+
+    (result, code_map)
+}
+
+/// Parse a stream of values, create a huffman tree and encode the values.
+/// Returns the stream of encoded data and the map used for encoding. Uses
+/// package_merge_experimental instead of parse_u8_stream
+///
+/// # Arguments
+///
+/// * stream: The stream of data to read.
+pub fn encode_exp(stream: &mut BitStream) -> (BitStream, HuffmanCodeMap) {
+    let code_map = package_merge_experimental(stream, 16);
     let mut result = BitStream::open();
 
     for byte in stream.data() {
@@ -506,7 +528,7 @@ mod tests {
 
     use crate::{bit_stream::BitStream, huffman::increment_or_append};
 
-    use super::{encode, parse_u8_stream, HuffmanNode};
+    use super::{encode, encode_exp, parse_u8_stream, HuffmanNode};
 
     // TODO: tests zumindest für remove_only_ones_code, code_len_to_tree, has_space_at_depth
     // TODO: tests für parse_u8_stream() müssen auch nach rechtswachsendheit prüfen!
@@ -591,6 +613,59 @@ mod tests {
         }
 
         let (code, map) = encode(&mut stream);
+
+        // code lengths should be 3 for 1, 3 for 2, 3 for 3, 3 for 4, 3 for 5, 2 for 6
+        let mut correct_code_len = 3 * 4 + // 4 1s with code length 3
+            4 * 4 + // 4 2s with code length 3, longer than optimal because of remove_only_ones_code()
+            3 * 6 + // 6 3s with code length 3
+            3 * 6 + // 6 4s with code length 4
+            2 * 7 + // 7 5s with code length 2
+            2 * 9; // 9 6s with code length 2
+        correct_code_len = (correct_code_len as f32 / 8 as f32).ceil() as usize;
+        assert_eq!(correct_code_len, code.data().len());
+
+        let shortest_code_len = map
+            .clone()
+            .into_iter()
+            .min_by_key(|(_, value)| value.0)
+            .unwrap()
+            .1
+             .0;
+        assert_eq!(shortest_code_len, map.get(&6u8).unwrap().0)
+    }
+
+    #[test]
+    fn test_encode_exp_example() {
+        let mut stream = BitStream::open();
+        stream.append_byte(1);
+        stream.append_byte(1);
+        stream.append_byte(2);
+        stream.append_byte(2);
+        stream.append_byte(3);
+        stream.append_byte(3);
+        stream.append_byte(4);
+        stream.append_byte(4);
+        stream.append_byte(5);
+        stream.append_byte(5);
+        stream.append_byte(6);
+        stream.append_byte(6);
+
+        for _ in 0..7 {
+            stream.append_byte(6);
+        }
+        for _ in 0..4 {
+            stream.append_byte(3);
+            stream.append_byte(4);
+        }
+        for _ in 0..2 {
+            stream.append_byte(1);
+            stream.append_byte(2);
+        }
+        for _ in 0..5 {
+            stream.append_byte(5);
+        }
+
+        let (code, map) = encode_exp(&mut stream);
 
         // code lengths should be 3 for 1, 3 for 2, 3 for 3, 3 for 4, 3 for 5, 2 for 6
         let mut correct_code_len = 3 * 4 + // 4 1s with code length 3

@@ -36,7 +36,9 @@ fn main() {
     let mut pool = Pool::new(*THREAD_COUNT as u32);
 
     // let mut image = read_ppm_from_file("test/dwsample-ppm-1920.ppm");
+    // let mut image = read_ppm_from_file("test/dwsample-ppm-4k.ppm");
     let mut image = read_ppm_from_file("test/test_16x16_red.ppm");
+
     image.rgb_to_ycbcr();
     image.downsample(4, 2, 0);
 
@@ -69,11 +71,11 @@ fn main() {
     let (cbcr_ac_encoded, huffman_ac_cbcr) = coefficient_encoder::encode_two_ac_coefficients(&cb_ac, &cr_ac);
     let cb_ac_encoded = &cbcr_ac_encoded[0..cbcr_ac_encoded.len() / 2];
     let cr_ac_encoded = &cbcr_ac_encoded[(cbcr_ac_encoded.len() / 2)..cbcr_ac_encoded.len()];
-    println!("{:?}", y_ac_encoded);
-    println!("{:?}", huffman_ac_y);
-    println!("{:?}", cb_ac_encoded);
-    println!("{:?}", cr_ac_encoded);
-    println!("{:?}", huffman_ac_cbcr);
+    // println!("{:?}", y_ac_encoded);
+    // println!("{:?}", huffman_ac_y);
+    // println!("{:?}", cb_ac_encoded);
+    // println!("{:?}", cr_ac_encoded);
+    // println!("{:?}", huffman_ac_cbcr);
 
 
     let mut target_stream = BitStream::open();

@@ -181,15 +181,13 @@ fn nodes_to_code(nodes: &Vec<HuffmanNode<u8>>, map: &mut HuffmanCodeMap, height:
         }
         // update the map
         map.insert(*val, (code_length, current_code));
-        println!(
-            "value: {}, current code:{:08b}, code length: {}",
-            *val, current_code, code_length
-        );
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::{bit_stream::BitStream, huffman::HuffmanNode};
     use crate::huffman::HuffmanCode;
 
@@ -342,7 +340,7 @@ mod tests {
 
     #[test]
     #[ignore]
-    fn test_experimental() {
+    fn test_experimental_bigger_stream() {
         let mut stream = BitStream::open();
         for _ in 0..2 {
             stream.append_byte(1);
@@ -437,4 +435,39 @@ mod tests {
         // 27 is the most likely symbol so it should have the shortest code
         assert_eq!(expected, test);
     }
+
+    #[test]
+    #[should_panic]
+    fn test_package_merge_experimental_too_many_symbols() {
+        let mut stream = BitStream::open();
+        stream.append_byte(1);
+        stream.append_byte(2);
+        stream.append_byte(3);
+        stream.append_byte(4);
+        stream.append_byte(5);
+        stream.append_byte(6);
+        stream.append_byte(7);
+        stream.append_byte(8);
+        stream.append_byte(9);
+        let _ = package_merge_experimental(&mut stream, 3);
+    }
+    #[test]
+    #[should_panic]
+    fn test_package_merge_experimental_empty_stream() {
+        let mut stream = BitStream::open();
+        let _ = package_merge_experimental(&mut stream, 16);
+    }
+
+    #[test]
+    fn test_package_merge_experimental_single_symbol() {
+        let mut stream = BitStream::open();
+        stream.append_byte(1);
+        stream.append_byte(1);
+        stream.append_byte(1);
+        let map = package_merge_experimental(&mut stream, 16);
+        let mut expected: HashMap<u8, (u8, u16)> = HashMap::new();
+        expected.insert(1, (1, 0));
+        assert_eq!(expected, map);
+    } 
+
 }
