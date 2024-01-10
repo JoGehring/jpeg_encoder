@@ -1,9 +1,10 @@
-use lazy_static::lazy_static;
-use nalgebra::SMatrix;
-use regex::Regex;
 use std::fs::File;
 use std::io::{Error, Write};
 use std::usize;
+
+use lazy_static::lazy_static;
+use nalgebra::SMatrix;
+use regex::Regex;
 
 lazy_static! {
     /// This regex checks correct paths given to the to_ppm function

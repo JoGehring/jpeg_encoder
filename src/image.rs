@@ -38,6 +38,7 @@ const TRANSFORM_RGB_YCBCR_MATRIX: Matrix3<f32> = Matrix3::new(
 
 const RGB_TO_YCBCR_OFFSET: Vector3<f32> = Vector3::new(0.0, 127.0, 127.0);
 const RGB_HALF_OFFSET: Vector3<f32> = Vector3::new(127.0, 127.0, 127.0);
+
 /// Convert an RGB value to a YCbCr value.
 ///
 /// # Arguments
@@ -439,7 +440,7 @@ mod tests {
                     vec![255, 0, 0, 0],
                 ],
                 channel2: vec![vec![0, 0], vec![127, 0], vec![0, 127], vec![0, 0]],
-                channel3: vec![vec![0, 127], vec![59, 0], vec![0, 59], vec![127, 0],],
+                channel3: vec![vec![0, 127], vec![59, 0], vec![0, 59], vec![127, 0]],
                 y_downsample_factor: 1,
                 cb_downsample_factor: 2,
                 cr_downsample_factor: 2,

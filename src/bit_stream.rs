@@ -214,7 +214,7 @@ impl BitStream {
 
         if self.byte_stuffing
             && ((self.bits_in_last_byte == 8 || self.bits_in_last_byte == 0)
-                && *(self.data.last().unwrap()) == 0xFF)
+            && *(self.data.last().unwrap()) == 0xFF)
         {
             self.data.push(0x00);
         }

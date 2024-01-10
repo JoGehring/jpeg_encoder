@@ -1,6 +1,7 @@
-use nalgebra::SMatrix;
 use std::sync::mpsc::{self, Receiver};
 use std::thread::{self, JoinHandle};
+
+use nalgebra::SMatrix;
 
 use crate::dct::inverse_dct;
 use crate::utils::THREAD_COUNT;
@@ -96,11 +97,13 @@ fn join_and_receive_threads_for_channel(
 
 #[cfg(test)]
 mod tests {
-    use crate::ppm_parser::read_ppm_from_file;
     use approx::assert_abs_diff_eq;
     use nalgebra::SMatrix;
 
+    use crate::ppm_parser::read_ppm_from_file;
+
     use super::idct;
+
     #[test]
     fn test_idct_parallel_simple_image() {
         let image = read_ppm_from_file("test/valid_test_8x8.ppm");

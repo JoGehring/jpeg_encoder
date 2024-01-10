@@ -18,7 +18,7 @@ pub fn downsample_channel(
     b: usize,
     downsample_vertical: bool,
 ) -> Vec<Vec<i16>> {
-    let len = if downsample_vertical { channel.len() / 2 } else {channel.len()};
+    let len = if downsample_vertical { channel.len() / 2 } else { channel.len() };
     let mut final_channel: Vec<Vec<i16>> = Vec::with_capacity(len);
     for y in (0..channel.len()).step_by(2) {
         let lower_row = if y + 1 < channel.len() {
@@ -164,7 +164,7 @@ fn downsample_segment_of_row(row_segment: &[i16], a: usize, b: usize) -> Vec<i16
 /// assert_eq!(vec![50, 25], value);
 /// ```
 fn downsample_vec_by_two(original_vec: &Vec<i16>) -> Vec<i16> {
-    let mut new_vec: Vec<i16> = Vec::with_capacity(original_vec.len()/2);
+    let mut new_vec: Vec<i16> = Vec::with_capacity(original_vec.len() / 2);
     for i in 0..(original_vec.len() / 2 + original_vec.len() % 2) {
         let key = if 2 * i + 1 < original_vec.len() {
             2 * i + 1
@@ -194,7 +194,7 @@ fn downsample_vec_by_two(original_vec: &Vec<i16>) -> Vec<i16> {
 /// let result = overflow_safe_avg(65535, 65533);
 /// assert_eq!(65534, result);
 /// ```
-fn overflow_safe_avg(value1: i16, value2: i16) -> i16{
+fn overflow_safe_avg(value1: i16, value2: i16) -> i16 {
     let carry = i16::from(value1 % 2 == 1 && (value2 % 2 == 1));
     let value = value1 / 2 + value2 / 2;
     carry + value

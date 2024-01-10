@@ -59,12 +59,12 @@ impl Vector8 for RowSVector<f32, 8> {
 }
 
 impl Vector8
-    for Matrix<
-        f32,
-        Const<1>,
-        Const<8>,
-        ViewStorageMut<'_, f32, Const<1>, Const<8>, Const<1>, Const<8>>,
-    >
+for Matrix<
+    f32,
+    Const<1>,
+    Const<8>,
+    ViewStorageMut<'_, f32, Const<1>, Const<8>, Const<1>, Const<8>>,
+>
 {
     #[inline(always)]
     fn at(&self, index: usize) -> f32 {
@@ -85,12 +85,12 @@ impl Vector8
 }
 
 impl Vector8
-    for Matrix<
-        f32,
-        Const<8>,
-        Const<1>,
-        ViewStorageMut<'_, f32, Const<8>, Const<1>, Const<1>, Const<8>>,
-    >
+for Matrix<
+    f32,
+    Const<8>,
+    Const<1>,
+    ViewStorageMut<'_, f32, Const<8>, Const<1>, Const<1>, Const<8>>,
+>
 {
     #[inline(always)]
     fn at(&self, index: usize) -> f32 {
@@ -299,6 +299,7 @@ mod tests {
 
         assert_eq!(expected, values_vec);
     }
+
     #[test]
     fn test_first_additions() {
         let values_vector: Vec<f32> = vec![47.0, 18.0, 13.0, 16.0, 41.0, 90.0, 47.0, 27.0];

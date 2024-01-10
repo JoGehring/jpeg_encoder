@@ -1,14 +1,15 @@
 #![allow(dead_code)]
 // remove this once integrating - this is to avoid exessive and useless warnings for the time being
 
+use scoped_threadpool::Pool;
+
 use dct::DCTMode;
 use image_data_writer::write_image_data_to_stream;
 use ppm_parser::read_ppm_from_file;
-use scoped_threadpool::Pool;
-
-use crate::utils::THREAD_COUNT;
 
 use crate::bit_stream::BitStream;
+use crate::utils::THREAD_COUNT;
+
 mod appendable_to_bit_stream;
 mod arai;
 mod bit_stream;
@@ -86,7 +87,7 @@ fn main() {
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOF0);
     jpg_writer::write_dht_segment(&mut target_stream, 0, &huffman_dc_y, false);
     jpg_writer::write_dht_segment(&mut target_stream, 1, &huffman_dc_cbcr, false);
-    
+
     jpg_writer::write_dht_segment(&mut target_stream, 2, &huffman_ac_y, true);
     jpg_writer::write_dht_segment(&mut target_stream, 3, &huffman_ac_cbcr, true);
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOS);

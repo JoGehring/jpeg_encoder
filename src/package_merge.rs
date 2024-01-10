@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::bit_stream::BitStream;
-use crate::huffman::{code_len_to_tree, get_single_leaves, HuffmanNode, HuffmanCodeMap};
+use crate::huffman::{code_len_to_tree, get_single_leaves, HuffmanCodeMap, HuffmanNode};
 
 pub fn package_merge(stream: &mut BitStream, height: u16) -> HuffmanNode<u8> {
     let mut nodes = get_single_leaves(stream);
@@ -317,7 +317,7 @@ mod tests {
             .min_by_key(|(_, value)| value.0)
             .unwrap()
             .1
-             .0;
+            .0;
         // 27 is the most likely symbol so it should have the shortest code
         assert_eq!(shortest_code_len, map.get(&27u8).unwrap().0)
     }
@@ -451,6 +451,7 @@ mod tests {
         stream.append_byte(9);
         let _ = package_merge_experimental(&mut stream, 3);
     }
+
     #[test]
     #[should_panic]
     fn test_package_merge_experimental_empty_stream() {
@@ -468,6 +469,5 @@ mod tests {
         let mut expected: HashMap<u8, (u8, u16)> = HashMap::new();
         expected.insert(1, (1, 0));
         assert_eq!(expected, map);
-    } 
-
+    }
 }

@@ -2,9 +2,9 @@ use modinverse::egcd;
 use nalgebra::SMatrix;
 
 use crate::bit_stream::BitStream;
+use crate::huffman::{HuffmanCode, HuffmanCodeMap};
 use crate::image::Image;
 use crate::quantization;
-use crate::huffman::{HuffmanCode, HuffmanCodeMap};
 
 /// Enum describing the different types of segments in a JPG file.
 pub enum SegmentType {
@@ -64,7 +64,7 @@ fn write_app0_segment(stream: &mut BitStream, image: &Image) {
     stream.append::<u16>(16);
     // string "JFIF": 0x4a 0x46 0x49 0x46 0x00
     stream.append::<Vec<u8>>(vec![0x4a, 0x46, 0x49, 0x46, 0x00]); // TODO: use array rather than vec
-                                                                  // revision number 1.1: 0x01 0x01
+    // revision number 1.1: 0x01 0x01
     stream.append::<u16>(0x0101);
     // of pixel size (0 => no unit, aspect ratio instead)
     stream.append::<u8>(0);
@@ -197,7 +197,7 @@ pub fn write_dht_segment(
     stream.append(dht_info_byte);
 
     for i in 1..17 {
-        let amount: u8 = code_map.iter().filter(|val| val.1 .0 == i).count() as u8;
+        let amount: u8 = code_map.iter().filter(|val| val.1.0 == i).count() as u8;
         stream.append(amount);
     }
     let mut code_vec: Vec<(&u8, &HuffmanCode)> = code_map.iter().collect();
@@ -229,8 +229,8 @@ mod tests {
     use crate::bit_stream::BitStream;
     use crate::huffman::encode;
     use crate::jpg_writer::{
-        write_app0_segment, write_dht_segment, write_marker_for_segment, write_segment_to_stream,
-        write_sof0_segment, write_sof0_segment_component, SegmentType,
+        SegmentType, write_app0_segment, write_dht_segment, write_marker_for_segment,
+        write_segment_to_stream, write_sof0_segment, write_sof0_segment_component,
     };
     use crate::ppm_parser::read_ppm_from_file;
     use crate::quantization;

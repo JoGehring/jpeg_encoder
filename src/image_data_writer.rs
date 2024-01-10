@@ -50,8 +50,8 @@ fn write_dc(
     index: usize,
 ) {
     let dc = &dc_encoded[index];
-    stream.append_n_bits(dc.0 .1, dc.0 .0);
-    stream.append_n_bits(dc.1 .1, dc.1 .0);
+    stream.append_n_bits(dc.0.1, dc.0.0);
+    stream.append_n_bits(dc.1.1, dc.1.0);
 }
 
 fn write_ac(
@@ -61,7 +61,7 @@ fn write_ac(
 ) {
     let ac = &ac_encoded[index];
     for value in ac {
-        stream.append_n_bits(value.0 .1, value.0 .0);
-        stream.append_n_bits(value.1 .1, value.1 .0);
+        stream.append_n_bits(value.0.1, value.0.0);
+        stream.append_n_bits(value.1.1, value.1.0);
     }
 }

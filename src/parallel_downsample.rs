@@ -74,7 +74,7 @@ fn downsample_internal(channel: &Vec<Vec<i16>>, a: usize, b: usize, downsample_v
 mod tests {
     use crate::parallel_downsample::downsample_channel;
 
-    // #[test]
+// #[test]
     // fn test_downsample_parallel_simple_image() {
     //     let image = read_ppm_from_file("test/valid_test_8x8.ppm");
     //     downsample_channel(image.channel1(), 4, 2, false);

@@ -3,7 +3,7 @@ use std::slice::ChunksMut;
 use nalgebra::SMatrix;
 use scoped_threadpool::Pool;
 
-use crate::dct::{arai_dct, direct_dct, matrix_dct, DCTMode};
+use crate::dct::{arai_dct, DCTMode, direct_dct, matrix_dct};
 use crate::image::Image;
 use crate::utils::THREAD_COUNT;
 
@@ -47,9 +47,9 @@ pub fn dct_single_channel(
     pool: &mut Pool,
 ) -> Vec<SMatrix<f32, 8, 8>> {
     let function = match mode {
-        DCTMode::Direct => crate::dct::direct_dct,
-        DCTMode::Matrix => crate::dct::matrix_dct,
-        DCTMode::Arai => crate::dct::arai_dct,
+        DCTMode::Direct => direct_dct,
+        DCTMode::Matrix => matrix_dct,
+        DCTMode::Arai => arai_dct,
     };
     let mut y_matrices = image.single_channel_to_matrices::<1>();
 
@@ -100,13 +100,15 @@ fn dct_channel(
 
 #[cfg(test)]
 mod tests {
+    use std::thread::available_parallelism;
+
     use approx::assert_abs_diff_eq;
     use nalgebra::SMatrix;
     use scoped_threadpool::Pool;
-    use std::thread::available_parallelism;
+
+    use crate::ppm_parser::read_ppm_from_file;
 
     use super::dct;
-    use crate::ppm_parser::read_ppm_from_file;
 
     fn get_pool() -> Pool {
         let thread_count = available_parallelism().unwrap().get();

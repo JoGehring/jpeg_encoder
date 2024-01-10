@@ -35,9 +35,10 @@ pub fn quantize_zigzag(
 
 #[cfg(test)]
 mod tests {
+    use std::thread::available_parallelism;
+
     use nalgebra::SMatrix;
     use scoped_threadpool::Pool;
-    use std::thread::available_parallelism;
 
     use crate::parallel_quantize::quantize_zigzag;
 

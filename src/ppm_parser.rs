@@ -132,7 +132,7 @@ fn parse_file_to_string(filename: &str) -> String {
 /// # Panics
 ///
 /// * If the value cannot be parsed into a float.
-fn unwrap_and_scale(value: &str, scaling_factor: f32) -> i16{
+fn unwrap_and_scale(value: &str, scaling_factor: f32) -> i16 {
     (value.parse::<f32>().unwrap() * scaling_factor) as i16
 }
 

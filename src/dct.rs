@@ -50,7 +50,7 @@ pub fn direct_dct(input: &mut SMatrix<f32, 8, 8>) {
 /// with O(n^3) complexity. Returns a 8x8 i32 matrix.
 /// # Arguments
 /// * `input`: The matrix to perform the DCT on.
-pub fn matrix_dct(input: &mut SMatrix<f32, 8, 8>){ 
+pub fn matrix_dct(input: &mut SMatrix<f32, 8, 8>) {
     MATRIX_A_MATRIX.mul(*input).mul_to(&MATRIX_A_MATRIX_TRANS, input);
 }
 

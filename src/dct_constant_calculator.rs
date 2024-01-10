@@ -1,10 +1,11 @@
-use lazy_static::lazy_static;
-use nalgebra::SMatrix;
-use std::io::Write;
 use std::{
     f32::consts::{PI, SQRT_2},
     fs::File,
 };
+use std::io::Write;
+
+use lazy_static::lazy_static;
+use nalgebra::SMatrix;
 
 const SQRT_2_DIV_2: f32 = SQRT_2 / 2f32;
 const MATRIX_C0: f32 = 1.0 / SQRT_2;
@@ -96,8 +97,7 @@ fn write_float_matrix(file: &mut File, name: &str, matrix: &SMatrix<f32, 8, 8>) 
             column[6],
             column[7],
             append
-        )
-        .unwrap();
+        ).unwrap();
     }
     writeln!(file, "]));").unwrap();
 }
@@ -107,8 +107,8 @@ fn write_direct_lut(file: &mut File) {
     writeln!(
         file,
         "pub const DIRECT_LOOKUP_TABLE: [[[[f32; 8]; 8]; 8]; 8] = ["
-    )
-    .unwrap();
+    ).unwrap();
+
     for row in lut {
         writeln!(file, "[").unwrap();
         for row2 in row {
