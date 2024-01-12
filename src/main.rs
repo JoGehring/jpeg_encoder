@@ -34,11 +34,13 @@ mod quantization;
 mod utils;
 
 fn main() {
-    let mut pool = Pool::new(*THREAD_COUNT as u32);
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() == 1 {
+        panic!("No file name specified!");
+    }
+    let mut image = read_ppm_from_file(&args[1]);
 
-    // let mut image = read_ppm_from_file("test/dwsample-ppm-1920.ppm");
-    // let mut image = read_ppm_from_file("test/dwsample-ppm-4k.ppm");
-    let mut image = read_ppm_from_file("test/test_16x16_red.ppm");
+    let mut pool = Pool::new(*THREAD_COUNT as u32);
 
     image.rgb_to_ycbcr();
     image.downsample(4, 2, 0);
