@@ -14,7 +14,7 @@ use crate::utils::THREAD_COUNT;
 /// # Arguments
 /// * `image`: The image to calculate the DCT for.
 pub fn dct(
-    image: &Image,
+    image: &mut Image,
     mode: &DCTMode, // perhaps make this a generic? does that help at compile time?
     pool: &mut Pool,
 ) -> (
@@ -119,9 +119,9 @@ mod tests {
     fn test_dct_parallel_simple_image() {
         let mut pool = get_pool();
 
-        let image = read_ppm_from_file("test/valid_test_8x8.ppm");
+        let mut image = read_ppm_from_file("test/valid_test_8x8.ppm");
 
-        let (y, cb, cr) = dct(&image, &crate::dct::DCTMode::Arai, &mut pool);
+        let (y, cb, cr) = dct(&mut image, &crate::dct::DCTMode::Arai, &mut pool);
 
         let y_expected_vec: Vec<f32> = vec![
             255.0, 0.0, 0.0, 0.0, 255.0, 0.0, 0.0, 0.0, // row 1
