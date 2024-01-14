@@ -20,7 +20,7 @@ pub fn quantize_zigzag(
         for chunk in chunks {
             s.execute(move || {
                 for matrix in chunk {
-                    crate::quantization::quantize(matrix, &q_table);
+                    quantization::quantize(matrix, &q_table);
                 }
             });
         }

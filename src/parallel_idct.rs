@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn test_idct_parallel_simple_image() {
-        let image = read_ppm_from_file("test/valid_test_8x8.ppm");
+        let mut image = read_ppm_from_file("test/valid_test_8x8.ppm");
         let (y_expected, cb_expected, cr_expected) = image.to_matrices();
 
         let y_dct_vec: Vec<f32> = vec![

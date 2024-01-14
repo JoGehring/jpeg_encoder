@@ -1,6 +1,6 @@
 extern crate nalgebra as na;
 
-use std::sync::mpsc::{self, Receiver};
+use std::sync::mpsc::{self, channel, Receiver};
 use std::thread::{self, JoinHandle};
 
 use na::{Matrix3, SMatrix, Vector3};
@@ -192,6 +192,31 @@ fn append_matrix_at_coordinates_to_channel_matrix(
     result_vec.push(SMatrix::<i16, 8, 8>::from_row_iterator(iter_vector).cast::<f32>());
 }
 
+fn pad_channel(channel: &mut Vec<Vec<i16>>, factor: usize) {
+    let previous_len = channel.len();
+    let outer_remainder = previous_len % factor;
+
+    if outer_remainder != 0 {
+        let missing_pixels = factor - outer_remainder;
+        for _ in 0..missing_pixels {
+            channel.push(channel[previous_len - 1].clone())
+        }
+    }
+
+    let inner_remainder = channel[0].len() % factor;
+    if inner_remainder != 0 {
+        let missing_pixels = factor - inner_remainder;
+        let desired_length = channel[0].len() + missing_pixels;
+
+        for inner_channel in channel {
+            let last_pxl_val = inner_channel.last().unwrap().clone();
+            while inner_channel.len() != desired_length {
+                inner_channel.push(last_pxl_val);
+            }
+        }
+    }
+}
+
 impl Image {
     /// Get the pixel at the x/y coordinates, with a bounds check.
     /// If it is outside the bounds, return the border pixel instead.
@@ -332,27 +357,41 @@ impl Image {
     /// # Panics
     /// * If the image's height or width cannot be divided by 8.
     pub fn to_matrices(
-        &self,
+        &mut self,
     ) -> (
         Vec<SMatrix<f32, 8, 8>>,
         Vec<SMatrix<f32, 8, 8>>,
         Vec<SMatrix<f32, 8, 8>>,
     ) {
-        if self.channel1.len() % 8 != 0
-            || (self.channel1[0].len()) % 8 != 0
-            || self.channel2.len() % 8 != 0
-            || self.channel2[0].len() % 8 != 0
-            || self.channel3.len() % 8 != 0
-            || self.channel3[0].len() % 8 != 0
-        {
-            panic!("attempted to convert image to matrices, but image dimensions are not divisible by 8 for at least one channel!");
-        }
+        self.pad_image_if_necessary();
 
         (
             channel_to_matrices(&self.channel1),
             channel_to_matrices(&self.channel2),
             channel_to_matrices(&self.channel3),
         )
+    }
+
+    fn pad_image_if_necessary(&mut self) {
+        let y_factor : usize;
+        let cb_factor : usize;
+        let cr_factor : usize;
+
+        if self.cr_downsample_factor == 2 && self.cb_downsample_factor == 2 {
+            y_factor = 16;
+            cb_factor = 8;
+            cr_factor = 8;
+        } else if self.cr_downsample_factor == 1 && self.cb_downsample_factor == 1 {
+            y_factor = 8;
+            cb_factor = 8;
+            cr_factor = 8;
+        } else {
+            panic!("Unsupported downsampling!")
+        }
+
+        pad_channel(&mut self.channel1, y_factor);
+        pad_channel(&mut self.channel2, cb_factor);
+        pad_channel(&mut self.channel3, cr_factor);
     }
 
     /// Get the data of this image's first channel (Y) as a vector of 8x8 matrices.
@@ -723,7 +762,7 @@ mod tests {
 
     #[test]
     fn test_to_matrices_basic() {
-        let image = read_ppm_from_file("test/valid_test_8x8.ppm");
+        let mut image = read_ppm_from_file("test/valid_test_8x8.ppm");
         let (r, g, b) = image.to_matrices();
 
         let r_expected_vec = vec![
@@ -821,6 +860,7 @@ mod tests {
 
     #[test]
     #[should_panic]
+    #[ignore]
     fn test_to_matrices_too_small_after_downsample() {
         let mut image = read_ppm_from_file("test/valid_test_8x8.ppm");
         image.rgb_to_ycbcr();
