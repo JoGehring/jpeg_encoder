@@ -81,6 +81,7 @@ fn main() {
     let mut target_stream = BitStream::open();
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOI);
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::APP0);
+    jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::COM);
     jpg_writer::write_dqt_segment(&mut target_stream, &luminance_q_table, 0);
     jpg_writer::write_dqt_segment(&mut target_stream, &chrominance_q_table, 1);
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOF0);

@@ -13,6 +13,7 @@ pub enum SegmentType {
     DQT,
     SOF0,
     DHT,
+    COM,
     SOS,
     EOI,
 }
@@ -33,6 +34,7 @@ pub fn write_segment_to_stream(stream: &mut BitStream, image: &Image, segment_ty
         SegmentType::SOI => (),
         SegmentType::APP0 => write_app0_segment(stream, image),
         SegmentType::SOF0 => write_sof0_segment(stream, image),
+        SegmentType::COM => write_com_segment(stream),
         SegmentType::SOS => write_sos_segment(stream),
         SegmentType::EOI => (),
         _ => panic!("Not implemented yet!"),
@@ -47,6 +49,7 @@ fn write_marker_for_segment(stream: &mut BitStream, segment_type: &SegmentType) 
         SegmentType::EOI => 0xffd9,
         SegmentType::DHT => 0xffc4,
         SegmentType::DQT => 0xffdb,
+        SegmentType::COM => 0xfffe,
         SegmentType::SOS => 0xffda,
     });
 }
@@ -64,7 +67,7 @@ fn write_app0_segment(stream: &mut BitStream, image: &Image) {
     stream.append::<u16>(16);
     // string "JFIF": 0x4a 0x46 0x49 0x46 0x00
     stream.append::<Vec<u8>>(vec![0x4a, 0x46, 0x49, 0x46, 0x00]); // TODO: use array rather than vec
-    // revision number 1.1: 0x01 0x01
+                                                                  // revision number 1.1: 0x01 0x01
     stream.append::<u16>(0x0101);
     // of pixel size (0 => no unit, aspect ratio instead)
     stream.append::<u8>(0);
@@ -156,6 +159,19 @@ fn write_sof0_segment_component(
     stream.append(quantise_table);
 }
 
+/// Write the COM segment.
+fn write_com_segment(stream: &mut BitStream) {
+    stream.append::<u16>(105);
+    stream.append::<Vec<u8>>(vec![
+        89, 111, 117, 32, 102, 111, 117, 110, 100, 32, 116, 104, 101, 32, 102, 105, 114, 115, 116,
+        32, 74, 80, 69, 71, 32, 101, 110, 99, 111, 100, 101, 114, 32, 116, 104, 97, 116, 32, 42,
+        100, 111, 101, 115, 110, 39, 116, 42, 32, 112, 114, 111, 109, 111, 116, 101, 32, 105, 116,
+        115, 101, 108, 102, 32, 105, 110, 32, 116, 104, 101, 32, 99, 111, 109, 109, 101, 110, 116,
+        32, 115, 101, 103, 109, 101, 110, 116, 33, 32, 67, 111, 110, 103, 114, 97, 116, 117, 108,
+        97, 116, 105, 111, 110, 115, 33,
+    ]);
+}
+
 /// Write the SOS segment of the JPG file.
 /// This denotes the start of the image data.
 ///
@@ -197,7 +213,7 @@ pub fn write_dht_segment(
     stream.append(dht_info_byte);
 
     for i in 1..17 {
-        let amount: u8 = code_map.iter().filter(|val| val.1.0 == i).count() as u8;
+        let amount: u8 = code_map.iter().filter(|val| val.1 .0 == i).count() as u8;
         stream.append(amount);
     }
     let mut code_vec: Vec<(&u8, &HuffmanCode)> = code_map.iter().collect();
@@ -229,8 +245,8 @@ mod tests {
     use crate::bit_stream::BitStream;
     use crate::huffman::encode;
     use crate::jpg_writer::{
-        SegmentType, write_app0_segment, write_dht_segment, write_marker_for_segment,
-        write_segment_to_stream, write_sof0_segment, write_sof0_segment_component,
+        write_app0_segment, write_dht_segment, write_marker_for_segment, write_segment_to_stream,
+        write_sof0_segment, write_sof0_segment_component, SegmentType,
     };
     use crate::ppm_parser::read_ppm_from_file;
     use crate::quantization;
@@ -328,7 +344,20 @@ mod tests {
     fn test_write_sos_segment() {
         let mut stream = BitStream::open();
         write_sos_segment(&mut stream);
-        let expected_data: Vec<u8> = vec![0x00, 0x0c, 0x03, 0x01, 0b0000_0010, 0x02, 0b0001_0011, 0x03, 0b0001_0011, 0x00, 0x3f, 0x00];
+        let expected_data: Vec<u8> = vec![
+            0x00,
+            0x0c,
+            0x03,
+            0x01,
+            0b0000_0010,
+            0x02,
+            0b0001_0011,
+            0x03,
+            0b0001_0011,
+            0x00,
+            0x3f,
+            0x00,
+        ];
         assert_eq!(&expected_data, stream.data());
     }
 
