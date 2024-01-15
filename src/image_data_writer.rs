@@ -1,8 +1,9 @@
-use crate::{
-    bit_stream::BitStream,
-    coefficient_encoder::CategoryCode, huffman::HuffmanCode,
-};
+use crate::{bit_stream::BitStream, coefficient_encoder::CategoryCode, huffman::HuffmanCode};
 
+/// Write the image's DC and AC coefficients to the stream.
+///
+/// This function assumes 4:2:0 downsampling and that the Y coefficients
+/// are already sorted block-wise (i.e. they can all just be written in order).
 pub fn write_image_data_to_stream(
     stream: &mut BitStream,
     y_dc_encoded: &[(HuffmanCode, CategoryCode)],
@@ -19,21 +20,12 @@ pub fn write_image_data_to_stream(
         }
         y_index += 4;
 
-        write_data_at_index(
-            stream,
-            cb_dc_encoded,
-            cb_ac_encoded,
-            cb_cr_index,
-        );
-        write_data_at_index(
-            stream,
-            cr_dc_encoded,
-            cr_ac_encoded,
-            cb_cr_index,
-        );
+        write_data_at_index(stream, cb_dc_encoded, cb_ac_encoded, cb_cr_index);
+        write_data_at_index(stream, cr_dc_encoded, cr_ac_encoded, cb_cr_index);
     }
 }
 
+/// write the DC, then the AC coefficients at this index.
 fn write_data_at_index(
     stream: &mut BitStream,
     dc_encoded: &[(HuffmanCode, CategoryCode)],
@@ -44,24 +36,20 @@ fn write_data_at_index(
     write_ac(stream, ac_encoded, index);
 }
 
-fn write_dc(
-    stream: &mut BitStream,
-    dc_encoded: &[(HuffmanCode, CategoryCode)],
-    index: usize,
-) {
+/// Write a DC coefficient - first writing the huffman code of the category,
+/// then the bit code for the categorised value.
+fn write_dc(stream: &mut BitStream, dc_encoded: &[(HuffmanCode, CategoryCode)], index: usize) {
     let dc = &dc_encoded[index];
-    stream.append_n_bits(dc.0.1, dc.0.0);
-    stream.append_n_bits(dc.1.1, dc.1.0);
+    stream.append_n_bits(dc.0 .1, dc.0 .0);
+    stream.append_n_bits(dc.1 .1, dc.1 .0);
 }
 
-fn write_ac(
-    stream: &mut BitStream,
-    ac_encoded: &[Vec<(HuffmanCode, CategoryCode)>],
-    index: usize,
-) {
+/// Write a set of AC coefficients - goiung through each and first writing the huffman code of the category,
+/// then the bit code for the categorised value.
+fn write_ac(stream: &mut BitStream, ac_encoded: &[Vec<(HuffmanCode, CategoryCode)>], index: usize) {
     let ac = &ac_encoded[index];
     for value in ac {
-        stream.append_n_bits(value.0.1, value.0.0);
-        stream.append_n_bits(value.1.1, value.1.0);
+        stream.append_n_bits(value.0 .1, value.0 .0);
+        stream.append_n_bits(value.1 .1, value.1 .0);
     }
 }

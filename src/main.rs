@@ -74,12 +74,6 @@ fn main() {
     let (cbcr_ac_encoded, huffman_ac_cbcr) = coefficient_encoder::encode_two_ac_coefficients(&cb_ac, &cr_ac);
     let cb_ac_encoded = &cbcr_ac_encoded[0..cbcr_ac_encoded.len() / 2];
     let cr_ac_encoded = &cbcr_ac_encoded[(cbcr_ac_encoded.len() / 2)..cbcr_ac_encoded.len()];
-    // println!("{:?}", y_ac_encoded);
-    // println!("{:?}", huffman_ac_y);
-    // println!("{:?}", cb_ac_encoded);
-    // println!("{:?}", cr_ac_encoded);
-    // println!("{:?}", huffman_ac_cbcr);
-
 
     let mut target_stream = BitStream::open();
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOI);

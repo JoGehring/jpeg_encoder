@@ -181,6 +181,8 @@ impl BitStream {
 
     /// Shift the provided value to the correct position, then store it in the last byte.
     /// This should be used to write data to the stream.
+    /// 
+    /// This also takes care of byte stuffing if activated.
     ///
     /// # Arguments
     ///
