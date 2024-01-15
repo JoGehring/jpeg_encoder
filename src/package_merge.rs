@@ -32,37 +32,6 @@ pub fn package_merge(stream: &mut BitStream, height: u16) -> HuffmanNode<u8> {
     code_len_to_tree(&mut nodes, &mut map)
 }
 
-//TODO: clean up
-pub fn package_merge_experimental(stream: &mut BitStream, height: u16) -> HuffmanCodeMap {
-    let mut nodes = get_single_leaves(stream);
-    if nodes.is_empty() {
-        panic!("Alarm");
-    }
-    if (nodes.len() as f64).log2().ceil() > height as f64 {
-        panic!("Package merge not possible");
-    }
-
-    nodes.sort_by_key(|node| node.chance());
-    let p = create_p(&mut nodes);
-
-    let mut lookup: HashMap<u8, (u8, u64)> = HashMap::with_capacity(p.len());
-    let mut q: Vec<Vec<Vec<(u8, u64)>>> = Vec::with_capacity((height - 1) as usize);
-    q.push(vec![]);
-
-    populate_first_q_row(&p, &mut lookup, &mut q);
-
-    calculate_further_q_rows(&mut q, height);
-
-    let l = calculate_code_lengths(q.last().unwrap(), &mut lookup, nodes.len());
-
-    let mut map = map_codes_to_code_length(&p, &l, &lookup, &mut nodes, height);
-
-    nodes.sort_by_key(|node| node.chance());
-
-    nodes_to_code(&nodes, &mut map, height);
-    map
-}
-
 #[inline(always)]
 fn create_p(nodes: &mut [HuffmanNode<u8>]) -> Vec<(u8, u64)> {
     nodes
@@ -147,51 +116,11 @@ fn map_codes_to_code_length(
     map
 }
 
-fn nodes_to_code(nodes: &Vec<HuffmanNode<u8>>, map: &mut HuffmanCodeMap, height: u16) {
-    if 2_i32.pow(height as u32) == nodes.len() as i32 {
-        panic!("Avoiding 1* not possible")
-    }
-    let mut current_code = 0;
-    let mut start = true;
-    // We iterate from shortest to longest code
-    for (i, node) in nodes.iter().rev().enumerate() {
-        let val = &node.content.unwrap();
-        let (mut code_length, _) = *map.get(val).unwrap();
-
-        let next_node_code_length: u8 = if i < nodes.len() - 1 {
-            let key = &nodes[nodes.len() - i - 2].content.unwrap();
-            map.get(key).unwrap().0
-        } else {
-            0
-        };
-        // If we're on the edge to the next code length, smooth out the transition by incrementing the
-        // current code_length and incrementing and shifting the current_code, if not 0
-        if code_length != next_node_code_length && next_node_code_length != 0 {
-            code_length += 1;
-            if !start {
-                current_code += 1;
-                current_code <<= 1;
-            }
-            start = false;
-            // If the code_length doesn't change, just increment the code
-        } else if !start {
-            current_code += 1;
-        } else {
-            start = false;
-        }
-        // update the map
-        map.insert(*val, (code_length, current_code));
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use crate::{bit_stream::BitStream, huffman::HuffmanNode};
-    use crate::huffman::HuffmanCode;
 
-    use super::{package_merge, package_merge_experimental};
+    use super::package_merge;
 
     #[test]
     fn test_package_merge_empty_stream() {
@@ -336,138 +265,5 @@ mod tests {
         stream.append_byte(8);
         stream.append_byte(9);
         let _ = package_merge(&mut stream, 3);
-    }
-
-    #[test]
-    #[ignore]
-    fn test_experimental_bigger_stream() {
-        let mut stream = BitStream::open();
-        for _ in 0..2 {
-            stream.append_byte(1);
-            stream.append_byte(2);
-        }
-        for _ in 0..3 {
-            stream.append_byte(3);
-            stream.append_byte(4);
-        }
-        for _ in 0..4 {
-            stream.append_byte(5);
-        }
-        for _ in 0..5 {
-            stream.append_byte(6);
-        }
-
-        for _ in 0..6 {
-            stream.append_byte(7);
-        }
-
-        for _ in 0..7 {
-            stream.append_byte(8);
-        }
-        for _ in 0..7 {
-            stream.append_byte(9);
-        }
-        for _ in 0..7 {
-            stream.append_byte(10);
-        }
-        for _ in 0..7 {
-            stream.append_byte(11);
-        }
-        for _ in 0..7 {
-            stream.append_byte(12);
-        }
-        for _ in 0..7 {
-            stream.append_byte(13);
-        }
-
-        for _ in 0..7 {
-            stream.append_byte(14);
-        }
-        for _ in 0..17 {
-            stream.append_byte(15);
-        }
-        for _ in 0..71 {
-            stream.append_byte(16);
-        }
-        for _ in 0..74 {
-            stream.append_byte(17);
-        }
-        for _ in 0..17 {
-            stream.append_byte(18);
-        }
-        for _ in 0..71 {
-            stream.append_byte(19);
-        }
-        for _ in 0..74 {
-            stream.append_byte(20);
-        }
-        for _ in 0..7 {
-            stream.append_byte(21);
-        }
-        for _ in 0..7 {
-            stream.append_byte(22);
-        }
-        for _ in 0..7 {
-            stream.append_byte(23);
-        }
-
-        for _ in 0..7 {
-            stream.append_byte(24);
-        }
-        for _ in 0..17 {
-            stream.append_byte(25);
-        }
-        for _ in 0..71 {
-            stream.append_byte(26);
-        }
-        for _ in 0..74 {
-            stream.append_byte(27);
-        }
-
-        let tree = package_merge(&mut stream, 5);
-        let map = tree.code_map();
-        let mut expected: Vec<(u8, HuffmanCode)> = map.into_iter().map(|(k, v)| (k, v)).collect();
-        expected.sort_by_key(|val| val.0);
-        let experimental_map = package_merge_experimental(&mut stream, 5);
-        let mut test: Vec<(u8, HuffmanCode)> =
-            experimental_map.into_iter().map(|(k, v)| (k, v)).collect();
-        test.sort_by_key(|val| val.0);
-        // 27 is the most likely symbol so it should have the shortest code
-        assert_eq!(expected, test);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_package_merge_experimental_too_many_symbols() {
-        let mut stream = BitStream::open();
-        stream.append_byte(1);
-        stream.append_byte(2);
-        stream.append_byte(3);
-        stream.append_byte(4);
-        stream.append_byte(5);
-        stream.append_byte(6);
-        stream.append_byte(7);
-        stream.append_byte(8);
-        stream.append_byte(9);
-        let _ = package_merge_experimental(&mut stream, 3);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_package_merge_experimental_empty_stream() {
-        let mut stream = BitStream::open();
-        let _ = package_merge_experimental(&mut stream, 16);
-    }
-
-    #[test]
-    fn test_package_merge_experimental_single_symbol() {
-        let mut stream = BitStream::open();
-        stream.append_byte(1);
-        stream.append_byte(1);
-        stream.append_byte(1);
-        let map = package_merge_experimental(&mut stream, 16);
-        let mut expected: HashMap<u8, (u8, u16)> = HashMap::new();
-        expected.insert(1, (1, 0));
-        assert_eq!(expected, map);
     }
 }

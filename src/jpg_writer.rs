@@ -227,7 +227,6 @@ pub fn write_dqt_segment(stream: &mut BitStream, q_table: &SMatrix<f32, 8, 8>, n
 #[cfg(test)]
 mod tests {
     use crate::bit_stream::BitStream;
-    use crate::huffman::encode;
     use crate::jpg_writer::{
         SegmentType, write_app0_segment, write_dht_segment, write_marker_for_segment,
         write_segment_to_stream, write_sof0_segment, write_sof0_segment_component,
@@ -452,7 +451,7 @@ mod tests {
             symbol_stream.append_byte(27);
         }
 
-        let (_, code_map) = encode(&mut symbol_stream);
+        let code_map = crate::huffman::parse_u8_stream(&mut symbol_stream).code_map();
         let mut stream = BitStream::open();
         write_dht_segment(&mut stream, 0, &code_map, false);
         let data: Vec<u8> = vec![

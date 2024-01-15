@@ -6,7 +6,6 @@ use std::thread::{self, JoinHandle};
 use na::{Matrix3, SMatrix, Vector3};
 
 use crate::downsample::downsample_channel;
-use crate::parallel_downsample;
 use crate::utils::THREAD_COUNT;
 
 /// Image data structure for parsed image files
@@ -217,42 +216,6 @@ fn pad_channel(channel: &mut Vec<Vec<i16>>, factor: usize) {
 }
 
 impl Image {
-    /// Get the pixel at the x/y coordinates, with a bounds check.
-    /// If it is outside the bounds, return the border pixel instead.
-    ///
-    /// # Arguments
-    ///
-    /// * `self`: This image
-    /// * `x`: The x coordinate of the pixel.
-    /// * `y`: The y coordinate of the pixel.
-    ///
-    /// # Examples
-    /// ```
-    /// let image = read_ppm_from_file("../path/to/image.ppm");
-    /// println!('{}', image.pixel_at(4, 19));
-    /// ```
-    pub fn pixel_at(&self, x: u16, y: u16) -> (i16, i16, i16) {
-        let mut actual_y = std::cmp::max(y, 0) as usize;
-        actual_y = std::cmp::min(actual_y, self.channel1.len() - 1);
-        let actual_y_downsampled = if self.downsampled_vertically {
-            actual_y / 2
-        } else {
-            actual_y
-        };
-
-        let mut actual_x = std::cmp::max(x, 0) as usize;
-        actual_x = std::cmp::min(actual_x, self.channel1[actual_y].len() - 1);
-        let actual_x_1 = actual_x / self.y_downsample_factor;
-        let actual_x_2 = actual_x / self.cb_downsample_factor;
-        let actual_x_3 = actual_x / self.cr_downsample_factor;
-
-        (
-            self.channel1[actual_y][actual_x_1],
-            self.channel2[actual_y_downsampled][actual_x_2],
-            self.channel3[actual_y_downsampled][actual_x_3],
-        )
-    }
-
     /// Convert this image from RGB to YCbCr color space.
     ///
     /// # Arguments
@@ -330,26 +293,6 @@ impl Image {
         self.downsampled_vertically |= c == 0;
     }
 
-    pub fn downsample_parallel(&mut self, a: usize, b: usize, c: usize) {
-        if a == b && a == c && b == c {
-            return;
-        }
-        let product = (a * b * c) as isize;
-        if (product & (product - 1)) != 0 {
-            panic!("One of the values is not in power of two");
-        }
-        let result_cb = parallel_downsample::downsample_channel(&self.channel2, a, b, c == 0);
-        let cr_b = if c == 0 { b } else { c };
-        let result_cr = parallel_downsample::downsample_channel(&self.channel3, a, cr_b, c == 0);
-
-        self.channel2 = result_cb;
-        self.channel3 = result_cr;
-
-        self.cb_downsample_factor *= a / b;
-        self.cr_downsample_factor *= a / cr_b;
-        self.downsampled_vertically |= c == 0;
-    }
-
     /// Get this image's data as vectors of 8x8 matrices for each of the three channels.
     /// The matrices are ordered top to bottom, then in each row left to right.
     ///
@@ -393,32 +336,6 @@ impl Image {
         pad_channel(&mut self.channel3, cr_factor);
     }
 
-    /// Get the data of this image's first channel (Y) as a vector of 8x8 matrices.
-    /// The matrices are ordered top to bottom, then in each row left to right.
-    ///
-    /// # Panics
-    /// * If the image's height or width cannot be divided by 8.
-    pub fn single_channel_to_matrices<const C: usize>(&self) -> Vec<SMatrix<f32, 8, 8>> {
-        if self.channel1.len() % 8 != 0 || (self.channel1[0].len()) % 8 != 0 {
-            panic!("attempted to convert image to matrices, but image dimensions are not divisible by 8 for at least one channel!");
-        }
-        let channel = match C {
-            2 => &self.channel2,
-            3 => &self.channel3,
-            _ => &self.channel1,
-        };
-        channel_to_matrices(channel)
-    }
-
-    pub fn channel1(&self) -> &Vec<Vec<i16>> {
-        &self.channel1
-    }
-    pub fn channel2(&self) -> &Vec<Vec<i16>> {
-        &self.channel2
-    }
-    pub fn channel3(&self) -> &Vec<Vec<i16>> {
-        &self.channel3
-    }
     pub fn height(&self) -> u16 {
         self.height
     }
@@ -546,74 +463,6 @@ mod tests {
             },
             read_image
         );
-    }
-
-    #[test]
-    fn test_pixel_at_in_bounds() {
-        let read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
-        let pixel = read_image.pixel_at(3, 0);
-        assert_eq!((255, 0, 255), pixel);
-    }
-
-    #[test]
-    fn test_pixel_at_x_out_of_bounds() {
-        let read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
-        let pixel = read_image.pixel_at(4, 0);
-        assert_eq!((255, 0, 255), pixel);
-    }
-
-    #[test]
-    fn test_pixel_at_y_out_of_bounds() {
-        let read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
-        let pixel = read_image.pixel_at(0, 4);
-        assert_eq!((255, 0, 255), pixel);
-    }
-
-    #[test]
-    fn test_pixel_at_y_and_x_out_of_bounds() {
-        let read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
-        let pixel = read_image.pixel_at(4, 4);
-        assert_eq!((0, 0, 0), pixel);
-    }
-
-    #[test]
-    fn test_pixel_at_in_bounds_after_downsample() {
-        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
-        read_image.downsample(4, 2, 2);
-        let pixel = read_image.pixel_at(3, 0);
-        assert_eq!((255, 0, 127), pixel);
-    }
-
-    #[test]
-    fn test_pixel_at_x_out_of_bounds_after_downsample() {
-        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
-        read_image.downsample(4, 2, 2);
-        let pixel = read_image.pixel_at(4, 0);
-        assert_eq!((255, 0, 127), pixel);
-    }
-
-    #[test]
-    fn test_pixel_at_y_out_of_bounds_after_vertical_downsample() {
-        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
-        read_image.downsample(4, 2, 0);
-        let pixel = read_image.pixel_at(0, 4);
-        assert_eq!((255, 0, 63), pixel);
-    }
-
-    #[test]
-    fn test_pixel_at_y_and_x_out_of_bounds_after_downsample() {
-        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
-        read_image.downsample(4, 2, 2);
-        let pixel = read_image.pixel_at(4, 4);
-        assert_eq!((0, 0, 0), pixel);
-    }
-
-    #[test]
-    fn test_pixel_at_y_and_x_out_of_bounds_after_vertical_downsample() {
-        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
-        read_image.downsample(4, 2, 0);
-        let pixel = read_image.pixel_at(4, 4);
-        assert_eq!((0, 63, 29), pixel);
     }
 
     fn test_convert_rgb_values_to_ycbcr_internal(start: (i16, i16, i16), target: (i16, i16, i16)) {
@@ -865,101 +714,5 @@ mod tests {
         image.rgb_to_ycbcr();
         image.downsample(4, 2, 0);
         let _ = image.to_matrices();
-    }
-
-    #[test]
-    fn test_downsample_parallel_image_factor_two() {
-        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
-        read_image.downsample_parallel(4, 2, 2);
-        assert_eq!(
-            Image {
-                width: 4,
-                height: 4,
-                channel1: vec![
-                    vec![0, 0, 0, 255],
-                    vec![0, 0, 0, 0],
-                    vec![0, 0, 0, 0],
-                    vec![255, 0, 0, 0],
-                ],
-                channel2: vec![vec![0, 0], vec![127, 0], vec![0, 127], vec![0, 0]],
-                channel3: vec![vec![0, 127], vec![59, 0], vec![0, 59], vec![127, 0],],
-                y_downsample_factor: 1,
-                cb_downsample_factor: 2,
-                cr_downsample_factor: 2,
-                downsampled_vertically: false,
-            },
-            read_image
-        );
-    }
-
-    #[test]
-    fn test_downsample_parallel_image_no_downsample() {
-        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
-        read_image.downsample_parallel(4, 4, 4);
-        assert_eq!(
-            Image {
-                width: 4,
-                height: 4,
-                channel1: vec![
-                    vec![0, 0, 0, 255],
-                    vec![0, 0, 0, 0],
-                    vec![0, 0, 0, 0],
-                    vec![255, 0, 0, 0],
-                ],
-                channel2: vec![
-                    vec![0, 0, 0, 0],
-                    vec![0, 255, 0, 0],
-                    vec![0, 0, 255, 0],
-                    vec![0, 0, 0, 0],
-                ],
-                channel3: vec![
-                    vec![0, 0, 0, 255],
-                    vec![0, 119, 0, 0],
-                    vec![0, 0, 119, 0],
-                    vec![255, 0, 0, 0],
-                ],
-                y_downsample_factor: 1,
-                cb_downsample_factor: 1,
-                cr_downsample_factor: 1,
-                downsampled_vertically: false,
-            },
-            read_image
-        );
-    }
-
-    #[test]
-    fn test_downsample_parallel_image_factor_four_and_vertical() {
-        let mut read_image = read_ppm_from_file("test/valid_test_maxVal_15.ppm");
-        read_image.downsample_parallel(4, 1, 0);
-        assert_eq!(
-            Image {
-                width: 4,
-                height: 4,
-                channel1: vec![
-                    vec![0, 0, 0, 255],
-                    vec![0, 0, 0, 0],
-                    vec![0, 0, 0, 0],
-                    vec![255, 0, 0, 0],
-                ],
-                channel2: vec![vec![31], vec![31]],
-                channel3: vec![vec![46], vec![46]],
-                y_downsample_factor: 1,
-                cb_downsample_factor: 4,
-                cr_downsample_factor: 4,
-                downsampled_vertically: true,
-            },
-            read_image
-        );
-    }
-
-    #[test]
-    #[ignore]
-    fn test_downsample_parallel_normal_equal() {
-        let mut read_image = read_ppm_from_file("test/dwsample-ppm-640.ppm");
-        let mut read_image_p = read_ppm_from_file("test/dwsample-ppm-640.ppm");
-        assert_eq!(read_image, read_image_p);
-        read_image.downsample(4, 1, 0);
-        read_image_p.downsample_parallel(4, 1, 0);
-        assert_eq!(read_image, read_image_p);
     }
 }

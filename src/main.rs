@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-// remove this once integrating - this is to avoid exessive and useless warnings for the time being
-
 use scoped_threadpool::Pool;
 
 use dct::DCTMode;
@@ -15,19 +12,14 @@ mod arai;
 mod bit_stream;
 mod coefficient_encoder;
 mod dct;
-mod dct_constant_calculator;
 mod dct_constants;
-mod dct_to_ppm;
 mod downsample;
 mod huffman;
-mod huffman_decoder;
 mod image;
 mod image_data_writer;
 mod jpg_writer;
 mod package_merge;
 mod parallel_dct;
-mod parallel_downsample;
-mod parallel_idct;
 mod parallel_quantize;
 mod ppm_parser;
 mod quantization;

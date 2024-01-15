@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::{appendable_to_bit_stream::AppendableToBitStream, utils::get_n_bits_at_offset};
+use crate::appendable_to_bit_stream::AppendableToBitStream;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct BitStream {
@@ -8,15 +8,6 @@ pub struct BitStream {
     bits_in_last_byte: u8,
     bits_read_from_first_byte: u8,
     byte_stuffing: bool,
-}
-
-/// Pad the first passed-in `value´ with the given `pad`, so th
-fn pad_read_bit_result(mut value: u16, amount: u8, pad: bool) -> u16 {
-    let pad_u16 = pad as u16;
-    for _ in 0..amount {
-        value = (value << 1) + pad_u16;
-    }
-    value
 }
 
 impl BitStream {
@@ -30,28 +21,6 @@ impl BitStream {
     pub fn open() -> BitStream {
         BitStream {
             ..Default::default()
-        }
-    }
-
-    /// Create a BitStream object from a file.
-    ///
-    /// # Arguments
-    ///
-    /// * filename: The name of the file to write to.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let stream = BitStream::read_bit_stream_from_file(filename);
-    /// stream.append_bit(true);
-    /// ```
-    pub fn read_bit_stream_from_file(filename: &str) -> BitStream {
-        let data = fs::read(filename).expect("failed to read file");
-        BitStream {
-            data,
-            bits_in_last_byte: 0,
-            bits_read_from_first_byte: 0,
-            byte_stuffing: false,
         }
     }
 
@@ -181,7 +150,7 @@ impl BitStream {
 
     /// Shift the provided value to the correct position, then store it in the last byte.
     /// This should be used to write data to the stream.
-    /// 
+    ///
     /// This also takes care of byte stuffing if activated.
     ///
     /// # Arguments
@@ -216,7 +185,7 @@ impl BitStream {
 
         if self.byte_stuffing
             && ((self.bits_in_last_byte == 8 || self.bits_in_last_byte == 0)
-            && *(self.data.last().unwrap()) == 0xFF)
+                && *(self.data.last().unwrap()) == 0xFF)
         {
             self.data.push(0x00);
         }
@@ -241,180 +210,6 @@ impl BitStream {
         //     self.clear_first_bits();
         // }
         fs::write(filename, &self.data).expect("Error when writing to file.")
-    }
-
-    fn clear_first_bits(&mut self) {
-        let last_byte_index = self.data.len() - 1;
-        let last_byte = self.data[last_byte_index];
-        let bits_to_clear = 8 - self.bits_in_last_byte;
-        let mask = (1 << bits_to_clear) - 1;
-        self.data[last_byte_index] = last_byte & mask;
-    }
-
-    /// Read up to 16 bits from the stream. If the stream has less than the requested
-    /// amount of bits, pad it with ones or zeroes depending on `pad`.
-    /// This does *NOT* alter the data contained in the stream. Calling this method repeatedly without
-    /// altering the stream inbetween leads to the same result.
-    ///
-    /// # Arguments
-    ///
-    /// * `amount`: The amount of bits to read. Should never be more than 16.
-    /// * `pad`: Whether to pad the value with 1 or 0 if the stream has less than the requested amount of bits.
-    pub fn read_n_bits_padded(&self, amount: u8, pad: bool) -> u16 {
-        if self.is_empty() {
-            let result = if pad { u16::MAX } else { u16::MIN };
-            return result >> (16 - amount);
-        }
-
-        let mut result;
-        let mut bits_in_result: u8 = 0;
-        let mut byte_index = 1;
-
-        result = self.read_n_bits_first_byte(&mut bits_in_result);
-
-        // if we already have more data than we need, remove unneeded data and return
-        if bits_in_result > amount {
-            return result >> (bits_in_result - amount);
-        }
-
-        // if we don't have further data, pad and return
-        if self.data.len() <= byte_index {
-            return pad_read_bit_result(result, amount - bits_in_result, pad);
-        }
-
-        if (amount - bits_in_result) >= 8 {
-            result = self.read_n_bits_middle_byte(&mut bits_in_result, &mut byte_index, result);
-
-            // if we don't have further data, pad and return
-            if self.data.len() <= byte_index {
-                return pad_read_bit_result(result, amount - bits_in_result, pad);
-            }
-        }
-
-        if amount > bits_in_result {
-            result = self.read_n_bits_end(&mut bits_in_result, byte_index, result, amount);
-        }
-
-        pad_read_bit_result(result, amount - bits_in_result, pad)
-    }
-
-    /// Submethod of read_n_bits_padded().
-    ///
-    /// Read bits from the first byte of the stream.
-    ///
-    /// # Arguments
-    ///
-    /// * `bits_in_result`: out-parameter for the amount of bits in the resulting u16.
-    fn read_n_bits_first_byte(&self, bits_in_result: &mut u8) -> u16 {
-        let bits_in_first_byte = if self.data.len() == 1
-            && !(self.bits_in_last_byte == 8 || self.bits_in_last_byte == 0)
-        {
-            self.bits_in_last_byte
-        } else {
-            8
-        };
-        *bits_in_result = bits_in_first_byte - self.bits_read_from_first_byte;
-        get_n_bits_at_offset(
-            self.data[0],
-            bits_in_first_byte - self.bits_read_from_first_byte,
-            self.bits_read_from_first_byte,
-        ) as u16
-    }
-
-    /// Submethod of read_n_bits_padded().
-    ///
-    /// Read bits from the byte_index'th byte of the stream.
-    ///
-    /// # Arguments
-    ///
-    /// * `bits_in_result`: Out-parameter, incremented by the amount of bits added to the result.
-    /// * `byte_index`: The index of the byte we are reading in the data vector, incremented by 1 afterwards.
-    /// * `result`: The existing result that this method adds to.
-    fn read_n_bits_middle_byte(
-        &self,
-        bits_in_result: &mut u8,
-        byte_index: &mut usize,
-        mut result: u16,
-    ) -> u16 {
-        // if this is our last bit and is incomplete, only append what we have
-        if self.data.len() == *byte_index - 1
-            && !(self.bits_in_last_byte == 8 || self.bits_in_last_byte == 0)
-        {
-            result = (result << self.bits_in_last_byte)
-                + get_n_bits_at_offset(self.data[*byte_index], self.bits_in_last_byte, 0) as u16;
-            *bits_in_result += self.bits_in_last_byte;
-        } else {
-            // otherwise, just append the byte
-            *bits_in_result += 8;
-            result = (result << 8) + self.data[*byte_index] as u16;
-        }
-        *byte_index += 1;
-        result
-    }
-
-    /// Submethod of read_n_bits_padded().
-    ///
-    /// Read bits from the byte_index'th byte of the stream. This is expected to result in `result` containing
-    /// `amount` set bits, except if the byte does not contain that many bytes (i.e. it is at the end of the stream and incomplete).
-    ///
-    /// # Arguments
-    ///
-    /// * `bits_in_result`: Out-parameter, incremented by the amount of bits added to the result.
-    /// * `byte_index`: The index of the byte we are reading in the data vector.
-    /// * `result`: The existing result that this method adds to.
-    /// * `amount`: The amount of bits the result is supposed to eventually contain.
-    fn read_n_bits_end(
-        &self,
-        bits_in_result: &mut u8,
-        byte_index: usize,
-        mut result: u16,
-        amount: u8,
-    ) -> u16 {
-        let number_of_bits = if self.data.len() == byte_index - 1
-            && !(self.bits_in_last_byte == 8 || self.bits_in_last_byte == 0)
-        {
-            std::cmp::min(self.bits_in_last_byte, amount - *bits_in_result)
-        } else {
-            amount - *bits_in_result
-        };
-
-        result = (result << number_of_bits)
-            + get_n_bits_at_offset(self.data[byte_index], number_of_bits, 0) as u16;
-
-        *bits_in_result += number_of_bits;
-        result
-    }
-
-    /// Flush the given number of bits from this stream.
-    ///
-    /// # Arguments
-    ///
-    /// * `amount`: The amount of bits to remove from the stream.
-    pub fn flush_n_bits(&mut self, mut amount: u8) {
-        if self.bits_read_from_first_byte + amount <= 7 {
-            self.bits_read_from_first_byte += amount;
-            return;
-        }
-        self.data.remove(0);
-        amount -= 8 - self.bits_read_from_first_byte;
-        while amount >= 8 {
-            amount -= 8;
-            self.data.remove(0);
-        }
-        self.bits_read_from_first_byte = amount;
-        if self.is_empty() {
-            // if we're empty, reset the stream
-            self.data = vec![];
-            self.bits_in_last_byte = 0;
-            self.bits_read_from_first_byte = 0;
-        }
-    }
-
-    /// Check whether this stream is empty, i.e. it no longer contains any data or all the data in it
-    /// has already been read.
-    pub fn is_empty(&self) -> bool {
-        self.data.len() == 0
-            || (self.data.len() == 1 && self.bits_in_last_byte == self.bits_read_from_first_byte)
     }
 
     /// Append the given data to this bit stream.
@@ -449,6 +244,8 @@ impl BitStream {
     pub fn data(&self) -> &Vec<u8> {
         &self.data
     }
+
+    #[cfg(test)]
     pub fn bits_in_last_byte(&self) -> u8 {
         self.bits_in_last_byte
     }
@@ -467,25 +264,37 @@ impl Default for BitStream {
 
 #[cfg(test)]
 mod tests {
+
+    impl BitStream {
+        /// Create a BitStream object from a file.
+        ///
+        /// # Arguments
+        ///
+        /// * filename: The name of the file to write to.
+        ///
+        /// # Example
+        ///
+        /// ```
+        /// let stream = BitStream::read_bit_stream_from_file(filename);
+        /// stream.append_bit(true);
+        /// ```
+        fn read_bit_stream_from_file(filename: &str) -> BitStream {
+            let data = fs::read(filename).expect("failed to read file");
+            BitStream {
+                data,
+                bits_in_last_byte: 0,
+                bits_read_from_first_byte: 0,
+                byte_stuffing: false,
+            }
+        }
+    }
+
     // TODO: byte stuffing tests
     use std::fs;
 
     use rand::Rng;
 
     use super::BitStream;
-
-    #[test]
-    fn test_is_empty_empty_stream() {
-        let stream = BitStream::open();
-        assert!(stream.is_empty());
-    }
-
-    #[test]
-    fn test_is_empty_non_empty_stream() {
-        let mut stream = BitStream::open();
-        stream.append(244u8);
-        assert!(!stream.is_empty());
-    }
 
     #[test]
     fn test_append_u8() {
@@ -499,63 +308,6 @@ mod tests {
         let mut stream = BitStream::open();
         stream.append(244u16);
         assert_eq!(stream.data, vec![0, 244]);
-    }
-
-    #[test]
-    fn test_flush_n_bits_less_than_byte() {
-        let mut stream = BitStream::open();
-        stream.append(244u8);
-        stream.flush_n_bits(3);
-        assert_eq!(stream.data, vec![244]);
-        assert_eq!(stream.bits_read_from_first_byte, 3);
-    }
-
-    #[test]
-    fn test_flush_n_bits_multiple_bytes() {
-        let mut stream = BitStream::open();
-        stream.append(244u8);
-        stream.append(255u8);
-        stream.flush_n_bits(13);
-        assert_eq!(stream.data, vec![255]);
-        assert_eq!(stream.bits_read_from_first_byte, 5);
-    }
-
-    #[test]
-    fn test_flush_n_bits_empty_stream() {
-        let mut stream = BitStream::open();
-        stream.flush_n_bits(5);
-        assert_eq!(stream.data, vec![]);
-        assert_eq!(stream.bits_read_from_first_byte, 5);
-    }
-
-    #[test]
-    fn test_read_n_bits_padded_empty_stream_pad_true() {
-        let stream = BitStream::open();
-        let result = stream.read_n_bits_padded(8, true);
-        assert_eq!(result, 0b1111_1111);
-    }
-
-    #[test]
-    fn test_read_n_bits_padded_empty_stream_pad_false() {
-        let stream = BitStream::open();
-        let result = stream.read_n_bits_padded(8, false);
-        assert_eq!(result, u16::MIN);
-    }
-
-    #[test]
-    fn test_read_n_bits_padded_sufficient_data_no_padding() {
-        let mut stream = BitStream::open();
-        stream.append_byte(0b1100_0011);
-        let result = stream.read_n_bits_padded(8, false);
-        assert_eq!(result, 0b1100_0011);
-    }
-
-    #[test]
-    fn test_read_n_bits_padded_sufficient_data_with_padding() {
-        let mut stream = BitStream::open();
-        stream.append_byte(0b1100_0011);
-        let result = stream.read_n_bits_padded(10, true);
-        assert_eq!(result, 0b0011_0000_1111);
     }
 
     #[test]

@@ -1,11 +1,11 @@
 use core::panic;
-use std::{collections::HashMap, fmt, mem};
+use std::{collections::HashMap, fmt};
 
 use debug_tree::{add_branch, add_leaf, defer_print};
 
 use crate::{
     bit_stream::BitStream,
-    package_merge::{package_merge, package_merge_experimental},
+    package_merge::package_merge,
 };
 
 /// A huffman-encoded value, containing both the code length and code.
@@ -31,43 +31,6 @@ impl<T: PartialEq> HuffmanNode<T> {
     pub fn right(&self) -> &Option<Box<HuffmanNode<T>>> {
         &self.right
     }
-}
-
-/// Parse a stream of values, create a huffman tree and encode the values.
-/// Returns the stream of encoded data and the map used for encoding.
-///
-/// # Arguments
-///
-/// * stream: The stream of data to read.
-pub fn encode(stream: &mut BitStream) -> (BitStream, HuffmanCodeMap) {
-    let code_map = parse_u8_stream(stream).code_map();
-    let mut result = BitStream::open();
-
-    for byte in stream.data() {
-        let (len, code) = code_map.get(byte).unwrap();
-        result.append_n_bits(*code, *len);
-    }
-
-    (result, code_map)
-}
-
-/// Parse a stream of values, create a huffman tree and encode the values.
-/// Returns the stream of encoded data and the map used for encoding. Uses
-/// package_merge_experimental instead of parse_u8_stream
-///
-/// # Arguments
-///
-/// * stream: The stream of data to read.
-pub fn encode_exp(stream: &mut BitStream) -> (BitStream, HuffmanCodeMap) {
-    let code_map = package_merge_experimental(stream, 16);
-    let mut result = BitStream::open();
-
-    for byte in stream.data() {
-        let (len, code) = code_map.get(byte).unwrap();
-        result.append_n_bits(*code, *len);
-    }
-
-    (result, code_map)
 }
 
 /// Parse a stream of u8 values and create a huffman tree for them.
@@ -119,57 +82,6 @@ fn increment_or_append(nodes: &mut Vec<HuffmanNode<u8>>, value: u8) {
             left: None,
             right: None,
         })
-    }
-}
-
-/// Build a huffman tree from a vector of leaf nodes.
-///
-/// # Arguments
-///
-/// * `nodes`: The leaf nodes to build a tree from.
-fn build_huffman_tree(nodes: &mut Vec<HuffmanNode<u8>>) -> HuffmanNode<u8> {
-    let mut sort_lambda = |node: &HuffmanNode<u8>| node.chance();
-    build_tree(nodes, &mut sort_lambda)
-}
-
-/// Build a tree from a vector of leaf nodes, using the provided sort function.
-/// The two nodes with the smallest result from the sort function will be combined with a parent node that's put
-/// back in the vector, then it again gets the two nodes with the smallest result, etc.
-/// Only leaf nodes will contain values.
-///
-/// # Arguments
-///
-/// * `nodes`: The leaf nodes to build a tree from.
-/// * `sort_lambda`: The function to sort nodes with.
-fn build_tree<K, F>(nodes: &mut Vec<HuffmanNode<u8>>, sort_lambda: &mut F) -> HuffmanNode<u8>
-where
-    F: FnMut(&HuffmanNode<u8>) -> K,
-    K: Ord,
-{
-    while !nodes.len() > 1 {
-        nodes.sort_by_key(&mut *sort_lambda);
-        // use swap_remove because we don't care how elements are reordered and it's O(1) rather than O(n)
-        let mut bigger_node = nodes.swap_remove(1);
-        let smaller_node = nodes.swap_remove(0);
-        bigger_node = combine_nodes(bigger_node, smaller_node);
-        nodes.push(bigger_node);
-    }
-    if nodes.is_empty() {
-        return HuffmanNode::default();
-    }
-    nodes.remove(0)
-}
-
-/// Combine two nodes and make them leaves of a new node.
-/// # Arguments
-///
-/// * node_1: The first node to include.
-/// * node_2: The second node to include.
-fn combine_nodes(node_1: HuffmanNode<u8>, node_2: HuffmanNode<u8>) -> HuffmanNode<u8> {
-    HuffmanNode {
-        left: Some(Box::from(node_2)),
-        right: Some(Box::from(node_1)),
-        ..Default::default()
     }
 }
 
@@ -318,6 +230,7 @@ impl HuffmanNode<u8> {
     /// Get the minimum depth (i.e. the minimum possible amount of nodes to go through before arriving at a leaf)
     /// of this node.
     /// Leaves are counted too, so if this node is a leaf, this function returns 1.
+    #[cfg(test)]
     pub fn min_depth(&self) -> u16 {
         let left = self.left.as_ref().map(|left| left.min_depth());
         let right = self.right.as_ref().map(|right| right.min_depth());
@@ -336,16 +249,6 @@ impl HuffmanNode<u8> {
                 None => u16::MAX,
             },
         )
-    }
-
-    /// Create a clone of this leaf node.
-    /// Only content and chance are kept, left and right child nodes are not included in the clone.
-    fn clone_leaf(&self) -> HuffmanNode<u8> {
-        HuffmanNode {
-            content: self.content,
-            chance: self.chance,
-            ..Default::default()
-        }
     }
 
     /// Create a code from this tree. The result is a HashMap
@@ -376,43 +279,6 @@ impl HuffmanNode<u8> {
             self.right_unchecked()
                 .append_to_map(map, (code << 1) + 1, code_len + 1);
         }
-    }
-
-    /// Update this tree to ensure it grows to the right, i.e. at any child node, the left child's maximum depth is not larger than
-    /// its right child's minimum depth.
-    /// Unused but left in to show it.
-    fn ensure_tree_grows_right(&mut self) {
-        if self.left.is_some() && self.right.is_none() {
-            let left = self.left.take();
-            self.right = left;
-        } else if self.left.is_some()
-            && self.left_unchecked().max_depth() > self.right_unchecked().min_depth()
-        {
-            if self.left_unchecked().min_depth() >= self.right_unchecked().max_depth() {
-                mem::swap(&mut self.right, &mut self.left);
-            } else {
-                self.swap_inner_nodes();
-            }
-        }
-
-        if self.left.is_some() {
-            self.left_unchecked_mut().ensure_tree_grows_right();
-        }
-        if self.right.is_some() {
-            self.right_unchecked_mut().ensure_tree_grows_right();
-        }
-    }
-
-    /// swap this node's right child's left child with the left child's right child node.
-    /// If this node's left child's max depth is greater than this node's right child's, swap them too.
-    fn swap_inner_nodes(&mut self) {
-        if self.left_unchecked().max_depth() > self.right_unchecked().max_depth() {
-            mem::swap(&mut self.right, &mut self.left);
-        }
-        mem::swap(
-            &mut self.right.as_mut().unwrap().left,
-            &mut self.left.as_mut().unwrap().right,
-        );
     }
 
     /// Remove the 1* code (lower right leaf). If its parent doesn't have a leaf to its left, put said
@@ -537,7 +403,7 @@ mod tests {
 
     use crate::{bit_stream::BitStream, huffman::increment_or_append};
 
-    use super::{encode, encode_exp, parse_u8_stream, HuffmanNode};
+    use super::{parse_u8_stream, HuffmanNode};
 
     // TODO: tests zumindest für remove_only_ones_code, code_len_to_tree, has_space_at_depth
     // TODO: tests für parse_u8_stream() müssen auch nach rechtswachsendheit prüfen!
@@ -574,121 +440,6 @@ mod tests {
             },
             tree
         );
-    }
-
-    #[test]
-    fn test_encode_example() {
-        /*
-        test with the following likelihoods:
-        - 1: 4
-        - 2: 4
-        - 3: 6
-        - 4: 6
-        - 5: 7
-        - 6: 9
-        */
-        let mut stream = BitStream::open();
-        stream.append_byte(1);
-        stream.append_byte(1);
-        stream.append_byte(2);
-        stream.append_byte(2);
-        stream.append_byte(3);
-        stream.append_byte(3);
-        stream.append_byte(4);
-        stream.append_byte(4);
-        stream.append_byte(5);
-        stream.append_byte(5);
-        stream.append_byte(6);
-        stream.append_byte(6);
-
-        for _ in 0..7 {
-            stream.append_byte(6);
-        }
-        for _ in 0..4 {
-            stream.append_byte(3);
-            stream.append_byte(4);
-        }
-        for _ in 0..2 {
-            stream.append_byte(1);
-            stream.append_byte(2);
-        }
-        for _ in 0..5 {
-            stream.append_byte(5);
-        }
-
-        let (code, map) = encode(&mut stream);
-
-        // code lengths should be 3 for 1, 3 for 2, 3 for 3, 3 for 4, 3 for 5, 2 for 6
-        let mut correct_code_len = 3 * 4 + // 4 1s with code length 3
-            4 * 4 + // 4 2s with code length 3, longer than optimal because of remove_only_ones_code()
-            3 * 6 + // 6 3s with code length 3
-            3 * 6 + // 6 4s with code length 4
-            2 * 7 + // 7 5s with code length 2
-            2 * 9; // 9 6s with code length 2
-        correct_code_len = (correct_code_len as f32 / 8 as f32).ceil() as usize;
-        assert_eq!(correct_code_len, code.data().len());
-
-        let shortest_code_len = map
-            .clone()
-            .into_iter()
-            .min_by_key(|(_, value)| value.0)
-            .unwrap()
-            .1
-             .0;
-        assert_eq!(shortest_code_len, map.get(&6u8).unwrap().0)
-    }
-
-    #[test]
-    fn test_encode_exp_example() {
-        let mut stream = BitStream::open();
-        stream.append_byte(1);
-        stream.append_byte(1);
-        stream.append_byte(2);
-        stream.append_byte(2);
-        stream.append_byte(3);
-        stream.append_byte(3);
-        stream.append_byte(4);
-        stream.append_byte(4);
-        stream.append_byte(5);
-        stream.append_byte(5);
-        stream.append_byte(6);
-        stream.append_byte(6);
-
-        for _ in 0..7 {
-            stream.append_byte(6);
-        }
-        for _ in 0..4 {
-            stream.append_byte(3);
-            stream.append_byte(4);
-        }
-        for _ in 0..2 {
-            stream.append_byte(1);
-            stream.append_byte(2);
-        }
-        for _ in 0..5 {
-            stream.append_byte(5);
-        }
-
-        let (code, map) = encode_exp(&mut stream);
-
-        // code lengths should be 3 for 1, 3 for 2, 3 for 3, 3 for 4, 3 for 5, 2 for 6
-        let mut correct_code_len = 3 * 4 + // 4 1s with code length 3
-            4 * 4 + // 4 2s with code length 3, longer than optimal because of only ones code removal 
-            3 * 6 + // 6 3s with code length 3
-            3 * 6 + // 6 4s with code length 3
-            3 * 7 + // 7 5s with code length 3
-            2 * 9; // 9 6s with code length 2
-        correct_code_len = (correct_code_len as f32 / 8 as f32).ceil() as usize;
-        assert_eq!(correct_code_len, code.data().len());
-
-        let shortest_code_len = map
-            .clone()
-            .into_iter()
-            .min_by_key(|(_, value)| value.0)
-            .unwrap()
-            .1
-             .0;
-        assert_eq!(shortest_code_len, map.get(&6u8).unwrap().0)
     }
 
     #[test]
@@ -741,41 +492,6 @@ mod tests {
         assert_eq!(nodes[1].chance, 2);
         assert_eq!(nodes[2].chance, 1);
         assert_eq!(nodes[2].content, Some(3));
-    }
-
-    #[test]
-    #[ignore]
-    fn test_huge_bit_stream_six_symbols() {
-        let mut stream = BitStream::open();
-        let mut rng = rand::thread_rng();
-        let six_occurence = rng.gen::<u32>();
-        for _ in 0..six_occurence {
-            stream.append_byte(6);
-        }
-        let three_four_occurence = rng.gen::<u32>();
-        for _ in 0..three_four_occurence {
-            stream.append_byte(3);
-            stream.append_byte(4);
-        }
-        let one_two_occurence = rng.gen::<u32>();
-        for _ in 0..one_two_occurence {
-            stream.append_byte(1);
-            stream.append_byte(2);
-        }
-        let five_occurence = rng.gen::<u32>();
-        for _ in 0..five_occurence {
-            stream.append_byte(5);
-        }
-        let tree = parse_u8_stream(&mut stream);
-        let (_, map) = encode(&mut stream);
-        println!("ones: {}", one_two_occurence);
-        println!("twos: {}", one_two_occurence);
-        println!("threes: {}", three_four_occurence);
-        println!("fours: {}", three_four_occurence);
-        println!("fives: {}", five_occurence);
-        println!("sixes: {}", six_occurence);
-        println!("{:?}", tree);
-        println!("{:?}", map);
     }
 
     #[test]

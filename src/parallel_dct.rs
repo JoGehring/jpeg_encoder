@@ -36,42 +36,6 @@ pub fn dct(
     (y_matrices, cb_matrices, cr_matrices)
 }
 
-/// Perform the DCT on only the image's 'Y' channel.
-/// The DCT on a channel is parallelised with as many threads as the system has logical CPUs.
-///
-/// # Arguments
-/// * `image`: The image to calculate the DCT for.
-pub fn dct_single_channel(
-    image: &Image,
-    mode: &DCTMode,
-    pool: &mut Pool,
-) -> Vec<SMatrix<f32, 8, 8>> {
-    let function = match mode {
-        DCTMode::Direct => direct_dct,
-        DCTMode::Matrix => matrix_dct,
-        DCTMode::Arai => arai_dct,
-    };
-    let mut y_matrices = image.single_channel_to_matrices::<1>();
-
-    dct_channel(&mut y_matrices, &function, pool);
-    y_matrices
-}
-
-/// Perform the DCT on a matrix vector representation of an image.
-/// The DCT on a channel is parallelised with as many threads as the system has logical CPUs.
-///
-/// # Arguments
-/// * `image`: The image to calculate the DCT for.
-pub fn dct_matrix_vector(matrices: &mut Vec<SMatrix<f32, 8, 8>>, mode: &DCTMode, pool: &mut Pool) {
-    let function = match mode {
-        DCTMode::Direct => direct_dct,
-        DCTMode::Matrix => matrix_dct,
-        DCTMode::Arai => arai_dct,
-    };
-
-    dct_channel(matrices, &function, pool);
-}
-
 /// process the channel.
 /// The channel data is split up into chunks of equal size,
 /// each of which is then passed into its own thread.
@@ -287,39 +251,6 @@ mod tests {
                     assert_abs_diff_eq!(
                         cr_expected[index][(i, j)],
                         cr[index][(i, j)],
-                        epsilon = 0.01
-                    );
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_single_channel_simple_image() {
-        let mut pool = get_pool();
-
-        let image = read_ppm_from_file("test/valid_test_8x8.ppm");
-
-        let y =
-            crate::parallel_dct::dct_single_channel(&image, &crate::dct::DCTMode::Arai, &mut pool);
-
-        let y_expected_vec: Vec<f32> = vec![
-            255.0, 0.0, 0.0, 0.0, 255.0, 0.0, 0.0, 0.0, // row 1
-            0.0, -78.70786, 0.0, -138.94827, 0.0, 27.638525, 0.0, -117.79471, // row 2
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 3
-            -138.94827, 0.0, -245.29465, 0.0, 48.792145, 0.0, -207.9509, 255.0, // row 4
-            0.0, 0.0, 0.0, 255.0, 0.0, 0.0, 0.0, 0.0, // row 5
-            27.638529, 0.0, 48.79214, 0.0, -9.705362, 0.0, 41.364006, 0.0, // row 6
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // row 7
-            -117.79469, 0.0, -207.95085, 0.0, 41.363987, 0.0, -176.29231, // row 8
-        ];
-        let y_expected: Vec<SMatrix<f32, 8, 8>> = vec![SMatrix::from_iterator(y_expected_vec)];
-        for index in 0..y_expected.len() {
-            for i in 0..8 {
-                for j in 0..8 {
-                    assert_abs_diff_eq!(
-                        y_expected[index][(i, j)],
-                        y[index][(i, j)],
                         epsilon = 0.01
                     );
                 }
