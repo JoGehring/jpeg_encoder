@@ -441,6 +441,7 @@ impl HuffmanNode<u8> {
             current.content = None;
             current.chance = 0;
         }
+        current.right = None;
         current.left = Some(Box::from(new_node))
     }
 
@@ -564,14 +565,9 @@ mod tests {
             HuffmanNode {
                 chance: 0,
                 content: None,
-                right: Some(Box::from(HuffmanNode {
-                    chance: 0,
-                    content: None,
-                    left: Some(Box::from(HuffmanNode {
-                        chance: u64::MAX - 1,
-                        content: Some(1),
-                        ..Default::default()
-                    })),
+                left: Some(Box::from(HuffmanNode {
+                    chance: u64::MAX - 1,
+                    content: Some(1),
                     ..Default::default()
                 })),
                 ..Default::default()

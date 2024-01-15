@@ -206,11 +206,10 @@ fn pad_channel(channel: &mut Vec<Vec<i16>>, factor: usize) {
     let inner_remainder = channel[0].len() % factor;
     if inner_remainder != 0 {
         let missing_pixels = factor - inner_remainder;
-        let desired_length = channel[0].len() + missing_pixels;
 
         for inner_channel in channel {
             let last_pxl_val = inner_channel.last().unwrap().clone();
-            while inner_channel.len() != desired_length {
+            for _ in 0..missing_pixels {
                 inner_channel.push(last_pxl_val);
             }
         }
@@ -373,9 +372,9 @@ impl Image {
     }
 
     fn pad_image_if_necessary(&mut self) {
-        let y_factor : usize;
-        let cb_factor : usize;
-        let cr_factor : usize;
+        let y_factor: usize;
+        let cb_factor: usize;
+        let cr_factor: usize;
 
         if self.cr_downsample_factor == 2 && self.cb_downsample_factor == 2 {
             y_factor = 16;
@@ -883,12 +882,7 @@ mod tests {
                     vec![255, 0, 0, 0],
                 ],
                 channel2: vec![vec![0, 0], vec![127, 0], vec![0, 127], vec![0, 0]],
-                channel3: vec![
-                    vec![0, 127],
-                    vec![59, 0],
-                    vec![0, 59],
-                    vec![127, 0],
-                ],
+                channel3: vec![vec![0, 127], vec![59, 0], vec![0, 59], vec![127, 0],],
                 y_downsample_factor: 1,
                 cb_downsample_factor: 2,
                 cr_downsample_factor: 2,
