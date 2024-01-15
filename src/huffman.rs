@@ -142,9 +142,9 @@ fn build_huffman_tree(nodes: &mut Vec<HuffmanNode<u8>>) -> HuffmanNode<u8> {
 /// * `nodes`: The leaf nodes to build a tree from.
 /// * `sort_lambda`: The function to sort nodes with.
 fn build_tree<K, F>(nodes: &mut Vec<HuffmanNode<u8>>, sort_lambda: &mut F) -> HuffmanNode<u8>
-    where
-        F: FnMut(&HuffmanNode<u8>) -> K,
-        K: Ord,
+where
+    F: FnMut(&HuffmanNode<u8>) -> K,
+    K: Ord,
 {
     while !nodes.len() > 1 {
         nodes.sort_by_key(&mut *sort_lambda);
@@ -219,14 +219,14 @@ pub fn code_len_to_tree(
                 current = current.right_unchecked_mut();
             } else if current.right().is_some()
                 && current
-                .right_unchecked()
-                .has_space_at_depth((destination - current_height - 1) as u16, false)
+                    .right_unchecked()
+                    .has_space_at_depth((destination - current_height - 1) as u16, false)
             {
                 current = current.right_unchecked_mut();
             } else if current.left().is_some()
                 && current
-                .left_unchecked()
-                .has_space_at_depth((destination - current_height - 1) as u16, false)
+                    .left_unchecked()
+                    .has_space_at_depth((destination - current_height - 1) as u16, false)
             {
                 current = current.left_unchecked_mut();
             } else if current.left().is_none() {
@@ -415,25 +415,33 @@ impl HuffmanNode<u8> {
         );
     }
 
-    /// Remove the lower right leaf (1*) and replace it with a node which has only a leaf on the left.
-    /// This will lead to a less optimised code
+    /// Remove the 1* code (lower right leaf). If its parent doesn't have a leaf to its left, put said
+    /// leaf there. If not, replace the 1* leaf with a node that only has a leaf on its left.
+    /// This might lead to a less optimal code.
     fn remove_only_ones_code(&mut self) {
         if self.right.is_none() {
             return;
         }
         let mut current = self;
-        while current.right.is_some() {
+        while current.right.is_some() && current.right_unchecked().right.is_some() {
             current = current.right_unchecked_mut();
         }
-        let new_left_node = HuffmanNode {
-            chance: current.chance,
-            content: current.content,
+        // current is now the parent of the 1* code node
+        let new_node = HuffmanNode {
+            chance: current.right_unchecked().chance,
+            content: current.right_unchecked().content,
             left: None,
             right: None,
         };
-        current.content = None;
-        current.chance = 0;
-        current.left = Some(Box::from(new_left_node))
+        if current.left.is_some() {
+            // we already have something on current's left, so we'll instead replace the 1* leaf with a
+            // node that only has a leaf on its left.
+            // to do this, simply empty it and then append the new_node to it rather than the parent
+            current = current.right_unchecked_mut();
+            current.content = None;
+            current.chance = 0;
+        }
+        current.left = Some(Box::from(new_node))
     }
 
     /// Checks if the Huffman tree has space at a given depth.
@@ -474,8 +482,8 @@ impl HuffmanNode<u8> {
                 .left_unchecked()
                 .has_space_at_depth(depth - 1, leaves_count_as_space)
                 || self
-                .right_unchecked()
-                .has_space_at_depth(depth - 1, leaves_count_as_space);
+                    .right_unchecked()
+                    .has_space_at_depth(depth - 1, leaves_count_as_space);
         }
     }
 }
@@ -528,9 +536,9 @@ mod tests {
 
     use crate::{bit_stream::BitStream, huffman::increment_or_append};
 
-    use super::{encode, encode_exp, HuffmanNode, parse_u8_stream};
+    use super::{encode, encode_exp, parse_u8_stream, HuffmanNode};
 
-// TODO: tests zumindest für remove_only_ones_code, code_len_to_tree, has_space_at_depth
+    // TODO: tests zumindest für remove_only_ones_code, code_len_to_tree, has_space_at_depth
     // TODO: tests für parse_u8_stream() müssen auch nach rechtswachsendheit prüfen!
 
     #[test]
@@ -630,7 +638,7 @@ mod tests {
             .min_by_key(|(_, value)| value.0)
             .unwrap()
             .1
-            .0;
+             .0;
         assert_eq!(shortest_code_len, map.get(&6u8).unwrap().0)
     }
 
@@ -683,7 +691,7 @@ mod tests {
             .min_by_key(|(_, value)| value.0)
             .unwrap()
             .1
-            .0;
+             .0;
         assert_eq!(shortest_code_len, map.get(&6u8).unwrap().0)
     }
 

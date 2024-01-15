@@ -1,6 +1,6 @@
 extern crate nalgebra as na;
 
-use std::sync::mpsc::{self, channel, Receiver};
+use std::sync::mpsc::{self, Receiver};
 use std::thread::{self, JoinHandle};
 
 use na::{Matrix3, SMatrix, Vector3};

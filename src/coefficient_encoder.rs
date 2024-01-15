@@ -125,6 +125,7 @@ fn categorize_and_encode_diffs(
     let mut categories = crate::BitStream::open();
     categories.append(categorized.iter().map(|cat| cat.0).collect::<Vec<u8>>());
     let category_code = crate::huffman::parse_u8_stream(&mut categories).code_map();
+    // let category_code = crate::package_merge::package_merge_experimental(&mut categories, 16);
 
     (
         categorized
@@ -169,8 +170,8 @@ fn huffman_encode_ac_coefficients(
         .iter()
         .for_each(|table| table.iter().for_each(|val| categories.append(val.0)));
 
-    // let category_code = crate::huffman::parse_u8_stream(&mut categories).code_map();
-    let category_code = crate::package_merge::package_merge_experimental(&mut categories, 16);
+    let category_code = crate::huffman::parse_u8_stream(&mut categories).code_map();
+    // let category_code = crate::package_merge::package_merge_experimental(&mut categories, 16);
 
     let mut huffman_encoded: Vec<Vec<(HuffmanCode, CategoryCode)>> =
         Vec::with_capacity(runlength_encoded.len());
