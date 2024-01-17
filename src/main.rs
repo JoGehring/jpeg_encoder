@@ -62,11 +62,8 @@ fn main() {
     let cb_ac = coefficient_encoder::ac_coefficients(&cb_quant);
     let cr_ac = coefficient_encoder::ac_coefficients(&cr_quant);
 
-    let mut actual_width_after_padding = image.width();
-    actual_width_after_padding += 16 - actual_width_after_padding % 16;
-
-    coefficient_encoder::reorder_y_coefficients(&mut y_dc, actual_width_after_padding);
-    coefficient_encoder::reorder_y_coefficients(&mut y_ac, actual_width_after_padding);
+    coefficient_encoder::reorder_y_coefficients(&mut y_dc, image.padded_width(16));
+    coefficient_encoder::reorder_y_coefficients(&mut y_ac, image.padded_width(16));
 
     let (y_dc_encoded, huffman_dc_y) = coefficient_encoder::encode_dc_coefficients(&y_dc);
     let (cbcr_dc_encoded, huffman_dc_cbcr) = coefficient_encoder::encode_two_dc_coefficients(&cb_dc, &cr_dc);
