@@ -4,8 +4,6 @@
 use scoped_threadpool::Pool;
 
 use dct::DCTMode;
-use image_data_writer::write_image_data_to_stream;
-use ppm_parser::read_ppm_from_file;
 
 use crate::bit_stream::BitStream;
 use crate::utils::THREAD_COUNT;
@@ -38,7 +36,7 @@ fn main() {
     if args.len() == 1 {
         panic!("No file name specified!");
     }
-    let mut image = read_ppm_from_file(&args[1]);
+    let mut image = ppm_parser::read_ppm_from_file(&args[1]);
 
     let mut pool = Pool::new(*THREAD_COUNT as u32);
 
@@ -90,7 +88,7 @@ fn main() {
     jpg_writer::write_segment_to_stream(&mut target_stream, &image, jpg_writer::SegmentType::SOS);
 
     target_stream.byte_stuffing(true);
-    write_image_data_to_stream(&mut target_stream, &y_dc_encoded, cb_dc_encoded, cr_dc_encoded, &y_ac_encoded, cb_ac_encoded, cr_ac_encoded);
+    image_data_writer::write_image_data_to_stream(&mut target_stream, &y_dc_encoded, cb_dc_encoded, cr_dc_encoded, &y_ac_encoded, cb_ac_encoded, cr_ac_encoded);
     target_stream.byte_stuffing(false);
 
     target_stream.pad_last_byte(true);
