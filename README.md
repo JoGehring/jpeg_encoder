@@ -1,6 +1,6 @@
 # JPEG_Encoder
 
-This is a somewhat simple tool converting PPM images to JPEG, created as a course project at the University of Applied Sciences Würzburg-Schweinfurt. It was mainly made and used to teach basics of encoding and compression, as well as practice Rust and various optimisation techniques - this implementation's DCT functions are among the fastest ever created for this course. At time of writing, since the current benchmark (a 4k image) has been in use, the direct DCT is the fastest, the separated DCT is the second fastest and the Arai DCT is tied for fastest DCT implementation created for the course.
+This is a simple tool converting PPM images to JPEG, created as a course project at the University of Applied Sciences Würzburg-Schweinfurt. It was mainly made and used to teach basics of encoding and compression, as well as practice Rust and various optimisation techniques - this implementation's DCT functions are among the fastest ever created for this course. At time of writing, since the current benchmark (a 4k image) has been in use, the direct DCT is the fastest, the separated DCT is the second fastest and the Arai DCT is tied for fastest DCT implementation created for the course.
 
 A cleaned-up version without unused functions can be found in the "cleanup" branch.
 
