@@ -413,7 +413,9 @@ impl Image {
     /// Get the width of the image after padding it to the next ``padded_to`` value.
     pub fn padded_width(&self, padded_to: u16) -> u16 {
         let mut actual_width_after_padding = self.width();
-        actual_width_after_padding += padded_to - actual_width_after_padding % padded_to;
+        if actual_width_after_padding % padded_to != 0 {
+            actual_width_after_padding += padded_to - actual_width_after_padding % padded_to;
+        }
         actual_width_after_padding
     }
 
